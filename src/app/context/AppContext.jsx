@@ -28,15 +28,19 @@ export const AppProvider = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
 
-  // 1. مراقبة حالة المصادقة عند البداية
+  // 1. مراقبة حالة المصادقة عند البداية (من sessionStorage لانهاء الجلسة عند إغلاق المتصفح)
   useEffect(() => {
-    const savedUser = localStorage.getItem("kareem_camp_logged_in");
+    const savedUser = sessionStorage.getItem("kareem_camp_logged_in");
     if (savedUser) {
       try {
         setUser(JSON.parse(savedUser));
       } catch (e) {
         setUser(null);
       }
+    } else {
+      // إزالة أي جلسات دائمة سابقة مخزنة في localStorage
+      localStorage.removeItem("kareem_camp_logged_in");
+      setUser(null);
     }
     setLoading(false);
   }, []);
@@ -89,6 +93,7 @@ export const AppProvider = ({ children }) => {
   }, [user?.campId, user?.role]);
 
   const handleLogout = async () => {
+    sessionStorage.removeItem("kareem_camp_logged_in");
     localStorage.removeItem("kareem_camp_logged_in");
     setUser(null);
     setCampProfile(null);

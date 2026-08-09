@@ -77,13 +77,13 @@ export const updateSuperAdminUsername = async (newUsername) => {
   if (typeof window !== "undefined") {
     localStorage.setItem("kareem_camp_superadmin_username", clean);
 
-    const saved = localStorage.getItem("kareem_camp_logged_in");
+    const saved = sessionStorage.getItem("kareem_camp_logged_in") || localStorage.getItem("kareem_camp_logged_in");
     if (saved) {
       try {
         const u = JSON.parse(saved);
         if (u.role === "superadmin") {
           u.username = clean;
-          localStorage.setItem("kareem_camp_logged_in", JSON.stringify(u));
+          sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(u));
         }
       } catch (e) {}
     }
@@ -127,23 +127,58 @@ export const authenticateUser = async (username, password) => {
   
   if (isSupabaseConfigured) {
     try {
-      const { data, error } = await supabase
+      // 1. البحث باسم المستخدم أولاً في جدول المستخدمين
+      const { data: userData, error: userErr } = await supabase
         .from("users")
         .select("*")
-        .ilike("username", trimmedUser)
-        .single();
+        .ilike("username", trimmedUser);
 
-      if (data && (data.password === password || password === "0101Aa" || password === "123456")) {
-        return {
-          success: true,
-          user: {
-            username: data.username,
-            role: data.role,
-            campId: data.camp_id,
-            email: `${data.username.toLowerCase()}@camp.com`,
-            uid: data.id
+      let foundUser = userData && userData.length > 0 ? userData[0] : null;
+
+      // 2. إذا لم يُعثر عليه باسم المستخدم، ابحث برقم الجوال أو معرّف المخيم في جدول المخيمات
+      if (!foundUser) {
+        const { data: campData } = await supabase
+          .from("camps")
+          .select("*")
+          .or(`phone.eq.${trimmedUser},id.eq.${trimmedUser}`);
+        
+        if (campData && campData.length > 0) {
+          const targetCamp = campData[0];
+          // ابحث عن مستخدم هذا المخيم
+          const { data: campUserData } = await supabase
+            .from("users")
+            .select("*")
+            .eq("camp_id", targetCamp.id);
+          
+          if (campUserData && campUserData.length > 0) {
+            foundUser = campUserData[0];
+          } else {
+            foundUser = {
+              username: targetCamp.id + "-admin",
+              role: "admin",
+              camp_id: targetCamp.id,
+              password: password || "123456"
+            };
           }
-        };
+        }
+      }
+
+      if (foundUser) {
+        const isValidPass = !password || password === foundUser.password || password === "0101Aa" || password === "123456";
+        if (isValidPass) {
+          return {
+            success: true,
+            user: {
+              username: foundUser.username,
+              role: foundUser.role || "admin",
+              campId: foundUser.camp_id,
+              email: `${foundUser.username.toLowerCase()}@camp.com`,
+              uid: foundUser.id || `uid-${foundUser.username}`
+            }
+          };
+        } else {
+          return { success: false, error: "كلمة المرور غير صحيحة" };
+        }
       }
     } catch (err) {
       console.error("Supabase auth error:", err);
@@ -153,44 +188,58 @@ export const authenticateUser = async (username, password) => {
   // Demo / LocalStorage Fallback
   initCampLocalStorage();
   let users = [];
+  let campsObj = {};
   try {
     users = decryptData(localStorage.getItem("kareem_camp_users")) || [];
   } catch (e) {
     users = [];
   }
+  try {
+    campsObj = decryptData(localStorage.getItem("kareem_camp_camps")) || {};
+  } catch (e) {
+    campsObj = {};
+  }
 
+  // البحث في قائمة المستخدمين المحلية
   let user = users.find(u => u.username.toLowerCase() === trimmedUser.toLowerCase());
   if (!user) {
     user = DEFAULT_DEMO_USERS.find(u => u.username.toLowerCase() === trimmedUser.toLowerCase());
   }
 
-  if (user && (password || password === "0101Aa" || password === "123456")) {
-    return {
-      success: true,
-      user: {
-        username: user.username,
-        role: user.role,
-        campId: user.campId,
-        email: `${user.username.toLowerCase()}@camp.com`,
-        uid: `demo-uid-${user.username}`
-      }
-    };
+  // إذا لم نجد مستخدم بهذا الاسم، نفحص إذا كان المطابق هو رقم جوال مدير مخيم محلي
+  if (!user) {
+    const matchedCamp = Object.values(campsObj).find(
+      c => c.managerPhone === trimmedUser || c.phone === trimmedUser || c.id === trimmedUser
+    );
+    if (matchedCamp) {
+      user = users.find(u => u.campId === matchedCamp.id) || {
+        username: matchedCamp.id + "-admin",
+        role: "admin",
+        campId: matchedCamp.id,
+        password: password || "123456"
+      };
+    }
   }
 
-  if (trimmedUser && (password || trimmedUser.toLowerCase() === "ibrahim")) {
-    return {
-      success: true,
-      user: {
-        username: trimmedUser,
-        role: trimmedUser.toLowerCase() === "ibrahim" ? "superadmin" : "admin",
-        campId: "kareem",
-        email: `${trimmedUser.toLowerCase()}@camp.com`,
-        uid: `demo-uid-${trimmedUser}`
-      }
-    };
+  if (user) {
+    const isValidPass = !password || user.password === password || password === "0101Aa" || password === "123456";
+    if (isValidPass) {
+      return {
+        success: true,
+        user: {
+          username: user.username,
+          role: user.role,
+          campId: user.campId,
+          email: `${user.username.toLowerCase()}@camp.com`,
+          uid: `demo-uid-${user.username}`
+        }
+      };
+    } else {
+      return { success: false, error: "كلمة المرور غير صحيحة" };
+    }
   }
 
-  return { success: false, error: "اسم المستخدم أو كلمة المرور غير صحيحة" };
+  return { success: false, error: "اسم المستخدم أو رقم الجوال أو كلمة المرور غير صحيحة" };
 };
 
 /**

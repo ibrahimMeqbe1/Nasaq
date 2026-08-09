@@ -250,7 +250,7 @@ const PrintPage = () => {
         marginBottom: "20px", 
         display: "flex", 
         alignItems: "center", 
-        justify-content: "space-between", 
+        justifyContent: "space-between", 
         flexWrap: "wrap", 
         gap: "10px",
         boxShadow: "0 4px 15px rgba(15, 81, 50, 0.25)"

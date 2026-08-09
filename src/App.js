@@ -32,29 +32,18 @@ function App() {
 
   // مراقبة حالة المصادقة (تسجيل الدخول)
   useEffect(() => {
-    let unsubscribeAuth;
-
-    if (isDemoMode) {
-      const savedUser = localStorage.getItem("kareem_camp_logged_in");
-      if (savedUser) {
+    const savedUser = sessionStorage.getItem("kareem_camp_logged_in");
+    if (savedUser) {
+      try {
         setUser(JSON.parse(savedUser));
+      } catch (e) {
+        setUser(null);
       }
-      setLoading(false);
     } else {
-      unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
-        if (currentUser) {
-          // يمكننا هنا الاستعلام عن الحساب ديناميكياً
-          setUser(currentUser);
-        } else {
-          setUser(null);
-        }
-        setLoading(false);
-      });
+      localStorage.removeItem("kareem_camp_logged_in");
+      setUser(null);
     }
-
-    return () => {
-      if (unsubscribeAuth) unsubscribeAuth();
-    };
+    setLoading(false);
   }, []);
 
   // التحقق من حالة اشتراك المخيم عند تسجيل الدخول
@@ -103,6 +92,7 @@ function App() {
   }, [user]);
 
   const handleLogout = async () => {
+    sessionStorage.removeItem("kareem_camp_logged_in");
     localStorage.removeItem("kareem_camp_logged_in");
     setUser(null);
     setCampProfile(null);

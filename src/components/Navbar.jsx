@@ -145,6 +145,10 @@ const Navbar = ({ user, campProfile, onLogout }) => {
               <span>المخيم</span>
             </Link>
           )}
+          <button onClick={handleLogout} className="mobile-bottom-link logout-mobile-btn" title="تسجيل الخروج">
+            <FaSignOutAlt className="mobile-nav-icon logout-icon-danger" />
+            <span>خروج</span>
+          </button>
         </nav>
       )}
     </header>

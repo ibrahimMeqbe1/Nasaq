@@ -3324,13 +3324,16 @@ select.form-control {
   }
 
   .btn-logout-icon span {
-    display: none !important;
+    display: inline-block !important;
   }
 
   .btn-logout-icon {
-    padding: 6px 10px !important;
-    font-size: 0.85rem !important;
-    border-radius: 50px !important;
+    padding: 5px 10px !important;
+    font-size: 0.82rem !important;
+    border-radius: 12px !important;
+    background: rgba(239, 68, 68, 0.2) !important;
+    color: #fca5a5 !important;
+    border: 1px solid rgba(239, 68, 68, 0.4) !important;
   }
 
   /* شريط التصفح السفلي للهواتف الذكية */
@@ -3365,6 +3368,22 @@ select.form-control {
     flex: 1;
     height: 100%;
     transition: all 0.2s ease;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  .mobile-bottom-link.logout-mobile-btn {
+    color: #fca5a5;
+  }
+
+  .mobile-bottom-link.logout-mobile-btn .logout-icon-danger {
+    color: #ef4444;
+  }
+
+  .mobile-bottom-link.logout-mobile-btn:active {
+    opacity: 0.7;
   }
 
   .mobile-bottom-link.active {

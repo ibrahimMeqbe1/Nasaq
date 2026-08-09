@@ -53,7 +53,8 @@ const Login = ({ setUser }) => {
       const result = await authenticateUser(username, password);
       
       if (result.success) {
-        localStorage.setItem("kareem_camp_logged_in", JSON.stringify(result.user));
+        sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(result.user));
+        localStorage.removeItem("kareem_camp_logged_in");
         setUser(result.user);
         setLoading(false);
         
