@@ -290,7 +290,7 @@ export const getCampProfile = async (campId) => {
 export const updateCampProfile = async (campId, updatedFields) => {
   if (isSupabaseConfigured) {
     try {
-      const payload = { id: campId };
+      const payload = {};
       if (updatedFields.name !== undefined) payload.name = updatedFields.name;
       if (updatedFields.managerName !== undefined) payload.manager_name = updatedFields.managerName;
       if (updatedFields.managerPhone !== undefined) payload.phone = updatedFields.managerPhone;
@@ -299,12 +299,18 @@ export const updateCampProfile = async (campId, updatedFields) => {
       if (updatedFields.isActive !== undefined) payload.is_active = updatedFields.isActive;
       if (updatedFields.logoUrl !== undefined) payload.logo_url = updatedFields.logoUrl;
 
-      const { error } = await supabase.from("camps").upsert([payload], { onConflict: "id" });
-      if (error) {
-        console.error("Supabase upsert camp profile error:", error);
+      if (Object.keys(payload).length > 0) {
+        const { error: updateError } = await supabase
+          .from("camps")
+          .update(payload)
+          .eq("id", campId);
+
+        if (updateError) {
+          console.error("Supabase update camp profile error:", updateError);
+        }
       }
     } catch (err) {
-      console.error("Supabase update camp profile error:", err);
+      console.error("Supabase update camp profile catch error:", err);
     }
   }
 
