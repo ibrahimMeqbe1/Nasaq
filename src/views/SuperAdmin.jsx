@@ -218,7 +218,17 @@ const SuperAdmin = ({ user, onLogout }) => {
 
   const handleOpenSubscriptionModal = (camp) => {
     setSelectedCampForSubscription(camp);
-    const initialDate = camp.subscriptionExpiry ? new Date(camp.subscriptionExpiry) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const isExpired = !camp.subscriptionExpiry || new Date(camp.subscriptionExpiry) <= new Date();
+    
+    // إذا كان اشتراك المخيم منتهياً، اقترح تلقائياً تمديد شهر كامل ابتداءً من اليوم
+    let initialDate;
+    if (isExpired) {
+      initialDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    } else {
+      // إذا كان نشطاً، اضف 30 يوماً على تاريخ انتهاء اشتراكه الحالي
+      const currentExp = new Date(camp.subscriptionExpiry);
+      initialDate = new Date(currentExp.getTime() + 30 * 24 * 60 * 60 * 1000);
+    }
     setSubscriptionExpiryInput(formatDateToLocalInput(initialDate));
     setIsSubscriptionModalOpen(true);
   };
