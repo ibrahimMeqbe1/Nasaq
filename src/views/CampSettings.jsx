@@ -11,7 +11,8 @@ import {
   FaTrash, 
   FaCheckCircle, 
   FaExclamationTriangle,
-  FaSpinner
+  FaSpinner,
+  FaCog
 } from "react-icons/fa";
 import { updateCampProfile } from "../services/campService";
 
@@ -49,6 +50,8 @@ const CampSettings = ({ user, campProfile, setCampProfile }) => {
       ...prev,
       [name]: value
     }));
+    setError("");
+    setSuccess("");
   };
 
   // معالجة اختيار ملف الشعار وتحويله لـ Base64
@@ -56,13 +59,13 @@ const CampSettings = ({ user, campProfile, setCampProfile }) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    // التحقق من حجم الملف (أقل من 300 كيلوبايت لضمان الحفظ السليم في Firestore)
-    if (file.size > 300 * 1024) {
-      setError("حجم الصورة كبير جداً. يرجى اختيار صورة أقل من 300 كيلوبايت.");
+    if (file.size > 500 * 1024) {
+      setError("حجم الصورة كبير. يرجى اختيار صورة أقل من 500 كيلوبايت لضمان سرعة التحميل.");
       return;
     }
 
     setError("");
+    setSuccess("");
     const reader = new FileReader();
     reader.onloadend = () => {
       setFormData(prev => ({
@@ -81,6 +84,8 @@ const CampSettings = ({ user, campProfile, setCampProfile }) => {
       logoUrl: ""
     }));
     setLogoPreview("");
+    setError("");
+    setSuccess("");
   };
 
   // حفظ التعديلات
@@ -97,16 +102,17 @@ const CampSettings = ({ user, campProfile, setCampProfile }) => {
     }
 
     try {
-      const res = await updateCampProfile(user.campId, formData);
+      const res = await updateCampProfile(user?.campId || "kareem", formData);
       if (res.success) {
-        setSuccess("تم تحديث إعدادات المخيم بنجاح!");
-        // تحديث الحالة العامة للتطبيق
-        setCampProfile(prev => ({
-          ...prev,
-          ...formData
-        }));
+        setSuccess("تم تحديث إعدادات المخيم والهوية البصرية بنجاح!");
+        if (setCampProfile) {
+          setCampProfile(prev => ({
+            ...prev,
+            ...formData
+          }));
+        }
       } else {
-        setError(res.error || "فشل تحديث الإعدادات.");
+        setError(res.error || "فشل تحديث الإعدادات. يرجى المحاولة لاحقاً.");
       }
     } catch (err) {
       setError("حدث خطأ غير متوقع أثناء حفظ الإعدادات.");
@@ -116,219 +122,242 @@ const CampSettings = ({ user, campProfile, setCampProfile }) => {
     }
   };
 
+  const isSubscriptionActive = campProfile?.subscriptionExpiry 
+    ? new Date(campProfile.subscriptionExpiry) > new Date()
+    : true;
+
+  const formattedExpiryDate = campProfile?.subscriptionExpiry
+    ? new Date(campProfile.subscriptionExpiry).toLocaleDateString("ar-EG", {
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      })
+    : "دائم";
+
   return (
-    <div className="families-page-container">
-      {/* الترويسة الرئيسية */}
-      <header className="page-header">
-        <div className="page-header-info">
-          <h1>⚙️ إدارة إعدادات المخيم</h1>
-          <p>تخصيص الهوية البصرية واسم المخيم، المسؤول الحالي، وأرقام التواصل التي ستظهر في الكشوفات والتقارير المطبوعة.</p>
+    <div className="settings-page-wrapper" dir="rtl">
+      {/* الترويسة الرئيسية الاحترافية */}
+      <header className="settings-header-card">
+        <div className="settings-header-title">
+          <div className="settings-header-icon">
+            <FaCog />
+          </div>
+          <div className="settings-header-text">
+            <h1>إدارة إعدادات المخيم والهوية</h1>
+            <p>تخصيص الشعار البصري، اسم المخيم، بيانات المسؤول، والمعلومات الرسمية المطبوعة في الكشوفات.</p>
+          </div>
         </div>
+
+        {campProfile && (
+          <div className="camp-expired-info-badge" style={{
+            background: isSubscriptionActive ? "rgba(16, 185, 129, 0.15)" : "rgba(239, 68, 68, 0.15)",
+            borderColor: isSubscriptionActive ? "#10b981" : "#ef4444",
+            color: isSubscriptionActive ? "#a7f3d0" : "#fca5a5"
+          }}>
+            <span>{isSubscriptionActive ? "🟢 اشتراك نشط" : "🔴 اشتراك منتهي"}</span>
+            <span>•</span>
+            <span>انتهاء الاشتراك: {formattedExpiryDate}</span>
+          </div>
+        )}
       </header>
 
-      {/* المحتوى الرئيسي للنموذج */}
-      <div className="settings-content-wrapper" style={{
-        maxWidth: "800px",
-        margin: "2rem auto",
-        background: "var(--bg-card)",
-        border: "1px solid var(--border-color)",
-        borderRadius: "var(--radius-md)",
-        padding: "2rem",
-        boxShadow: "var(--shadow-md)"
-      }}>
-        {success && (
-          <div className="login-error-badge mb-4" style={{ 
-            backgroundColor: "rgba(25, 135, 84, 0.1)", 
-            color: "var(--success-color)", 
-            borderColor: "rgba(25, 135, 84, 0.2)",
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            padding: "12px 15px",
-            borderRadius: "var(--radius-sm)"
-          }}>
-            <FaCheckCircle /> {success}
+      {/* التنبيهات والرسائل */}
+      {success && (
+        <div className="renewal-success-box mb-4" style={{
+          background: "#dcfce7",
+          border: "1.5px solid #86efac",
+          padding: "1rem 1.25rem",
+          borderRadius: "14px",
+          color: "#166534",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          fontWeight: "700"
+        }}>
+          <FaCheckCircle style={{ fontSize: "1.3rem", color: "#16a34a", flexShrink: 0 }} />
+          <span>{success}</span>
+        </div>
+      )}
+
+      {error && (
+        <div className="login-error-badge mb-4" style={{
+          background: "#fef2f2",
+          border: "1.5px solid #fca5a5",
+          padding: "1rem 1.25rem",
+          borderRadius: "14px",
+          color: "#991b1b",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+          fontWeight: "700"
+        }}>
+          <FaExclamationTriangle style={{ fontSize: "1.3rem", color: "#dc2626", flexShrink: 0 }} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit}>
+        {/* قسم 1: الشعار والهوية البصرية */}
+        <section className="settings-section-card">
+          <div className="settings-section-header">
+            <FaImage className="section-icon" />
+            <h2>الشعار والهوية البصرية الرسمية</h2>
           </div>
-        )}
 
-        {error && (
-          <div className="login-error-badge mb-4" style={{ 
-            backgroundColor: "var(--danger-light)", 
-            color: "var(--danger-color)", 
-            borderColor: "rgba(220, 53, 69, 0.2)",
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-            padding: "12px 15px",
-            borderRadius: "var(--radius-sm)"
-          }}>
-            <FaExclamationTriangle /> {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="modal-form">
-          <div style={{ display: "flex", flexDirection: "column", gap: "25px" }}>
-            
-            {/* قسم إدارة الشعار البصري */}
-            <div style={{ 
-              display: "flex", 
-              alignItems: "center", 
-              gap: "20px", 
-              flexWrap: "wrap",
-              background: "#fafafa",
-              padding: "15px",
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid #e2e8f0"
-            }}>
-              <div style={{ position: "relative" }}>
-                <img 
-                  src={logoPreview || "/logo.jpg"} 
-                  alt="شعار المخيم" 
-                  style={{
-                    width: "120px",
-                    height: "120px",
-                    objectFit: "contain",
-                    borderRadius: "50%",
-                    border: "3px solid var(--secondary-color)",
-                    backgroundColor: "white"
-                  }}
-                  onError={(e) => {
-                    e.target.src = "/logo.jpg";
-                  }}
-                />
-                {logoPreview && (
-                  <button
-                    type="button"
-                    onClick={handleRemoveLogo}
-                    style={{
-                      position: "absolute",
-                      bottom: "0",
-                      right: "0",
-                      backgroundColor: "var(--danger-color)",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "50%",
-                      width: "32px",
-                      height: "32px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      cursor: "pointer",
-                      boxShadow: "var(--shadow-sm)"
-                    }}
-                    title="إزالة الشعار"
-                  >
-                    <FaTrash size={12} />
-                  </button>
-                )}
-              </div>
-
-              <div style={{ flex: 1, minWidth: "200px" }}>
-                <h3 style={{ fontSize: "1.1rem", color: "var(--primary-dark)", marginBottom: "8px" }}>شعار المخيم الرسمي</h3>
-                <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "15px" }}>
-                  سيتم عرض الشعار في شريط التنقل العلوي للوحة التحكم وفي أعلى كشوفات الطباعة وتصدير PDF. (يفضل أن تكون الصورة دائرية أو مربعة ذات خلفية شفافة أو بيضاء).
-                </p>
-                <label className="btn btn-secondary" style={{ 
-                  display: "inline-flex", 
-                  alignItems: "center", 
-                  gap: "8px", 
-                  cursor: "pointer",
-                  fontSize: "0.9rem"
-                }}>
-                  <FaImage /> اختيار صورة الشعار
-                  <input 
-                    type="file" 
-                    onChange={handleLogoChange} 
-                    accept="image/*" 
-                    style={{ display: "none" }} 
-                  />
-                </label>
-              </div>
+          <div className="logo-manage-container">
+            <div className="logo-preview-wrapper">
+              <img 
+                src={logoPreview || "/logo.jpg"} 
+                alt={`شعار ${formData.name || "المخيم"}`}
+                className="logo-preview-img"
+                onError={(e) => {
+                  e.target.src = "/logo.jpg";
+                }}
+              />
+              {logoPreview && (
+                <button
+                  type="button"
+                  onClick={handleRemoveLogo}
+                  className="btn-remove-logo"
+                  title="إزالة الشعار الحالي"
+                  aria-label="إزالة الشعار الحالي"
+                >
+                  <FaTrash size={12} />
+                </button>
+              )}
             </div>
 
-            {/* الحقول النصية للإعدادات */}
-            <div className="form-row">
-              <div className="form-group col-6">
-                <label htmlFor="name"><FaCampground className="form-icon" /> اسم المخيم الرسمي</label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  placeholder="مثال: مخيم كريم"
-                  style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)" }}
-                />
-              </div>
-              <div className="form-group col-6">
-                <label htmlFor="managerName"><FaUser className="form-icon" /> اسم المندوب / المسؤول</label>
-                <input
-                  type="text"
-                  id="managerName"
-                  name="managerName"
-                  value={formData.managerName}
-                  onChange={handleChange}
-                  placeholder="الاسم الثلاثي أو الرباعي للمسؤول"
-                  style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)" }}
-                />
-              </div>
-            </div>
-
-            <div className="form-row">
-              <div className="form-group col-6">
-                <label htmlFor="managerPhone"><FaPhoneAlt className="form-icon" /> رقم الجوال للتواصل</label>
-                <input
-                  type="text"
-                  id="managerPhone"
-                  name="managerPhone"
-                  value={formData.managerPhone}
-                  onChange={handleChange}
-                  placeholder="مثال: 0599XXXXXX"
-                  style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)", textAlign: "left", direction: "ltr" }}
-                />
-              </div>
-              <div className="form-group col-6">
-                <label htmlFor="address"><FaMapMarkerAlt className="form-icon" /> عنوان / موقع المخيم</label>
-                <input
-                  type="text"
-                  id="address"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  placeholder="مثال: حي القصاصيب - جباليا"
-                  style={{ width: "100%", padding: "10px 12px", border: "1px solid var(--border-color)", borderRadius: "var(--radius-sm)" }}
-                />
-              </div>
-            </div>
-
-            {/* أزرار الإجراءات */}
-            <div style={{ 
-              display: "flex", 
-              justifyContent: "flex-end", 
-              marginTop: "15px",
-              borderTop: "1px solid var(--border-color)",
-              paddingTop: "20px"
-            }}>
-              <button 
-                type="submit" 
-                className="btn btn-primary"
-                disabled={loading}
-                style={{ 
-                  display: "inline-flex", 
-                  alignItems: "center", 
-                  gap: "8px",
-                  fontSize: "1rem",
-                  padding: "10px 20px"
+            <div className="logo-upload-info">
+              <h3>صورة شعار المخيم</h3>
+              <p>
+                يظهر الشعار في الترويسة الرئيسية للوحة التحكم وفي أعلى التقارير وكشوفات PDF المطبوعة. 
+                يُفضل استخدام صورة دائرية أو مربعة ذات خلفية شفافة أو بيضاء.
+              </p>
+              <label 
+                className="btn-upload-label"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    document.getElementById('logoInput')?.click();
+                  }
                 }}
               >
-                {loading ? <FaSpinner className="spinner" /> : <FaSave />}
-                <span>حفظ التعديلات والإعدادات</span>
-              </button>
+                <FaImage /> اختيار صورة الشعار من جهازك
+                <input 
+                  id="logoInput"
+                  type="file" 
+                  onChange={handleLogoChange} 
+                  accept="image/*" 
+                  style={{ display: "none" }} 
+                />
+              </label>
+            </div>
+          </div>
+        </section>
+
+        {/* قسم 2: البيانات الأساسية للمخيم */}
+        <section className="settings-section-card">
+          <div className="settings-section-header">
+            <FaCampground className="section-icon" />
+            <h2>البيانات الأساسية والموقع الجغرافي</h2>
+          </div>
+
+          <div className="settings-grid-2">
+            <div className="settings-field-group">
+              <label htmlFor="name">
+                <FaCampground className="field-icon" /> اسم المخيم الرسمي *
+              </label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleChange}
+                placeholder="مثال: مخيم كريم الإغاثي"
+                className="settings-input"
+                required
+              />
             </div>
 
+            <div className="settings-field-group">
+              <label htmlFor="address">
+                <FaMapMarkerAlt className="field-icon" /> عنوان وموقع المخيم
+              </label>
+              <input
+                type="text"
+                id="address"
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+                placeholder="مثال: غزة - حي القصاصيب - جباليا"
+                className="settings-input"
+              />
+            </div>
           </div>
-        </form>
-      </div>
+        </section>
+
+        {/* قسم 3: معلومات المسؤول والتواصل */}
+        <section className="settings-section-card">
+          <div className="settings-section-header">
+            <FaUser className="section-icon" />
+            <h2>معلومات المسؤول المندوب والتواصل</h2>
+          </div>
+
+          <div className="settings-grid-2">
+            <div className="settings-field-group">
+              <label htmlFor="managerName">
+                <FaUser className="field-icon" /> اسم المسؤول / المندوب الرئيسي
+              </label>
+              <input
+                type="text"
+                id="managerName"
+                name="managerName"
+                value={formData.managerName}
+                onChange={handleChange}
+                placeholder="الاسم الثلاثي أو الرباعي للمسؤول"
+                className="settings-input"
+              />
+            </div>
+
+            <div className="settings-field-group">
+              <label htmlFor="managerPhone">
+                <FaPhoneAlt className="field-icon" /> رقم الجوال الرسمي للتواصل
+              </label>
+              <input
+                type="text"
+                id="managerPhone"
+                name="managerPhone"
+                value={formData.managerPhone}
+                onChange={handleChange}
+                placeholder="مثال: 0599000000"
+                className="settings-input phone-input"
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* زر حفظ التعديلات */}
+        <div className="settings-footer-actions">
+          <button 
+            type="submit" 
+            className="btn-save-settings"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <FaSpinner className="spinner" />
+                <span>جاري حفظ الإعدادات...</span>
+              </>
+            ) : (
+              <>
+                <FaSave />
+                <span>حفظ التعديلات وإعدادات المخيم</span>
+              </>
+            )}
+          </button>
+        </div>
+      </form>
     </div>
   );
 };
