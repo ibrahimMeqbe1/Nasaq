@@ -64,7 +64,7 @@ const SubscriptionCountdown = ({ expiryDate, compact = false }) => {
       <FaClock className="sub-icon" />
       <span className="sub-label">المتبقي:</span>
       <div className="time-chips">
-        {timeLeft.days > 0 && <span className="time-chip"><strong>{timeLeft.days}</strong>ج</span>}
+        {timeLeft.days > 0 && <span className="time-chip"><strong>{timeLeft.days}</strong>ي</span>}
         <span className="time-chip"><strong>{timeLeft.hours}</strong>س</span>
         <span className="time-chip"><strong>{timeLeft.minutes}</strong>د</span>
         <span className="time-chip seconds"><strong>{timeLeft.seconds}</strong>ث</span>
