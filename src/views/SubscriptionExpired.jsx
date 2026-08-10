@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { FaLock, FaCheckCircle, FaExclamationTriangle, FaUniversity, FaMobileAlt, FaWallet, FaPaperPlane } from "react-icons/fa";
+import { FaLock, FaCheckCircle, FaExclamationTriangle, FaUniversity, FaMobileAlt, FaWallet, FaPaperPlane, FaWhatsapp } from "react-icons/fa";
 import { getPaymentMethods, submitRenewalRequest } from "../services/campService";
 
 const SubscriptionExpired = ({ user, campProfile, onLogout }) => {
@@ -14,11 +14,13 @@ const SubscriptionExpired = ({ user, campProfile, onLogout }) => {
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
 
+  const whatsappPhone = "+970597163242";
+  const whatsappCleanNumber = "970597163242";
+
   useEffect(() => {
     getPaymentMethods().then((res) => {
       setMethods(res);
       if (res) {
-        // تحديد أول طريقة دفع كافتراضية
         setSelectedMethod(Object.keys(res)[0]);
       }
     });
@@ -27,7 +29,7 @@ const SubscriptionExpired = ({ user, campProfile, onLogout }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!txId || !amount) {
-      setError("يرجى ملء جميع الحقول المطلوبة.");
+      setError("يرجى ملء جميع الحقول المطلوبة (رقم المعاملة والمبلغ).");
       return;
     }
 
@@ -35,31 +37,54 @@ const SubscriptionExpired = ({ user, campProfile, onLogout }) => {
     setLoading(true);
 
     const methodNameMap = {
-      bankOfPalestine: "بنك فلسطين",
-      jawwalPay: "جوال باي",
-      palPay: "بال باي"
+      bankOfPalestine: "حساب بنك فلسطين",
+      jawwalPay: "حساب جوال باي (Jawwal Pay)",
+      palPay: "حساب بال باي (PalPay)"
     };
 
+    const chosenMethodName = methodNameMap[selectedMethod] || selectedMethod;
+    const currentCampName = campProfile?.name || user?.name || "المخيم الحالي";
+    const currentCampId = user?.campId || "kareem";
+    const managerName = campProfile?.managerName || user?.username || "غير محدد";
+
     try {
-      const res = await submitRenewalRequest({
-        campId: user.campId,
-        campName: campProfile?.name || "مخيم غير معروف",
-        method: methodNameMap[selectedMethod] || selectedMethod,
+      // 1. تسجيل الطلب في النظام لضمان حفظه في لوحة التحكم
+      await submitRenewalRequest({
+        campId: currentCampId,
+        campName: currentCampName,
+        method: chosenMethodName,
         txId,
         amount,
         notes
       });
 
-      if (res.success) {
-        setSuccess(true);
-        setTxId("");
-        setAmount("");
-        setNotes("");
-      } else {
-        setError(res.error || "فشل إرسال الطلب. يرجى المحاولة لاحقاً.");
+      // 2. إعداد رسالة الواتساب الاحترافية المباشرة للمهندس إبراهيم مقبل
+      const messageText = 
+`السلام عليكم ورحمة الله وبركاته 🌿
+الأستاذ م. إبراهيم مقبل،
+
+تم إرسال إثبات دفع جديد لتجديد اشتراك لوحة المخيم:
+----------------------------------------
+⛺ *المخيم:* ${currentCampName}
+🔑 *معرف المخيم:* ${currentCampId}
+👤 *مسؤول المخيم:* ${managerName}
+💳 *طريقة الدفع:* ${chosenMethodName}
+🔢 *رقم المعاملة / السند (TxID):* ${txId}
+💰 *المبلغ المحول:* ${amount}
+${notes ? `📝 *ملاحظات:* ${notes}\n` : ''}----------------------------------------
+يرجى المراجعة وتأكيد تفعيل اشتراك اللوحة الرقمية. وشكراً لجهودكم! ✨`;
+
+      const whatsappUrl = `https://wa.me/${whatsappCleanNumber}?text=${encodeURIComponent(messageText)}`;
+
+      // 3. فتح الواتساب فوراً
+      if (typeof window !== "undefined") {
+        window.open(whatsappUrl, "_blank");
       }
+
+      setSuccess(true);
     } catch (err) {
-      setError("حدث خطأ أثناء الاتصال بالخادم.");
+      console.error("WhatsApp renewal error:", err);
+      setError("حدث خطأ أثناء إرسال الطلب. يمكنك التواصل مباشرة عبر الواتساب.");
     } finally {
       setLoading(false);
     }
@@ -114,7 +139,7 @@ const SubscriptionExpired = ({ user, campProfile, onLogout }) => {
               </div>
               <div className="step-box">
                 <div className="step-num">3</div>
-                <div className="step-text">أدخل رقم المعاملة (TxID) والمبلغ لتفعيل لوحتك فوراً.</div>
+                <div className="step-text">أدخل رقم المعاملة والمبلغ واضغط إرسال للواتساب للتفعيل فوراً.</div>
               </div>
             </div>
           </div>
@@ -144,22 +169,28 @@ const SubscriptionExpired = ({ user, campProfile, onLogout }) => {
             )}
           </div>
 
-          {/* نموذج طلب التجديد */}
+          {/* نموذج طلب التجديد عبر الواتساب */}
           {success ? (
             <div className="renewal-success-box" style={{ background: "#dcfce7", border: "1.5px solid #86efac", padding: "1.5rem", borderRadius: "16px", color: "#166534" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "8px" }}>
                 <FaCheckCircle style={{ fontSize: "1.5rem", color: "#16a34a" }} />
-                <h4 style={{ margin: 0, fontSize: "1.1rem", fontWeight: "800" }}>تم إرسال إثبات الدفع بنجاح إلى المشرف العام!</h4>
+                <h4 style={{ margin: 0, fontSize: "1.1rem", fontWeight: "800" }}>تم تجهيز وإرسال الإشعار للواتساب بنجاح!</h4>
               </div>
-              <p style={{ margin: 0, fontSize: "0.9rem", lineHeight: "1.6", fontWeight: "600" }}>
-                تم استلام رقم المعاملة وإرسالها للمشرف العام (م. إبراهيم مقبل). سيتم التحقق من الحوالة وتفعيل لوحة المخيم خلال وقت قصير جداً. يمكنك العودة وتسجيل الدخول لاحقاً.
+              <p style={{ margin: "0 0 1rem 0", fontSize: "0.92rem", lineHeight: "1.6", fontWeight: "600" }}>
+                تم فتح الواتساب لإرسال بيانات الحوالة إلى المهندس <strong>إبراهيم مقبل ({whatsappPhone})</strong>. سيتم التحقق وتفعيل لوحة المخيم فوراً.
               </p>
+              <button 
+                onClick={() => setSuccess(false)}
+                style={{ background: "#16a34a", color: "white", border: "none", padding: "8px 16px", borderRadius: "10px", fontWeight: "700", cursor: "pointer" }}
+              >
+                إرسال إشعار آخر
+              </button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="renewal-form-luxury">
               <h3 className="form-title-luxury">
-                <FaPaperPlane style={{ color: "#059669" }} />
-                <span>نموذج تأكيد الدفع وإرسال إيصال الحوالة</span>
+                <FaWhatsapp style={{ color: "#25D366", fontSize: "1.3rem" }} />
+                <span>إرسال إثبات الدفع والبيانات عبر الواتساب المباشر</span>
               </h3>
 
               {error && <div className="login-error-badge mb-3">{error}</div>}
@@ -169,7 +200,7 @@ const SubscriptionExpired = ({ user, campProfile, onLogout }) => {
                 <select 
                   value={selectedMethod} 
                   onChange={(e) => setSelectedMethod(e.target.value)}
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "0.92rem", fontWeight: "700", backgroundColor: "white" }}
+                  style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "0.92rem", fontWeight: "700", backgroundColor: "white" }}
                 >
                   {methods && Object.keys(methods).map((key) => (
                     <option key={key} value={key}>{getMethodTitle(key)}</option>
@@ -177,7 +208,7 @@ const SubscriptionExpired = ({ user, campProfile, onLogout }) => {
                 </select>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
+              <div className="renewal-form-grid">
                 <div className="form-group">
                   <label style={{ fontWeight: "700", color: "#334155", display: "block", marginBottom: "6px" }}>رقم المعاملة / السند (TxID) *</label>
                   <input 
@@ -186,7 +217,7 @@ const SubscriptionExpired = ({ user, campProfile, onLogout }) => {
                     value={txId} 
                     onChange={(e) => setTxId(e.target.value)} 
                     required 
-                    style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "0.92rem", boxSizing: "border-box" }}
+                    style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "0.92rem", boxSizing: "border-box" }}
                   />
                 </div>
                 <div className="form-group">
@@ -197,26 +228,27 @@ const SubscriptionExpired = ({ user, campProfile, onLogout }) => {
                     value={amount} 
                     onChange={(e) => setAmount(e.target.value)} 
                     required 
-                    style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "0.92rem", boxSizing: "border-box" }}
+                    style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "0.92rem", boxSizing: "border-box" }}
                   />
                 </div>
               </div>
 
-              <div className="form-group mb-3">
+              <div className="form-group mb-3" style={{ marginTop: "1rem" }}>
                 <label style={{ fontWeight: "700", color: "#334155", display: "block", marginBottom: "6px" }}>ملاحظات إضافية (اختياري)</label>
                 <textarea 
                   rows="2"
                   placeholder="اسم المحول أو تفاصيل الحوالة..." 
                   value={notes} 
                   onChange={(e) => setNotes(e.target.value)}
-                  style={{ width: "100%", padding: "10px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "0.92rem", boxSizing: "border-box", fontFamily: "inherit" }}
+                  style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "0.92rem", boxSizing: "border-box", fontFamily: "inherit" }}
                 />
               </div>
 
-              <button type="submit" className="btn-submit-renewal-luxury" disabled={loading}>
-                {loading ? "جاري إرسال الإيصال..." : (
+              <button type="submit" className="btn-submit-renewal-whatsapp" disabled={loading}>
+                {loading ? "جاري تجهيز الواتساب..." : (
                   <>
-                    <FaPaperPlane /> إرسال إثبات الدفع وتأكيد التجديد
+                    <FaWhatsapp style={{ fontSize: "1.35rem" }} />
+                    <span>إرسال إثبات الدفع والبيانات عبر الواتساب ({whatsappPhone})</span>
                   </>
                 )}
               </button>

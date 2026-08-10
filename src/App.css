@@ -2606,13 +2606,20 @@ select.form-control {
   gap: 8px;
 }
 
-.btn-submit-renewal-luxury {
-  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+.renewal-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.btn-submit-renewal-luxury,
+.btn-submit-renewal-whatsapp {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   color: white;
   border: none;
   width: 100%;
-  padding: 14px;
-  border-radius: 12px;
+  padding: 15px 20px;
+  border-radius: 14px;
   font-size: 1rem;
   font-weight: 800;
   cursor: pointer;
@@ -2621,13 +2628,20 @@ select.form-control {
   justify-content: center;
   gap: 10px;
   transition: all 0.25s ease;
-  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
   margin-top: 1rem;
+  font-family: inherit;
 }
 
-.btn-submit-renewal-luxury:hover {
+.btn-submit-renewal-whatsapp {
+  background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+  box-shadow: 0 4px 16px rgba(37, 211, 102, 0.35);
+}
+
+.btn-submit-renewal-luxury:hover,
+.btn-submit-renewal-whatsapp:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 22px rgba(5, 150, 105, 0.45);
+  box-shadow: 0 8px 24px rgba(37, 211, 102, 0.5);
 }
 
 .expired-footer-luxury {
@@ -3503,6 +3517,64 @@ select.form-control {
   .stats-grid {
     grid-template-columns: 1fr !important;
     gap: 0.8rem !important;
+  }
+
+  /* تنسيق صفحة انتهى الاشتراك للهاتف المحمول */
+  .subscription-expired-container {
+    padding: 1rem 0.5rem !important;
+  }
+
+  .subscription-expired-card {
+    border-radius: 16px !important;
+    max-width: 100% !important;
+  }
+
+  .expired-header-luxury {
+    padding: 1.5rem 1rem !important;
+  }
+
+  .expired-header-luxury h1 {
+    font-size: 1.3rem !important;
+  }
+
+  .camp-expired-info-badge {
+    font-size: 0.78rem !important;
+    padding: 4px 12px !important;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .expired-body-luxury {
+    padding: 1.25rem 0.85rem !important;
+  }
+
+  .steps-list {
+    grid-template-columns: 1fr !important;
+    gap: 8px !important;
+  }
+
+  .methods-grid-luxury {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .renewal-form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .expired-footer-luxury {
+    flex-direction: column !important;
+    gap: 12px !important;
+    text-align: center !important;
+    padding: 1.25rem 1rem !important;
+  }
+
+  .btn-submit-renewal-whatsapp,
+  .btn-submit-renewal-luxury {
+    padding: 14px 14px !important;
+    font-size: 0.92rem !important;
+    border-radius: 12px !important;
   }
 }
 
