@@ -59,8 +59,8 @@ const SubscriptionExpired = ({ user, campProfile, onLogout }) => {
       });
 
       // 2. إعداد رسالة الواتساب الاحترافية المباشرة للمهندس إبراهيم مقبل
-      const messageText = 
-`السلام عليكم ورحمة الله وبركاته 🌿
+      const messageText =
+        `السلام عليكم ورحمة الله وبركاته 🌿
 الأستاذ م. إبراهيم مقبل،
 
 تم إرسال إثبات دفع جديد لتجديد اشتراك لوحة المخيم:
@@ -179,7 +179,7 @@ ${notes ? `📝 *ملاحظات:* ${notes}\n` : ''}-----------------------------
               <p style={{ margin: "0 0 1rem 0", fontSize: "0.92rem", lineHeight: "1.6", fontWeight: "600" }}>
                 تم فتح الواتساب لإرسال بيانات الحوالة إلى المهندس <strong>إبراهيم مقبل ({whatsappPhone})</strong>. سيتم التحقق وتفعيل لوحة المخيم فوراً.
               </p>
-              <button 
+              <button
                 onClick={() => setSuccess(false)}
                 style={{ background: "#16a34a", color: "white", border: "none", padding: "8px 16px", borderRadius: "10px", fontWeight: "700", cursor: "pointer" }}
               >
@@ -197,8 +197,8 @@ ${notes ? `📝 *ملاحظات:* ${notes}\n` : ''}-----------------------------
 
               <div className="form-group mb-3">
                 <label style={{ fontWeight: "700", color: "#334155", display: "block", marginBottom: "6px" }}>طريقة الدفع المستخدمة:</label>
-                <select 
-                  value={selectedMethod} 
+                <select
+                  value={selectedMethod}
                   onChange={(e) => setSelectedMethod(e.target.value)}
                   style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "0.92rem", fontWeight: "700", backgroundColor: "white" }}
                 >
@@ -211,23 +211,23 @@ ${notes ? `📝 *ملاحظات:* ${notes}\n` : ''}-----------------------------
               <div className="renewal-form-grid">
                 <div className="form-group">
                   <label style={{ fontWeight: "700", color: "#334155", display: "block", marginBottom: "6px" }}>رقم المعاملة / السند (TxID) *</label>
-                  <input 
-                    type="text" 
-                    placeholder="مثال: 987654321" 
-                    value={txId} 
-                    onChange={(e) => setTxId(e.target.value)} 
-                    required 
+                  <input
+                    type="text"
+                    placeholder="مثال: 987654321"
+                    value={txId}
+                    onChange={(e) => setTxId(e.target.value)}
+                    required
                     style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "0.92rem", boxSizing: "border-box" }}
                   />
                 </div>
                 <div className="form-group">
                   <label style={{ fontWeight: "700", color: "#334155", display: "block", marginBottom: "6px" }}>المبلغ المحول *</label>
-                  <input 
-                    type="number" 
-                    placeholder="أدخل المبلغ المحول" 
-                    value={amount} 
-                    onChange={(e) => setAmount(e.target.value)} 
-                    required 
+                  <input
+                    type="number"
+                    placeholder="أدخل المبلغ المحول"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    required
                     style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "0.92rem", boxSizing: "border-box" }}
                   />
                 </div>
@@ -235,10 +235,10 @@ ${notes ? `📝 *ملاحظات:* ${notes}\n` : ''}-----------------------------
 
               <div className="form-group mb-3" style={{ marginTop: "1rem" }}>
                 <label style={{ fontWeight: "700", color: "#334155", display: "block", marginBottom: "6px" }}>ملاحظات إضافية (اختياري)</label>
-                <textarea 
+                <textarea
                   rows="2"
-                  placeholder="اسم المحول أو تفاصيل الحوالة..." 
-                  value={notes} 
+                  placeholder="اسم المحول أو تفاصيل الحوالة..."
+                  value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   style={{ width: "100%", padding: "12px 14px", borderRadius: "10px", border: "1.5px solid #cbd5e1", fontSize: "0.92rem", boxSizing: "border-box", fontFamily: "inherit" }}
                 />
