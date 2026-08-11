@@ -19,12 +19,12 @@ export async function POST(request) {
     if (isSupabaseConfigured && supabase) {
       const email = cleanUser.includes("@") ? cleanUser : `${cleanUser.toLowerCase()}@camp.com`;
       
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      let { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password: cleanPass,
       });
 
-      if (!authError && authData?.user) {
+      if (!authError && authData?.session) {
         const { data: profile } = await supabase
           .from("users")
           .select("*")
@@ -44,11 +44,11 @@ export async function POST(request) {
             name: profile?.name || authData.user.user_metadata?.name || cleanUser,
             uid: authData.user.id,
           },
-          token: authData.session?.access_token,
+          session: authData.session,
         });
       }
 
-      // 2. التحقق من جدول المستخدمين public.users مع تشفير وتقاطعات
+      // 2. التحقق من جدول المستخدمين public.users مع ترقية وتوليد جلسة
       const { data: userData } = await supabase
         .from("users")
         .select("*")
@@ -65,16 +65,38 @@ export async function POST(request) {
             await supabase.from("users").update({ password: newHash }).eq("id", foundUser.id);
           }
 
+          // محاولة إنشاء/ربط الحساب بـ Supabase Auth لتوليد جلسة JWT حقيقية
+          try {
+            const { data: signUpData } = await supabase.auth.signUp({
+              email,
+              password: cleanPass,
+              options: {
+                data: {
+                  username: foundUser.username,
+                  role: foundUser.role || "admin",
+                  campId: foundUser.camp_id || "kareem",
+                  name: foundUser.name || foundUser.username,
+                },
+              },
+            });
+            if (signUpData?.session) {
+              authData = signUpData;
+            }
+          } catch (signUpErr) {
+            console.warn("Supabase Auth fallback signUp error:", signUpErr);
+          }
+
           return NextResponse.json({
             success: true,
             user: {
               username: foundUser.username,
               role: foundUser.role || "admin",
               campId: foundUser.camp_id || "kareem",
-              email: `${foundUser.username.toLowerCase()}@camp.com`,
+              email,
               name: foundUser.name || foundUser.username,
               uid: foundUser.id,
             },
+            session: authData?.session || null,
           });
         }
       }

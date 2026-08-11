@@ -140,6 +140,17 @@ export const authenticateUser = async (username, password) => {
     if (res.ok) {
       const data = await res.json();
       if (data.success) {
+        if (data.session && isSupabaseConfigured && supabase) {
+          try {
+            await supabase.auth.setSession(data.session);
+            if (typeof window !== "undefined") {
+              sessionStorage.setItem("kareem_camp_supabase_session", JSON.stringify(data.session));
+              localStorage.setItem("kareem_camp_supabase_session", JSON.stringify(data.session));
+            }
+          } catch (sErr) {
+            console.warn("Supabase setSession error:", sErr);
+          }
+        }
         return data;
       }
     } else {
@@ -280,11 +291,18 @@ export const createCamp = async (campData) => {
       }]);
       if (campError) throw campError;
 
-      const { error: userError } = await supabase.from("users").upsert([{
-        id: `user-${Date.now()}`, username: adminUsername, password: adminPassword,
-        role: "admin", camp_id: id, name,
-      }]);
-      if (userError) throw userError;
+      // إنشاء حساب المستخدم والكلمة المشفرة عبر السيرفر
+      await fetch("/api/auth/user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: adminUsername,
+          password: adminPassword,
+          role: "admin",
+          campId: id,
+          name,
+        }),
+      });
 
       return { success: true };
     } catch (err) {
@@ -706,21 +724,16 @@ export const updateCampFullDetails = async (campId, campDetails) => {
       }
 
       if (adminUsername || adminPassword) {
-        const { data: existingUsers } = await supabase
-          .from("users").select("id").eq("camp_id", campId).limit(1);
-
-        if (existingUsers?.length) {
-          const userPayload = {};
-          if (adminUsername) userPayload.username = adminUsername;
-          if (adminPassword) userPayload.password = adminPassword;
-          if (name) userPayload.name = name;
-          await supabase.from("users").update(userPayload).eq("camp_id", campId);
-        } else if (adminUsername && adminPassword) {
-          await supabase.from("users").insert([{
-            id: `user-${Date.now()}`, username: adminUsername, password: adminPassword,
-            role: "admin", camp_id: campId, name: name || campId,
-          }]);
-        }
+        await fetch("/api/auth/user", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            campId,
+            adminUsername,
+            adminPassword,
+            name,
+          }),
+        });
       }
     } catch (err) {
       console.error("Supabase updateCampFullDetails error:", err);

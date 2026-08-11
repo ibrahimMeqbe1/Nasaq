@@ -50,6 +50,10 @@ const Login = ({ setUser }) => {
       
       if (result.success) {
         sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(result.user));
+        if (result.session) {
+          sessionStorage.setItem("kareem_camp_supabase_session", JSON.stringify(result.session));
+          localStorage.setItem("kareem_camp_supabase_session", JSON.stringify(result.session));
+        }
         localStorage.removeItem("kareem_camp_logged_in");
         setUser(result.user);
         setLoading(false);
