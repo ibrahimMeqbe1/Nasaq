@@ -31,13 +31,17 @@ export const AppProvider = ({ children }) => {
   // 1. مراقبة حالة المصادقة عند البداية واستعادة الجلسة السحابية
   useEffect(() => {
     const restoreSession = async () => {
-      const savedUser =
-        sessionStorage.getItem("kareem_camp_logged_in") ||
-        localStorage.getItem("kareem_camp_logged_in");
+      // إزالة مفاتيح التخزين القديمة من localStorage لتنظيف متصفح المستخدم تلقائياً
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("kareem_camp_logged_in");
+      }
 
+      const savedUser = typeof window !== "undefined" ? sessionStorage.getItem("kareem_camp_logged_in") : null;
       const savedSession =
-        sessionStorage.getItem("kareem_camp_supabase_session") ||
-        localStorage.getItem("kareem_camp_supabase_session");
+        typeof window !== "undefined"
+          ? sessionStorage.getItem("kareem_camp_supabase_session") ||
+            localStorage.getItem("kareem_camp_supabase_session")
+          : null;
 
       if (savedUser) {
         try {
@@ -68,8 +72,8 @@ export const AppProvider = ({ children }) => {
         setUser(null);
         if (typeof window !== "undefined") {
           sessionStorage.removeItem("kareem_camp_logged_in");
-          localStorage.removeItem("kareem_camp_logged_in");
           sessionStorage.removeItem("kareem_camp_supabase_session");
+          localStorage.removeItem("kareem_camp_logged_in");
           localStorage.removeItem("kareem_camp_supabase_session");
         }
       }
@@ -128,21 +132,27 @@ export const AppProvider = ({ children }) => {
 
   const handleLogout = async () => {
     if (typeof window !== "undefined") {
-      sessionStorage.removeItem("kareem_camp_logged_in");
+      sessionStorage.clear();
       localStorage.removeItem("kareem_camp_logged_in");
-      sessionStorage.removeItem("kareem_camp_supabase_session");
       localStorage.removeItem("kareem_camp_supabase_session");
 
-      // إخلاء كامل لأي رموز Supabase قديمة مخزنة بالمتصفح
+      // إخلاء كامل لأي رموز قديمة مخزنة بـ localStorage أو sessionStorage
       Object.keys(localStorage).forEach((key) => {
-        if (key.includes("supabase.auth.token") || key.startsWith("sb-")) {
+        if (key.includes("kareem") || key.includes("supabase") || key.startsWith("sb-")) {
           localStorage.removeItem(key);
         }
       });
       Object.keys(sessionStorage).forEach((key) => {
-        if (key.includes("supabase.auth.token") || key.startsWith("sb-")) {
+        if (key.includes("kareem") || key.includes("supabase") || key.startsWith("sb-")) {
           sessionStorage.removeItem(key);
         }
+      });
+
+      // مسح كوكيز المتصفح
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
       });
     }
 
@@ -153,10 +163,16 @@ export const AppProvider = ({ children }) => {
         console.warn("Supabase signOut warning:", e);
       }
     }
+
     setUser(null);
     setCampProfile(null);
     setIsSubscriptionExpired(false);
-    router.replace("/login");
+
+    if (typeof window !== "undefined") {
+      window.location.href = "/login";
+    } else {
+      router.replace("/login");
+    }
   };
 
   // 4. حماية المسارات والتوجيه التلقائي
