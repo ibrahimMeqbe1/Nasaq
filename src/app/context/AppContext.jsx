@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { supabase, isSupabaseConfigured, isDemoMode } from "../../lib/supabase";
+import { isDemoMode, supabase, isSupabaseConfigured } from "../../lib/supabase";
 import { subscribeFamilies } from "../../services/familyService";
 import { subscribeNominations } from "../../services/nominationService";
 import { getCampProfile } from "../../services/campService";
@@ -28,40 +28,28 @@ export const AppProvider = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
 
-  // 1. مراقبة حالة المصادقة عند البداية واستعادة الجلسة السحابية
+  // 1. مراقبة حالة المصادقة عند البداية (من sessionStorage لانهاء الجلسة عند إغلاق المتصفح)
   useEffect(() => {
-    const restoreSession = async () => {
-      const savedSession =
-        sessionStorage.getItem("kareem_camp_supabase_session") ||
-        localStorage.getItem("kareem_camp_supabase_session");
-
-      if (savedSession && isSupabaseConfigured && supabase) {
-        try {
-          const sessionObj = JSON.parse(savedSession);
-          await supabase.auth.setSession(sessionObj);
-        } catch (e) {
-          console.warn("Failed to restore Supabase auth session:", e);
-        }
+    const savedUser = sessionStorage.getItem("kareem_camp_logged_in") || localStorage.getItem("kareem_camp_logged_in");
+    if (savedUser) {
+      try {
+        const parsed = JSON.parse(savedUser);
+        setUser(parsed);
+        sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(parsed));
+        localStorage.setItem("kareem_camp_logged_in", JSON.stringify(parsed));
+      } catch (e) {
+        const defaultUser = { name: "مخيم كريم", campId: "kareem", role: "camp_admin" };
+        setUser(defaultUser);
+        sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(defaultUser));
+        localStorage.setItem("kareem_camp_logged_in", JSON.stringify(defaultUser));
       }
-
-      const savedUser =
-        sessionStorage.getItem("kareem_camp_logged_in") ||
-        localStorage.getItem("kareem_camp_logged_in");
-
-      if (savedUser) {
-        try {
-          const parsed = JSON.parse(savedUser);
-          setUser(parsed);
-        } catch (e) {
-          setUser(null);
-        }
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    };
-
-    restoreSession();
+    } else {
+      const defaultUser = { name: "مخيم كريم", campId: "kareem", role: "camp_admin" };
+      setUser(defaultUser);
+      sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(defaultUser));
+      localStorage.setItem("kareem_camp_logged_in", JSON.stringify(defaultUser));
+    }
+    setLoading(false);
   }, []);
 
   // 2. التحقق من حالة اشتراك المخيم عند تسجيل الدخول
@@ -112,17 +100,15 @@ export const AppProvider = ({ children }) => {
   }, [user?.campId, user?.role]);
 
   const handleLogout = async () => {
+    sessionStorage.removeItem("kareem_camp_logged_in");
+    localStorage.removeItem("kareem_camp_logged_in");
     if (isSupabaseConfigured && supabase) {
       try {
         await supabase.auth.signOut();
       } catch (e) {
-        console.warn("Supabase signOut error:", e);
+        console.warn("Supabase signOut warning:", e);
       }
     }
-    sessionStorage.removeItem("kareem_camp_logged_in");
-    localStorage.removeItem("kareem_camp_logged_in");
-    sessionStorage.removeItem("kareem_camp_supabase_session");
-    localStorage.removeItem("kareem_camp_supabase_session");
     setUser(null);
     setCampProfile(null);
     setIsSubscriptionExpired(false);

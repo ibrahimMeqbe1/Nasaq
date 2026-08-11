@@ -29,3 +29,4 @@ yarn-error.log*
 # Next.js build output
 .next/
 scratch/
+session-fix-patch/

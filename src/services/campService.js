@@ -140,15 +140,17 @@ export const authenticateUser = async (username, password) => {
     if (res.ok) {
       const data = await res.json();
       if (data.success) {
-        if (data.session && isSupabaseConfigured && supabase) {
+        // لازم نربط الجلسة الحقيقية بعميل Supabase بالمتصفح، وإلا رح تُحسب
+        // كل الاستعلامات القادمة (families/nominations/...) كـ "anon" وتُرفض
+        // بسبب سياسات RLS رغم إن تسجيل الدخول نجح.
+        if (isSupabaseConfigured && data.access_token && data.refresh_token) {
           try {
-            await supabase.auth.setSession(data.session);
-            if (typeof window !== "undefined") {
-              sessionStorage.setItem("kareem_camp_supabase_session", JSON.stringify(data.session));
-              localStorage.setItem("kareem_camp_supabase_session", JSON.stringify(data.session));
-            }
-          } catch (sErr) {
-            console.warn("Supabase setSession error:", sErr);
+            await supabase.auth.setSession({
+              access_token: data.access_token,
+              refresh_token: data.refresh_token,
+            });
+          } catch (sessionErr) {
+            console.error("setSession error:", sessionErr);
           }
         }
         return data;
@@ -285,25 +287,23 @@ export const createCamp = async (campData) => {
 
   if (isSupabaseConfigured) {
     try {
-      const { error: campError } = await supabase.from("camps").upsert([{
-        id, name, manager_name: managerName, phone: managerPhone,
-        is_active: true, subscription_expiry: expiryDate.toISOString(),
-      }]);
-      if (campError) throw campError;
-
-      // إنشاء حساب المستخدم والكلمة المشفرة عبر السيرفر
-      await fetch("/api/auth/user", {
+      // الإنشاء لازم يصير عبر مسار سيرفر محمي (service role)، مش إدراج مباشر
+      // من المتصفح، عشان: 1) الباسورد يتشفر صح، 2) يتربط حساب Supabase Auth
+      // حقيقي للمدير الجديد، 3) RLS ما يمنع العملية أصلاً.
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("/api/admin/create-camp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token || ""}`,
+        },
         body: JSON.stringify({
-          username: adminUsername,
-          password: adminPassword,
-          role: "admin",
-          campId: id,
-          name,
+          id, name, managerName, managerPhone, adminUsername, adminPassword,
+          expiryDate: expiryDate.toISOString(),
         }),
       });
-
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "فشل إنشاء المخيم");
       return { success: true };
     } catch (err) {
       console.error("Supabase create camp error:", err);
@@ -724,16 +724,21 @@ export const updateCampFullDetails = async (campId, campDetails) => {
       }
 
       if (adminUsername || adminPassword) {
-        await fetch("/api/auth/user", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            campId,
-            adminUsername,
-            adminPassword,
-            name,
-          }),
-        });
+        const { data: existingUsers } = await supabase
+          .from("users").select("id").eq("camp_id", campId).limit(1);
+
+        if (existingUsers?.length) {
+          const userPayload = {};
+          if (adminUsername) userPayload.username = adminUsername;
+          if (adminPassword) userPayload.password = adminPassword;
+          if (name) userPayload.name = name;
+          await supabase.from("users").update(userPayload).eq("camp_id", campId);
+        } else if (adminUsername && adminPassword) {
+          await supabase.from("users").insert([{
+            id: `user-${Date.now()}`, username: adminUsername, password: adminPassword,
+            role: "admin", camp_id: campId, name: name || campId,
+          }]);
+        }
       }
     } catch (err) {
       console.error("Supabase updateCampFullDetails error:", err);
