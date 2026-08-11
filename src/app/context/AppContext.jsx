@@ -31,34 +31,47 @@ export const AppProvider = ({ children }) => {
   // 1. مراقبة حالة المصادقة عند البداية واستعادة الجلسة السحابية
   useEffect(() => {
     const restoreSession = async () => {
-      const savedSession =
-        sessionStorage.getItem("kareem_camp_supabase_session") ||
-        localStorage.getItem("kareem_camp_supabase_session");
-
-      if (savedSession && isSupabaseConfigured && supabase) {
-        try {
-          const sessionObj = JSON.parse(savedSession);
-          await supabase.auth.setSession(sessionObj);
-        } catch (e) {
-          console.warn("Failed to restore Supabase auth session:", e);
-        }
-      }
-
       const savedUser =
         sessionStorage.getItem("kareem_camp_logged_in") ||
         localStorage.getItem("kareem_camp_logged_in");
 
+      const savedSession =
+        sessionStorage.getItem("kareem_camp_supabase_session") ||
+        localStorage.getItem("kareem_camp_supabase_session");
+
       if (savedUser) {
         try {
           const parsed = JSON.parse(savedUser);
+
+          if (savedSession && isSupabaseConfigured && supabase) {
+            try {
+              const sessionObj = JSON.parse(savedSession);
+              const { error } = await supabase.auth.setSession(sessionObj);
+              if (error) {
+                console.warn("Expired or invalid Supabase session, clearing auth:", error);
+                await handleLogout();
+                setLoading(false);
+                return;
+              }
+            } catch (e) {
+              console.warn("Failed to restore Supabase auth session:", e);
+            }
+          }
+
           setUser(parsed);
         } catch (e) {
-          setUser(null);
-          sessionStorage.removeItem("kareem_camp_logged_in");
-          localStorage.removeItem("kareem_camp_logged_in");
+          await handleLogout();
+          setLoading(false);
+          return;
         }
       } else {
         setUser(null);
+        if (typeof window !== "undefined") {
+          sessionStorage.removeItem("kareem_camp_logged_in");
+          localStorage.removeItem("kareem_camp_logged_in");
+          sessionStorage.removeItem("kareem_camp_supabase_session");
+          localStorage.removeItem("kareem_camp_supabase_session");
+        }
       }
       setLoading(false);
     };
@@ -114,10 +127,25 @@ export const AppProvider = ({ children }) => {
   }, [user?.campId, user?.role]);
 
   const handleLogout = async () => {
-    sessionStorage.removeItem("kareem_camp_logged_in");
-    localStorage.removeItem("kareem_camp_logged_in");
-    sessionStorage.removeItem("kareem_camp_supabase_session");
-    localStorage.removeItem("kareem_camp_supabase_session");
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("kareem_camp_logged_in");
+      localStorage.removeItem("kareem_camp_logged_in");
+      sessionStorage.removeItem("kareem_camp_supabase_session");
+      localStorage.removeItem("kareem_camp_supabase_session");
+
+      // إخلاء كامل لأي رموز Supabase قديمة مخزنة بالمتصفح
+      Object.keys(localStorage).forEach((key) => {
+        if (key.includes("supabase.auth.token") || key.startsWith("sb-")) {
+          localStorage.removeItem(key);
+        }
+      });
+      Object.keys(sessionStorage).forEach((key) => {
+        if (key.includes("supabase.auth.token") || key.startsWith("sb-")) {
+          sessionStorage.removeItem(key);
+        }
+      });
+    }
+
     if (isSupabaseConfigured && supabase) {
       try {
         await supabase.auth.signOut();
