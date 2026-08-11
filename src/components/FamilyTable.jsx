@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { FaEdit, FaTrashAlt, FaSearch, FaUserFriends, FaMapMarkerAlt, FaPhoneAlt, FaIdCard } from "react-icons/fa";
+import { formatDateForExcel } from "../utils/exportExcel";
 
 const FamilyTable = ({ families, onEdit, onDelete }) => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -95,7 +96,7 @@ const FamilyTable = ({ families, onEdit, onDelete }) => {
                     </td>
 
                     {/* تاريخ ميلاد رب الأسرة */}
-                    <td>{family.dob || <span className="text-muted">-</span>}</td>
+                    <td>{family.dob ? formatDateForExcel(family.dob) : <span className="text-muted">-</span>}</td>
 
                     {/* الحالة الاجتماعية */}
                     <td className="text-center">
@@ -129,7 +130,7 @@ const FamilyTable = ({ families, onEdit, onDelete }) => {
 
                     {/* تاريخ ميلاد الزوجة */}
                     <td>
-                      {isMarried ? (family.wifeDob || <span className="text-muted">-</span>) : <span className="text-muted">-</span>}
+                      {isMarried && family.wifeDob ? formatDateForExcel(family.wifeDob) : <span className="text-muted">-</span>}
                     </td>
 
                     {/* الهاتف */}

@@ -19,7 +19,7 @@ import {
   FaGlobe,
   FaBuilding
 } from "react-icons/fa";
-import { authenticateUser, getSuperAdminUsername } from "../services/campService";
+import { authenticateUser } from "../services/campService";
 
 const Login = ({ setUser }) => {
   const [username, setUsername] = useState("");
@@ -28,9 +28,6 @@ const Login = ({ setUser }) => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-
-  const superAdminUser = getSuperAdminUsername();
-  const isSuperAdminUser = username.trim().toLowerCase() === superAdminUser.toLowerCase() || username.trim().toLowerCase() === "ibrahim";
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -41,8 +38,7 @@ const Login = ({ setUser }) => {
       return;
     }
 
-    // إذا كان اسم المستخدم ليس superadmin ويحتاج كلمة سر
-    if (!isSuperAdminUser && !password) {
+    if (!password) {
       setError("يرجى إدخال كلمة المرور.");
       return;
     }
@@ -204,26 +200,20 @@ const Login = ({ setUser }) => {
                     autoComplete="username"
                   />
                 </div>
-                {isSuperAdminUser && (
-                  <div className="ibrahim-pass-free-notice">
-                    <FaCrown style={{ color: "#f59e0b" }} /> 
-                    <span>حساب المشرف العام والمهندس المطور ({superAdminUser}) - مسموح الدخول مباشرة بدون كلمة سر ✨</span>
-                  </div>
-                )}
               </div>
 
               <div className="login-input-group-3d">
                 <label htmlFor="password" className="login-input-label">
-                  <FaLock className="login-field-icon" /> كلمة المرور {isSuperAdminUser && <span className="optional-badge">(اختياري لـ {superAdminUser})</span>}
+                  <FaLock className="login-field-icon" /> كلمة المرور
                 </label>
                 <div className="input-with-icon-3d">
                   <input
                     type={showPassword ? "text" : "password"}
                     id="password"
-                    placeholder={isSuperAdminUser ? `غير مطلوبة لحساب ${superAdminUser}` : "أدخل كلمة المرور"}
+                    placeholder="أدخل كلمة المرور"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    required={!isSuperAdminUser}
+                    required
                     autoComplete="current-password"
                   />
                   <button

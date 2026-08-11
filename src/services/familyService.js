@@ -1,1887 +1,117 @@
-import { supabase, isSupabaseConfigured, isDemoMode } from "../lib/supabase";
+import { supabase, isSupabaseConfigured } from "../lib/supabase";
 import { encryptData, decryptData } from "../utils/security";
+import {
+  localStorageGet,
+  localStorageSet,
+  mapFamilyToSupabase,
+  mapFamilyToLocal,
+} from "./helpers";
+import defaultFamilies from "./familiesDefault.json";
 
-const demoSubscribers = new Set();
-const notifyDemoSubscribers = () => {
-  demoSubscribers.forEach(cb => cb());
-};
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const FAMILIES_KEY = "kareem_camp_families_v5";
+const FAMILIES_CLEARED_KEY = "kareem_camp_families_cleared";
+
+// ─── Local Storage helpers ────────────────────────────────────────────────────
+
+const getFamiliesFromLocal = () => localStorageGet(FAMILIES_KEY, []);
+
+const saveFamiliesToLocal = (families) => localStorageSet(FAMILIES_KEY, families);
 
 const initLocalStorage = () => {
   if (typeof window === "undefined") return;
-  const existing = localStorage.getItem("kareem_camp_families_v5");
-  if (!existing && localStorage.getItem("kareem_camp_families_cleared") !== "true") {
-    localStorage.setItem("kareem_camp_families_v5", encryptData(defaultFamilies));
+  const existing = localStorage.getItem(FAMILIES_KEY);
+  if (!existing && localStorage.getItem(FAMILIES_CLEARED_KEY) !== "true") {
+    saveFamiliesToLocal(defaultFamilies);
   }
 };
 
-// بيانات تجريبية افتراضية للمخيم
-const defaultFamilies = [
-  {
-    "id": "csv-2-410178776",
-    "name": "محمد جودة عبدالله جودة",
-    "idNumber": "410178776",
-    "phone": "0599499119",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1972-04-20",
-    "wifeName": "منى محمد محمود جودة",
-    "wifeId": "900838657",
-    "wifeDob": "1975-04-21",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.041Z"
-  },
-  {
-    "id": "csv-3-800703761",
-    "name": "عبد المعطى خميس رمضان غبن",
-    "idNumber": "800703761",
-    "phone": "0592780314",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1987-03-11",
-    "wifeName": "ايمان محمد جوده جوده",
-    "wifeId": "420425803",
-    "wifeDob": "2004-07-09",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-4-906531702",
-    "name": "ابرهيم موسى محمود المطوق",
-    "idNumber": "906531702",
-    "phone": "0592384156",
-    "membersCount": 8,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1981-01-05",
-    "wifeName": "رغده محمد العبد خليل المطوق",
-    "wifeId": "800114357",
-    "wifeDob": "1983-12-07",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-5-803589118",
-    "name": "ايهاب خليل موسى المطوق",
-    "idNumber": "803589118",
-    "phone": "0592445223",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1992-05-28",
-    "wifeName": "ايات عمر نعمان المطوق",
-    "wifeId": "401255096",
-    "wifeDob": "1996-04-12",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-6-800011876",
-    "name": "مصطفي محمود احمد المطوق",
-    "idNumber": "800011876",
-    "phone": "0599848874",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1983-05-15",
-    "wifeName": "اسلام محمد احمد المطوق",
-    "wifeId": "801504044",
-    "wifeDob": "1986-06-04",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-7-974860165",
-    "name": "ايوب محمد محمود المطوق",
-    "idNumber": "974860165",
-    "phone": "0594061447",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1995-10-12",
-    "wifeName": "نعيمة حسن عطا المطوق",
-    "wifeId": "903461226",
-    "wifeDob": "1971-02-05",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-8-400121505",
-    "name": "محمد جميل موسى المطوق",
-    "idNumber": "400121505",
-    "phone": "0598288415",
-    "membersCount": 5,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1988-09-01",
-    "wifeName": "امنه خالد عبدالكريم المطوق",
-    "wifeId": "400831079",
-    "wifeDob": "1995-09-04",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-9-408042729",
-    "name": "محمود خليل موسى المطوق",
-    "idNumber": "408042729",
-    "phone": "0592758442",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2002-06-04",
-    "wifeName": "خلود عزات عبد الخالق منون",
-    "wifeId": "425936580",
-    "wifeDob": "2008-05-11",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-10-900627753",
-    "name": "محمد جميل مصطفى شلحه",
-    "idNumber": "900627753",
-    "phone": "0597844531",
-    "membersCount": 8,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1978-01-29",
-    "wifeName": "هبه اسماعيل محمد شلحه",
-    "wifeId": "800298705",
-    "wifeDob": "1985-01-19",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-11-935207670",
-    "name": "جميل موسى محمود المطوق",
-    "idNumber": "935207670",
-    "phone": "0598835402",
-    "membersCount": 7,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1966-04-01",
-    "wifeName": "حنان خليل ابراهيم  المطوق",
-    "wifeId": "925352239",
-    "wifeDob": "1972-02-17",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-12-800165144",
-    "name": "سامي حنبلي محمد المطوق",
-    "idNumber": "800165144",
-    "phone": "0598381524",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1984-01-18",
-    "wifeName": "مريم ناصر مصطفى المطوق",
-    "wifeId": "803321603",
-    "wifeDob": "1991-08-29",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-13-801881715",
-    "name": "محمد احمد محمد ابو لغد",
-    "idNumber": "801881715",
-    "phone": "0599235474",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1988-01-31",
-    "wifeName": "فداء عاطف محمد ابو لغد",
-    "wifeId": "802651414",
-    "wifeDob": "1990-03-08",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-14-901433474",
-    "name": "عمر عمر عبد السلام عوض",
-    "idNumber": "901433474",
-    "phone": "0599602172",
-    "membersCount": 8,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1978-11-25",
-    "wifeName": "رحاب عطية إبراهيم عوض",
-    "wifeId": "901628172",
-    "wifeDob": "1977-04-03",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-15-420567240",
-    "name": "محمد حنبلي عبدالناصر المطوق",
-    "idNumber": "420567240",
-    "phone": "0592119164",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2004-11-29",
-    "wifeName": "ريماس احمد محمود المطوق",
-    "wifeId": "429834922",
-    "wifeDob": "2010-07-07",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-16-974867731",
-    "name": "احمد ابراهيم محمد ريحان",
-    "idNumber": "974867731",
-    "phone": "0597930618",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1956-01-01",
-    "wifeName": "امل محمد على ريحان",
-    "wifeId": "917037459",
-    "wifeDob": "1962-01-01",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-17-803156421",
-    "name": "هاني احمد ابراهيم ريحان",
-    "idNumber": "803156421",
-    "phone": "0598402269",
-    "membersCount": 8,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1992-01-02",
-    "wifeName": "اسماء عاطف محمد ريحان",
-    "wifeId": "400774154",
-    "wifeDob": "1994-10-10",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-18-421693839",
-    "name": "اسماعيل احمد ابراهيم ريحان",
-    "idNumber": "421693839",
-    "phone": "0594341817",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2007-11-23",
-    "wifeName": "امال محمد احمد ريحان",
-    "wifeId": "426191987",
-    "wifeDob": "2008-10-08",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-19-903634822",
-    "name": "سامي احمد ابراهيم ريحان",
-    "idNumber": "903634822",
-    "phone": "0595642422",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1980-02-14",
-    "wifeName": "سنية محمود ابراهيم ريحان",
-    "wifeId": "905503231",
-    "wifeDob": "1980-12-26",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-20-802075358",
-    "name": "يوسف احمد ابراهيم ريحان",
-    "idNumber": "802075358",
-    "phone": "0598327448",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1988-09-10",
-    "wifeName": "ايمان محمد غازي جمعه ريحان",
-    "wifeId": "802278663",
-    "wifeDob": "1989-04-15",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-21-803211135",
-    "name": "قاسم عاطف محمد شعبان",
-    "idNumber": "803211135",
-    "phone": "0599025710",
-    "membersCount": 5,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1991-05-12",
-    "wifeName": "سريه احمد ابراهيم شعبان",
-    "wifeId": "804775708",
-    "wifeDob": "1994-01-28",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-22-802848622",
-    "name": "اسماء محمد حنفي محمد سعد",
-    "idNumber": "802848622",
-    "phone": "0592625668",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1990-12-09",
-    "wifeName": "-",
-    "wifeId": "-",
-    "wifeDob": "-",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-23-800589053",
-    "name": "يوسف محمود احمد المطوق",
-    "idNumber": "800589053",
-    "phone": "0599272921",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1985-09-09",
-    "wifeName": "انسام ماهر صبري المطوق",
-    "wifeId": "804577377",
-    "wifeDob": "1993-10-16",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-24-935249425",
-    "name": "زهير ربيع صالح عوض",
-    "idNumber": "935249425",
-    "phone": "0599726762",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1973-11-27",
-    "wifeName": "سماهر عطية عطية عوض",
-    "wifeId": "901300301",
-    "wifeDob": "1976-11-18",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-25-901523209",
-    "name": "زاهر ربيع صالح عوض",
-    "idNumber": "901523209",
-    "phone": "0597063620",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1978-10-09",
-    "wifeName": "تحرير داود زكريا عوض",
-    "wifeId": "800201485",
-    "wifeDob": "1984-04-22",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-26-802460667",
-    "name": "علاء الدين محمد صالح عوض",
-    "idNumber": "802460667",
-    "phone": "0594858089",
-    "membersCount": 5,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1989-10-08",
-    "wifeName": "ماريا ربيع صالح عوض",
-    "wifeId": "405909607",
-    "wifeDob": "2000-03-23",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-27-801963653",
-    "name": "محمد ربيع صالح عوض",
-    "idNumber": "801963653",
-    "phone": "0597313996",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1988-04-16",
-    "wifeName": "سهير صفوت محمد عوض",
-    "wifeId": "400110912",
-    "wifeDob": "1994-09-24",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-28-403256910",
-    "name": "رامي زهير ربيع عوض",
-    "idNumber": "403256910",
-    "phone": "0592564098",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1997-11-15",
-    "wifeName": "الهام مروان عطية عوض",
-    "wifeId": "403749856",
-    "wifeDob": "1998-03-26",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-29-915826846",
-    "name": "ربيع صالح احمد عوض",
-    "idNumber": "915826846",
-    "phone": "0598433015",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1955-01-01",
-    "wifeName": "نعيمة عايش ابرهيم عوض",
-    "wifeId": "915825483",
-    "wifeDob": "1966-01-10",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-30-405973660",
-    "name": "عبدالرحيم خالد عبد الرحيم سليمان",
-    "idNumber": "405973660",
-    "phone": "0594627930",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2000-05-16",
-    "wifeName": "هنادي ناصر لقمان سليمان",
-    "wifeId": "422740423",
-    "wifeDob": "2006-03-06",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-31-408510535",
-    "name": "سليمان خالد عبدالرحيم سليمان",
-    "idNumber": "408510535",
-    "phone": "0591969481",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2002-07-01",
-    "wifeName": "ميسون اسامه حسن سليمان",
-    "wifeId": "424738623",
-    "wifeDob": "2007-06-27",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-32-409665213",
-    "name": "رجب خالد عبدالرحيم سليمان",
-    "idNumber": "409665213",
-    "phone": "0597969481",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2004-05-21",
-    "wifeName": "روان محمود عبدالرحيم سليمان",
-    "wifeId": "422745935",
-    "wifeDob": "2006-05-16",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-33-407858653",
-    "name": "الاء محمود عبدالرحيم سليمان",
-    "idNumber": "407858653",
-    "phone": "0593693116",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2001-12-14",
-    "wifeName": "-",
-    "wifeId": "-",
-    "wifeDob": "-",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-34-903291672",
-    "name": "محمود عبدالرحيم رجب سليمان",
-    "idNumber": "903291672",
-    "phone": "0592660977",
-    "membersCount": 7,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1979-11-28",
-    "wifeName": "مريم محمد عبدالله سليمان",
-    "wifeId": "906528047",
-    "wifeDob": "1982-02-06",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-35-901338756",
-    "name": "خالد عبدالرحيم رجب سليمان",
-    "idNumber": "901338756",
-    "phone": "0599473983",
-    "membersCount": 7,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1976-07-16",
-    "wifeName": "اسماء زياد ربيع سليمان",
-    "wifeId": "931517718",
-    "wifeDob": "1982-05-08",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-36-801976622",
-    "name": "محمد عبد الهادي محمد المطوق",
-    "idNumber": "801976622",
-    "phone": "0598287690",
-    "membersCount": 8,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1988-06-01",
-    "wifeName": "امينة محمود عزات المطوق",
-    "wifeId": "803705706",
-    "wifeDob": "1992-06-30",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-37-801899980",
-    "name": "وليد توفيق محمد شبير",
-    "idNumber": "801899980",
-    "phone": "0599537909",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1988-01-14",
-    "wifeName": "لمياء أحمد عبد المعطي المبحوح",
-    "wifeId": "400865366",
-    "wifeDob": "1990-01-12",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-38-902525872",
-    "name": "نور الدين احمد محمود المطوق",
-    "idNumber": "902525872",
-    "phone": "0599810506",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1968-10-05",
-    "wifeName": "تحرير حمودة عبد السلام المطوق",
-    "wifeId": "930539580",
-    "wifeDob": "1970-01-18",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-39-422446856",
-    "name": "مهند جودة محمد إسماعيل جودة",
-    "idNumber": "422446856",
-    "phone": "0592628902",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1999-12-25",
-    "wifeName": "الفت محمد محمد صبح أبو زردة",
-    "wifeId": "422434928",
-    "wifeDob": "2005-10-04",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-40-903112027",
-    "name": "محمد علي محمد خليل ابو ورده",
-    "idNumber": "903112027",
-    "phone": "0592391213",
-    "membersCount": 9,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1981-03-13",
-    "wifeName": "ميرفت باسل يوسف ابوورده",
-    "wifeId": "800256943",
-    "wifeDob": "1984-04-14",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-41-407664507",
-    "name": "تامر محمد علي محمد ابووردة",
-    "idNumber": "407664507",
-    "phone": "0592391213",
-    "membersCount": 5,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2001-06-02",
-    "wifeName": "اسماء بشير حسن ابووردة",
-    "wifeId": "408379063",
-    "wifeDob": "2002-01-02",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-42-422559708",
-    "name": "عمارمحمد علي محمد ابووردة",
-    "idNumber": "422559708",
-    "phone": "0592391213",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2005-09-19",
-    "wifeName": "دعاء بشير حسن ابو وردة",
-    "wifeId": "422356592",
-    "wifeDob": "2008-04-16",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-43-400574984",
-    "name": "ايمن ايوب محمد المطوق",
-    "idNumber": "400574984",
-    "phone": "0593462926",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1995-02-25",
-    "wifeName": "شروق عطالله محمد المطوق",
-    "wifeId": "404675944",
-    "wifeDob": "1999-03-14",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-44-408039469",
-    "name": "عمران ايوب محمد المطوق",
-    "idNumber": "408039469",
-    "phone": "0599460061",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2002-05-21",
-    "wifeName": "اسماء تحسين كامل المطوق",
-    "wifeId": "425874997",
-    "wifeDob": "2008-05-01",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-45-915537922",
-    "name": "احمد صبحي احمد مقبل",
-    "idNumber": "915537922",
-    "phone": "0599792884",
-    "membersCount": 8,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1971-02-20",
-    "wifeName": "رندة رمضان احمد مقبل",
-    "wifeId": "910718444",
-    "wifeDob": "1970-01-26",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-46-935205104",
-    "name": "موسى عبد الرحمن محمد شهاب",
-    "idNumber": "935205104",
-    "phone": "0592119500",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1964-01-01",
-    "wifeName": "امنة رجب ابراهيم شهاب",
-    "wifeId": "976663070",
-    "wifeDob": "1964-01-01",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-47-414837336",
-    "name": "جودة محمد إسماعيل جودة جودة",
-    "idNumber": "414837336",
-    "phone": "0597793861",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1972-06-04",
-    "wifeName": "مريم محمد صبح محمد جودة",
-    "wifeId": "413350281",
-    "wifeDob": "1973-06-04",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-48-936658798",
-    "name": "فاطمة ربيع محمد جودة",
-    "idNumber": "936658798",
-    "phone": "0599858100",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1960-02-13",
-    "wifeName": "-",
-    "wifeId": "-",
-    "wifeDob": "-",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.042Z"
-  },
-  {
-    "id": "csv-49-800531683",
-    "name": "عبد الله جمال جودة جودة",
-    "idNumber": "800531683",
-    "phone": "0597060410",
-    "membersCount": 8,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1985-07-30",
-    "wifeName": "أسماء عطية إبراهيم جودة",
-    "wifeId": "800501397",
-    "wifeDob": "1985-04-09",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-50-802387381",
-    "name": "ربيع جمال جودة جودة",
-    "idNumber": "802387381",
-    "phone": "0599099693",
-    "membersCount": 8,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1989-11-25",
-    "wifeName": "نداء عاطف محمد جودة",
-    "wifeId": "802061606",
-    "wifeDob": "1988-08-06",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-51-400825055",
-    "name": "يوسف جمال جودة جودة",
-    "idNumber": "400825055",
-    "phone": "0599619593",
-    "membersCount": 4,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1995-08-29",
-    "wifeName": "مرح عبد الرحيم محمد أبو الحسنى",
-    "wifeId": "409040698",
-    "wifeDob": "2003-06-16",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-52-804574937",
-    "name": "محمود جمال جودة جودة",
-    "idNumber": "804574937",
-    "phone": "0597135848",
-    "membersCount": 5,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1993-10-27",
-    "wifeName": "امنة محمد صلاح رشد زامل",
-    "wifeId": "403647464",
-    "wifeDob": "1997-12-13",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-53-800505521",
-    "name": "رضا جهاد محمد جودة",
-    "idNumber": "800505521",
-    "phone": "0597858100",
-    "membersCount": 7,
-    "location": "مخيم كريم",
-    "status": "ارملة",
-    "dob": "1985-03-31",
-    "wifeName": "-",
-    "wifeId": "-",
-    "wifeDob": "-",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-54-946672953",
-    "name": "ميرفت جمال جودة منصور",
-    "idNumber": "946672953",
-    "phone": "0595830229",
-    "membersCount": 5,
-    "location": "مخيم كريم",
-    "status": "ارملة",
-    "dob": "1982-07-27",
-    "wifeName": "-",
-    "wifeId": "-",
-    "wifeDob": "-",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-55-800331803",
-    "name": "نضال سعدي صبري الدبور",
-    "idNumber": "800331803",
-    "phone": "0597099693",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1984-07-22",
-    "wifeName": "عائشة جمال جودة الدبور",
-    "wifeId": "801801069",
-    "wifeDob": "1987-10-20",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-56-804356582",
-    "name": "محمد جمال عايش النجار",
-    "idNumber": "804356582",
-    "phone": "0592108370",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1993-03-02",
-    "wifeName": "عبير جمال جودة النجار",
-    "wifeId": "803410505",
-    "wifeDob": "1991-10-09",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-57-422446831",
-    "name": "محمد جودة إسماعيل جودة",
-    "idNumber": "422446831",
-    "phone": "0592587826",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1996-08-02",
-    "wifeName": "شيماء معاذ نبيل المطوق",
-    "wifeId": "421071374",
-    "wifeDob": "2005-01-05",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-58-410313936",
-    "name": "ماهر جوده عبدالله جودة",
-    "idNumber": "410313936",
-    "phone": "0597114234",
-    "membersCount": 5,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1974-08-04",
-    "wifeName": "فاطمه محمد محمود جودة",
-    "wifeId": "901273391",
-    "wifeDob": "1976-08-27",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-59-414837120",
-    "name": "ميسر جوده عبدالله جودة",
-    "idNumber": "414837120",
-    "phone": "0597114234",
-    "membersCount": 1,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1976-06-18",
-    "wifeName": "-",
-    "wifeId": "-",
-    "wifeDob": "-",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-60-407017136",
-    "name": "جودة ماهر جوده جودة",
-    "idNumber": "407017136",
-    "phone": "0594707086",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2001-01-05",
-    "wifeName": "اريج هاني محمد عبدالله",
-    "wifeId": "409444163",
-    "wifeDob": "2003-09-16",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-61-903291722",
-    "name": "احمد محمد رجب سليمان",
-    "idNumber": "903291722",
-    "phone": "0592630552",
-    "membersCount": 7,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1979-12-24",
-    "wifeName": "خديجة محمود رمضان سليمان",
-    "wifeId": "800449654",
-    "wifeDob": "1985-02-03",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-62-405788720",
-    "name": "محمد عبدالله رجب محمد سليمان",
-    "idNumber": "405788720",
-    "phone": "0567754731",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1999-12-20",
-    "wifeName": "بيسان احمد محمد سليمان",
-    "wifeId": "426141032",
-    "wifeDob": "2008-07-07",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-63-405826744",
-    "name": "هاني عبدالهادي محمد المطوق",
-    "idNumber": "405826744",
-    "phone": "0592437153",
-    "membersCount": 4,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1999-12-21",
-    "wifeName": "فاتن جمال محمد دردونه",
-    "wifeId": "424475002",
-    "wifeDob": "2007-02-27",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-64-906651591",
-    "name": "نافزمحمد صبري المدني",
-    "idNumber": "906651591",
-    "phone": "0597792403",
-    "membersCount": 9,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1982-03-21",
-    "wifeName": "انعام وديع عوض ريحان",
-    "wifeId": "908961741",
-    "wifeDob": "1981-12-20",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-65-801066911",
-    "name": "نعيم وديع عوض ريحان",
-    "idNumber": "801066911",
-    "phone": "0599082446",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1972-11-17",
-    "wifeName": "سهيله محمد صبري المدني",
-    "wifeId": "991295411",
-    "wifeDob": "1980-11-30",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-66-901011775",
-    "name": "احمد محمود احمد المطوق",
-    "idNumber": "901011775",
-    "phone": "0569674445",
-    "membersCount": 7,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1975-12-01",
-    "wifeName": "ابتسام احمد عبدالقادرالمطوق",
-    "wifeId": "800854606",
-    "wifeDob": "1978-10-17",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-67-413345430",
-    "name": "ريم عبد المجيد حسن جمعه",
-    "idNumber": "413345430",
-    "phone": "0597450904",
-    "membersCount": 1,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1987-01-31",
-    "wifeName": "-",
-    "wifeId": "-",
-    "wifeDob": "-",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-68-401851670",
-    "name": "محموداحمد محمود المطوق",
-    "idNumber": "401851670",
-    "phone": "0592141440",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1996-09-03",
-    "wifeName": "دعاء خالد محمد ابولغد",
-    "wifeId": "424704559",
-    "wifeDob": "2007-07-11",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-69-912278769",
-    "name": "رائد ذياب محمد ابو معروف",
-    "idNumber": "912278769",
-    "phone": "0599342604",
-    "membersCount": 8,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1972-05-30",
-    "wifeName": "رضا فارس علي ابومعروف",
-    "wifeId": "900234824",
-    "wifeDob": "1974-05-04",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-70-801910803",
-    "name": "عبد الرحمن محمد احمد عبدالله",
-    "idNumber": "801910803",
-    "phone": "0598698648",
-    "membersCount": 5,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1988-02-20",
-    "wifeName": "اسماء ياسر خليل عبدالله",
-    "wifeId": "400869210",
-    "wifeDob": "1995-10-06",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-71-906559240",
-    "name": "مصطفي حسني شعبان المطوق",
-    "idNumber": "906559240",
-    "phone": "0599907381",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1982-04-17",
-    "wifeName": "ياسمين محمد حنفي محمد المطوق",
-    "wifeId": "802049106",
-    "wifeDob": "1988-09-04",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-72-400807806",
-    "name": "فايز جمعه احمد جمعه",
-    "idNumber": "400807806",
-    "phone": "0597450904",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1995-08-15",
-    "wifeName": "ريم عبد المجيد حسن البشليقي",
-    "wifeId": "413345430",
-    "wifeDob": "1987-01-31",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-73-801932500",
-    "name": "حمادة محمد درويش عساف",
-    "idNumber": "801932500",
-    "phone": "0599976850",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1988-04-05",
-    "wifeName": "ظريفة راجح عبد الرحمان عساف",
-    "wifeId": "801832163",
-    "wifeDob": "1987-12-16",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-74-991295304",
-    "name": "اياد محمد درويش عساف",
-    "idNumber": "991295304",
-    "phone": "0597676179",
-    "membersCount": 5,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1980-11-27",
-    "wifeName": "مني محمد عمر يوسف عساف",
-    "wifeId": "410538896",
-    "wifeDob": "1982-11-08",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-75-949832067",
-    "name": "امجد محمد درويش عساف",
-    "idNumber": "949832067",
-    "phone": "0597800150",
-    "membersCount": 4,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1983-06-03",
-    "wifeName": "اية محمود محمد حمدية",
-    "wifeId": "407930890",
-    "wifeDob": "2002-01-20",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-76-802666446",
-    "name": "ابرهيم محمد عوض ريحان",
-    "idNumber": "802666446",
-    "phone": "0599457356",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1990-10-18",
-    "wifeName": "ايمان محمد درويش ريحان",
-    "wifeId": "802387423",
-    "wifeDob": "1989-11-24",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-77-410550313",
-    "name": "خالد محمد عمر يوسف عساف",
-    "idNumber": "410550313",
-    "phone": "0599038151",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1977-09-27",
-    "wifeName": "نهي محمد درويش عساف",
-    "wifeId": "999781248",
-    "wifeDob": "1976-12-18",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-78-900278797",
-    "name": "درويش محمد درويش عساف",
-    "idNumber": "900278797",
-    "phone": "0595675183",
-    "membersCount": 9,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1974-10-13",
-    "wifeName": "حنان عطالله درويش عساف",
-    "wifeId": "700355662",
-    "wifeDob": "1982-01-01",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-79-902525856",
-    "name": "محمد احمد محمود المطوق",
-    "idNumber": "902525856",
-    "phone": "0599014173",
-    "membersCount": 4,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1958-05-13",
-    "wifeName": "مريم صبري محمد المطوق",
-    "wifeId": "915826168",
-    "wifeDob": "1965-03-18",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-80-802221598",
-    "name": "محمد عبد الرحيم احمد البشليقي",
-    "idNumber": "802221598",
-    "phone": "0567590971",
-    "membersCount": 6,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1989-02-16",
-    "wifeName": "خلود محمد احمد المطوق",
-    "wifeId": "803516046",
-    "wifeDob": "1992-02-24",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-81-803245406",
-    "name": "فداء عكاشة محمد المطوق",
-    "idNumber": "803245406",
-    "phone": "0595077749",
-    "membersCount": 4,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1991-06-10",
-    "wifeName": "0",
-    "wifeId": "-",
-    "wifeDob": "-",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-82-804410009",
-    "name": "بلال محمد احمد المطوق",
-    "idNumber": "804410009",
-    "phone": "0599744776",
-    "membersCount": 5,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1993-07-09",
-    "wifeName": "نفين اسامه فايق المطوق",
-    "wifeId": "404540064",
-    "wifeDob": "1998-12-09",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-83-403093057",
-    "name": "ناريمان يوسف صبري المطوق",
-    "idNumber": "403093057",
-    "phone": "0599747353",
-    "membersCount": 4,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1997-09-27",
-    "wifeName": "-",
-    "wifeId": "-",
-    "wifeDob": "-",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-84-911470276",
-    "name": "بسام محمد عبدربه ياغي",
-    "idNumber": "911470276",
-    "phone": "0595570031",
-    "membersCount": 4,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1969-03-05",
-    "wifeName": "فاطمه جميل موسى ياغي",
-    "wifeId": "802671511",
-    "wifeDob": "1990-11-09",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-85-403075195",
-    "name": "شادية صقر ذياب ريحان",
-    "idNumber": "403075195",
-    "phone": "0598889732",
-    "membersCount": 4,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1997-09-13",
-    "wifeName": "-",
-    "wifeId": "-",
-    "wifeDob": "-",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-86-900973553",
-    "name": "انتصار مصباح حمودة الدبور",
-    "idNumber": "900973553",
-    "phone": "0593629082",
-    "membersCount": 1,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1976-03-01",
-    "wifeName": "-",
-    "wifeId": "-",
-    "wifeDob": "-",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-87-400813697",
-    "name": "شادي صقر ذياب الدبور",
-    "idNumber": "400813697",
-    "phone": "0597629506",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1995-08-19",
-    "wifeName": "ياسمين بسام مصباح الدبور",
-    "wifeId": "407363746",
-    "wifeDob": "2001-11-30",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-88-424269629",
-    "name": "عدي عمر محمود دردونة",
-    "idNumber": "424269629",
-    "phone": "0592119713",
-    "membersCount": 5,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2006-08-07",
-    "wifeName": "اسلام محمد جمال دردونة",
-    "wifeId": "429122427",
-    "wifeDob": "2010-07-31",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-89-800202152",
-    "name": "عمر محمود محمد دردونة",
-    "idNumber": "800202152",
-    "phone": "0599654608",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1984-04-01",
-    "wifeName": "سناء عزام خليل دردونة",
-    "wifeId": "801480740",
-    "wifeDob": "1986-05-17",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-90-900534967",
-    "name": "محمد موسى سعد سعد",
-    "idNumber": "900534967",
-    "phone": "0599600543",
-    "membersCount": 7,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1978-03-29",
-    "wifeName": "ياسمين احمد فايق سليمان",
-    "wifeId": "906533419",
-    "wifeDob": "1981-01-22",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-91-404144826",
-    "name": "ريهام محمد موسى عيد",
-    "idNumber": "404144826",
-    "phone": "0599600543",
-    "membersCount": 1,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1998-09-15",
-    "wifeName": "0",
-    "wifeId": "-",
-    "wifeDob": "-",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-92-801328790",
-    "name": "عبد العزيز حسني شعبان المطوق",
-    "idNumber": "801328790",
-    "phone": "0595840622",
-    "membersCount": 7,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1985-10-15",
-    "wifeName": "ناهد شعبان حسين المطوق",
-    "wifeId": "801515578",
-    "wifeDob": "1986-07-01",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-93-409812138",
-    "name": "جمعه احمد جمعة جمعة",
-    "idNumber": "409812138",
-    "phone": "0592494048",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2003-12-30",
-    "wifeName": "سمام عبدالله ابرهيم جمعة",
-    "wifeId": "424389997",
-    "wifeDob": "2007-08-29",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-94-900963851",
-    "name": "تحسين كامل خليل خضر",
-    "idNumber": "900963851",
-    "phone": "0599176393",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1976-02-22",
-    "wifeName": "مريم محمد حنفي خضر",
-    "wifeId": "800177057",
-    "wifeDob": "1984-02-04",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-95-801933730",
-    "name": "باسل حنبلي محمد المطوق",
-    "idNumber": "801933730",
-    "phone": "0598395221",
-    "membersCount": 5,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1988-04-04",
-    "wifeName": "هديل جميل موسى المطوق",
-    "wifeId": "803545961",
-    "wifeDob": "1992-01-15",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-96-413347469",
-    "name": "حمزة جمال عبد الخالق ريحان",
-    "idNumber": "413347469",
-    "phone": "0599248329",
-    "membersCount": 4,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1986-07-11",
-    "wifeName": "نهاد زياد حمودة ريحان",
-    "wifeId": "803573666",
-    "wifeDob": "1992-03-15",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-97-421181470",
-    "name": "خضر صقر ذياب الدبور",
-    "idNumber": "421181470",
-    "phone": "0593219945",
-    "membersCount": 4,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2005-01-02",
-    "wifeName": "درين ماجد عبد المطلب الدبور",
-    "wifeId": "426141230",
-    "wifeDob": "2008-07-03",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-98-400898136",
-    "name": "يوسف عبد الفتاح محمد المطوق",
-    "idNumber": "400898136",
-    "phone": "0592453837",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1995-10-27",
-    "wifeName": "شيماء محمد خليل جميل دردونه",
-    "wifeId": "408397123",
-    "wifeDob": "2002-03-28",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-99-402974984",
-    "name": "محمود عيسى حسين البشليقي",
-    "idNumber": "402974984",
-    "phone": "0594133125",
-    "membersCount": 3,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1997-08-06",
-    "wifeName": "اسراء سعيد سعدي البشليقي",
-    "wifeId": "407038033",
-    "wifeDob": "2001-01-28",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-100-803714732",
-    "name": "محمد جمعه احمد جمعة",
-    "idNumber": "803714732",
-    "phone": "0592898929",
-    "membersCount": 4,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1992-07-11",
-    "wifeName": "حياة يحيى خليل جمعة",
-    "wifeId": "413328238",
-    "wifeDob": "1992-05-11",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-101-804494656",
-    "name": "عوض ناهض محمد ابو وردة",
-    "idNumber": "804494656",
-    "phone": "0597110269",
-    "membersCount": 5,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1993-10-05",
-    "wifeName": "سوسن جمعه محمد ابو وردة",
-    "wifeId": "802966690",
-    "wifeDob": "1995-04-08",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-102-409435880",
-    "name": "سميه ناهض محمد شعبان",
-    "idNumber": "409435880",
-    "phone": "0597110269",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2004-02-11",
-    "wifeName": "0",
-    "wifeId": "-",
-    "wifeDob": "-",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-103-926494154",
-    "name": "حسن احمد عبدالله خضر",
-    "idNumber": "926494154",
-    "phone": "0598885016",
-    "membersCount": 4,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1965-07-24",
-    "wifeName": "سهام ابراهيم علي خضر",
-    "wifeId": "801003732",
-    "wifeDob": "1966-04-06",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-104-900971250",
-    "name": "بشرى مصطفي حسين ابو وردة",
-    "idNumber": "900971250",
-    "phone": "0597110269",
-    "membersCount": 1,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1976-02-01",
-    "wifeName": "0",
-    "wifeId": "-",
-    "wifeDob": "-",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-105-914426739",
-    "name": "عبد الفتاح محمد محمود المطوق",
-    "idNumber": "914426739",
-    "phone": "0592491850",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1970-07-15",
-    "wifeName": "نهاد ذيب شعبان المطوق",
-    "wifeId": "945753747",
-    "wifeDob": "1973-11-27",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-106-800544264",
-    "name": "رائد زياد خليل عزام",
-    "idNumber": "800544264",
-    "phone": "0597205489",
-    "membersCount": 7,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1985-06-03",
-    "wifeName": "رقيه محمد خليل عزام",
-    "wifeId": "802181891",
-    "wifeDob": "1988-09-02",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-107-801328857",
-    "name": "حسام مصباح حمودة بدره",
-    "idNumber": "801328857",
-    "phone": "0594444900",
-    "membersCount": 8,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1985-04-25",
-    "wifeName": "رويدا زيادحمودة بدره",
-    "wifeId": "801468380",
-    "wifeDob": "1986-04-08",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-108-407743400",
-    "name": "احمد موسى احمد المطوق",
-    "idNumber": "407743400",
-    "phone": "0593229318",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2001-07-27",
-    "wifeName": "حليمة بلال سعيد المطوق",
-    "wifeId": "429793508",
-    "wifeDob": "2010-08-27",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-109-803900802",
-    "name": "مريم خضر حسين البشليقي",
-    "idNumber": "803900802",
-    "phone": "0567177302",
-    "membersCount": 5,
-    "location": "مخيم كريم",
-    "status": "ارملة",
-    "dob": "1992-12-24",
-    "wifeName": "-",
-    "wifeId": "-",
-    "wifeDob": "-",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-110-900935271",
-    "name": "محمود عبد محمد سليمان",
-    "idNumber": "900935271",
-    "phone": "0592724856",
-    "membersCount": 7,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1975-09-28",
-    "wifeName": "نعيمه عايش محمد سليمان",
-    "wifeId": "901523126",
-    "wifeDob": "1978-09-10",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-111-802669721",
-    "name": "سعيد حرب سعيد عسلية",
-    "idNumber": "802669721",
-    "phone": "0598392203",
-    "membersCount": 7,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1990-11-12",
-    "wifeName": "صابرين رائد مهيوب عسلية",
-    "wifeId": "400076066",
-    "wifeDob": "1994-07-19",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-112-936658756",
-    "name": "يحيى ربيع محمد ابو حميدان",
-    "idNumber": "936658756",
-    "phone": "0567409511",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1964-08-21",
-    "wifeName": "رحاب محمد عبدالكريم ابوحميدان",
-    "wifeId": "925734550",
-    "wifeDob": "1971-10-12",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-113-404614547",
-    "name": "براء محمد اسماعيل رضوان",
-    "idNumber": "404614547",
-    "phone": "0592924702",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "27/02/1999",
-    "wifeName": "مها درويش محمد عساف",
-    "wifeId": "422734319",
-    "wifeDob": "21/12/2005",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-114-801387028",
-    "name": "سها محمد درويش عبيد",
-    "idNumber": "801387028",
-    "phone": "0597447379",
-    "membersCount": 8,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1987-11-01",
-    "wifeName": "الزوج خارج البلد",
-    "wifeId": "-",
-    "wifeDob": "-",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-115-424045425",
-    "name": "إبراهيم ناهض محمد أبو وردة",
-    "idNumber": "424045425",
-    "phone": "0598565982",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2006-06-27",
-    "wifeName": "أريج ناصر جمعة أبو وردة",
-    "wifeId": "422678532",
-    "wifeDob": "2006-02-18",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-116-424052322",
-    "name": "عمر محمد أحمد المطوق",
-    "idNumber": "424052322",
-    "phone": "0597968215",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2007-03-20",
-    "wifeName": "سندس عبد الله محمد المطوق",
-    "wifeId": "427601851",
-    "wifeDob": "2009-04-20",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-117-440447605",
-    "name": "زهير ربيع زهير عوض",
-    "idNumber": "440447605",
-    "phone": "0598075729",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "يتيم",
-    "dob": "2018-02-19",
-    "wifeName": "-",
-    "wifeId": "-",
-    "wifeDob": "-",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-118-409511482",
-    "name": "أحمد نافذ حكمت ريحان",
-    "idNumber": "409511482",
-    "phone": "0594456216",
-    "membersCount": 2,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "2004-08-04",
-    "wifeName": "ريماس أسامة رمضان طنبورة",
-    "wifeId": "452272073",
-    "wifeDob": "2011-09-21",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-119-903277622",
-    "name": "نافذ حكمت فوزي ريحان",
-    "idNumber": "903277622",
-    "phone": "0598378020",
-    "membersCount": 4,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1979-02-28",
-    "wifeName": "ريما محمد جمعة ريحان",
-    "wifeId": "410151095",
-    "wifeDob": "1982-04-09",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-120-801999665",
-    "name": "محمد أحمد عبد الله عسلية",
-    "idNumber": "801999665",
-    "phone": "0597287573",
-    "membersCount": 5,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1988-07-17",
-    "wifeName": "ابتسام ناصر مصباح عسلية",
-    "wifeId": "802491696",
-    "wifeDob": "1989-11-02",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-121-801328568",
-    "name": "عمر حكمت فواز ريحان",
-    "idNumber": "801328568",
-    "phone": "0594714485",
-    "membersCount": 5,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "1985-10-17",
-    "wifeName": "كاملة جمال مصطفى ريحان",
-    "wifeId": "801717562",
-    "wifeDob": "1987-10-07",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
-  },
-  {
-    "id": "csv-132-900645797",
-    "name": "أكرم جمال جودة جودة",
-    "idNumber": "900645797",
-    "phone": "0595558021",
-    "membersCount": 7,
-    "location": "مخيم كريم",
-    "status": "متزوج",
-    "dob": "21/05/1978",
-    "wifeName": "أسماء محمود صالح عوض",
-    "wifeId": "931543664",
-    "wifeDob": "19/07/1982",
-    "notes": "",
-    "createdAt": "2026-08-05T10:22:14.043Z"
+// ─── Demo subscriber pub/sub ─────────────────────────────────────────────────
+
+const demoSubscribers = new Set();
+
+const notifyDemoSubscribers = () => {
+  demoSubscribers.forEach((cb) => cb());
+};
+
+// ─── Supabase mapper ─────────────────────────────────────────────────────────
+
+const mapSupabaseFamilyToJS = (row) => {
+  let dob =
+    row.dob || row.birth_date || row.date_of_birth || row.birthDate || row.birthdate || "";
+  let wifeDob =
+    row.wife_dob ||
+    row.wife_birth_date ||
+    row.wife_date_of_birth ||
+    row.wifeDob ||
+    row.wifebirthdate ||
+    "";
+
+  // مطابقة تلقائية لتواريخ الميلاد من القائمة الافتراضية في حال كانت فارغة
+  const match = defaultFamilies.find(
+    (df) => (df.idNumber && df.idNumber === row.id_number) || df.id === row.id
+  );
+  if (match) {
+    if (!dob || dob === "-") dob = match.dob;
+    if (!wifeDob || wifeDob === "-") wifeDob = match.wifeDob;
   }
-];
+
+  return {
+    id: row.id,
+    campId: row.camp_id,
+    name: row.name,
+    idNumber: row.id_number || "",
+    phone: row.phone || "",
+    membersCount: row.members_count || 1,
+    location: row.location || "",
+    status: row.status || "",
+    dob: dob || "",
+    wifeName: row.wife_name || "",
+    wifeId: row.wife_id || "",
+    wifeDob: wifeDob || "",
+    notes: row.notes || "",
+    createdAt: row.created_at || new Date().toISOString(),
+  };
+};
+
+// ─── Demo data reader ─────────────────────────────────────────────────────────
 
 const getDemoFamilies = (campId) => {
   if (typeof window === "undefined") return defaultFamilies;
   initLocalStorage();
-  const ciphertext = localStorage.getItem("kareem_camp_families_v5");
-  let families = ciphertext ? decryptData(ciphertext) : [];
-  if ((!families || families.length === 0) && localStorage.getItem("kareem_camp_families_cleared") !== "true") {
+
+  let families = getFamiliesFromLocal();
+
+  // تهيئة البيانات الافتراضية إن كانت فارغة
+  if (!families.length && localStorage.getItem(FAMILIES_CLEARED_KEY) !== "true") {
     families = defaultFamilies;
-    localStorage.setItem("kareem_camp_families_v5", encryptData(families));
-  } else if (families && families.length > 0) {
+    saveFamiliesToLocal(families);
+  } else if (families.length) {
+    // تحديث تواريخ الميلاد الناقصة من البيانات الافتراضية
     let updated = false;
-    families = families.map(f => {
-      const match = defaultFamilies.find(df => (df.idNumber && df.idNumber === f.idNumber) || df.id === f.id);
+    families = families.map((f) => {
+      const match = defaultFamilies.find(
+        (df) => (df.idNumber && df.idNumber === f.idNumber) || df.id === f.id
+      );
       if (match) {
         if (!f.dob || f.dob === "-") { f.dob = match.dob; updated = true; }
         if (!f.wifeDob || f.wifeDob === "-") { f.wifeDob = match.wifeDob; updated = true; }
       }
       return f;
     });
-    if (updated) {
-      localStorage.setItem("kareem_camp_families_v5", encryptData(families));
-    }
+    if (updated) saveFamiliesToLocal(families);
   }
 
-  const filtered = families.filter(f => {
-    if (!f.campId || f.campId === "kareem") {
-      return campId === "kareem";
-    }
-    return f.campId === campId;
-  });
-
-  return filtered.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  return families
+    .filter((f) => {
+      if (!f.campId || f.campId === "kareem") return campId === "kareem";
+      return f.campId === campId;
+    })
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 };
 
-const mapSupabaseFamilyToJS = (row) => ({
-  id: row.id,
-  campId: row.camp_id,
-  name: row.name,
-  idNumber: row.id_number || "",
-  phone: row.phone || "",
-  membersCount: row.members_count || 1,
-  location: row.location || "",
-  status: row.status || "",
-  dob: row.dob || "",
-  wifeName: row.wife_name || "",
-  wifeId: row.wife_id || "",
-  wifeDob: row.wife_dob || "",
-  notes: row.notes || "",
-  createdAt: row.created_at || new Date().toISOString()
-});
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 export const subscribeFamilies = (campId, callback) => {
   if (isSupabaseConfigured) {
@@ -1890,21 +120,16 @@ export const subscribeFamilies = (campId, callback) => {
         const { data, error } = await supabase
           .from("families")
           .select("*")
-          .eq("camp_id", campId)
           .order("created_at", { ascending: true });
-        
-        if (!error && data && data.length > 0) {
-          callback(data.map(mapSupabaseFamilyToJS));
+
+        if (!error && data) {
+          const target = campId || "kareem";
+          const filtered = data.filter((f) => (f.camp_id || "kareem") === target);
+          callback(filtered.map(mapSupabaseFamilyToJS));
           return;
         }
-
-        if (!error && data && data.length === 0 && localStorage.getItem("kareem_camp_families_cleared") === "true") {
-          callback([]);
-          return;
-        }
-
         callback(getDemoFamilies(campId));
-      } catch (e) {
+      } catch {
         callback(getDemoFamilies(campId));
       }
     };
@@ -1920,9 +145,7 @@ export const subscribeFamilies = (campId, callback) => {
       )
       .subscribe();
 
-    const wrapper = () => {
-      fetchAndNotify();
-    };
+    const wrapper = () => fetchAndNotify();
     demoSubscribers.add(wrapper);
 
     return () => {
@@ -1932,109 +155,48 @@ export const subscribeFamilies = (campId, callback) => {
   }
 
   initLocalStorage();
-  const wrapper = () => {
-    callback(getDemoFamilies(campId));
-  };
+  const wrapper = () => callback(getDemoFamilies(campId));
   demoSubscribers.add(wrapper);
   wrapper();
-  return () => {
-    demoSubscribers.delete(wrapper);
-  };
+  return () => demoSubscribers.delete(wrapper);
 };
 
 /**
  * إضافة عائلة جديدة
- * @param {string} campId - معرّف المخيم
- * @param {Object} familyData - بيانات العائلة
  */
 export const addFamily = async (campId, familyData) => {
-  const customId = familyData.id || "family_" + Date.now();
-  
+  const id = familyData.id || "family_" + Date.now();
+
   if (isSupabaseConfigured) {
     try {
-      const payload = {
-        id: customId,
-        camp_id: campId,
-        name: familyData.name.trim(),
-        id_number: familyData.idNumber.trim(),
-        phone: familyData.phone.trim(),
-        members_count: parseInt(familyData.membersCount) || 1,
-        location: familyData.location.trim(),
-        status: familyData.status ? familyData.status.trim() : "أعزب",
-        dob: familyData.dob ? familyData.dob.trim() : "",
-        wife_name: familyData.wifeName ? familyData.wifeName.trim() : "",
-        wife_id: familyData.wifeId ? familyData.wifeId.trim() : "",
-        wife_dob: familyData.wifeDob ? familyData.wifeDob.trim() : "",
-        notes: familyData.notes ? familyData.notes.trim() : "",
-        created_at: new Date().toISOString()
-      };
-      await supabase.from("families").insert([payload]);
+      await supabase.from("families").insert([mapFamilyToSupabase(campId, familyData, id)]);
     } catch (e) {
       console.warn("Supabase addFamily warning:", e);
     }
   }
 
-  const newFamily = {
-    id: customId,
-    campId,
-    name: familyData.name.trim(),
-    idNumber: familyData.idNumber.trim(),
-    phone: familyData.phone.trim(),
-    membersCount: parseInt(familyData.membersCount) || 1,
-    location: familyData.location.trim(),
-    status: familyData.status ? familyData.status.trim() : "أعزب",
-    dob: familyData.dob ? familyData.dob.trim() : "",
-    wifeName: familyData.wifeName ? familyData.wifeName.trim() : "",
-    wifeId: familyData.wifeId ? familyData.wifeId.trim() : "",
-    wifeDob: familyData.wifeDob ? familyData.wifeDob.trim() : "",
-    notes: familyData.notes ? familyData.notes.trim() : "",
-    createdAt: new Date().toISOString()
-  };
-
-  localStorage.removeItem("kareem_camp_families_cleared");
+  localStorage.removeItem(FAMILIES_CLEARED_KEY);
   initLocalStorage();
-  const ciphertext = localStorage.getItem("kareem_camp_families_v5");
-  let families = ciphertext ? decryptData(ciphertext) : [];
-  families = families.filter(f => f.id !== customId);
-  families.push(newFamily);
-  localStorage.setItem("kareem_camp_families_v5", encryptData(families));
+  const families = getFamiliesFromLocal().filter((f) => f.id !== id);
+  families.push(mapFamilyToLocal(campId, familyData, id));
+  saveFamiliesToLocal(families);
   notifyDemoSubscribers();
-  return customId;
+  return id;
 };
 
 /**
  * تعديل بيانات عائلة موجودة
  */
 export const updateFamily = async (id, familyData) => {
-  const updatedData = {
-    name: familyData.name.trim(),
-    idNumber: familyData.idNumber.trim(),
-    phone: familyData.phone.trim(),
-    membersCount: parseInt(familyData.membersCount) || 1,
-    location: familyData.location.trim(),
-    status: familyData.status ? familyData.status.trim() : "أعزب",
-    dob: familyData.dob ? familyData.dob.trim() : "",
-    wifeName: familyData.wifeName ? familyData.wifeName.trim() : "",
-    wifeId: familyData.wifeId ? familyData.wifeId.trim() : "",
-    wifeDob: familyData.wifeDob ? familyData.wifeDob.trim() : "",
-    notes: familyData.notes ? familyData.notes.trim() : ""
-  };
+  const updatedData = mapFamilyToLocal(null, familyData, id);
 
   if (isSupabaseConfigured) {
     try {
-      const payload = {
-        name: updatedData.name,
-        id_number: updatedData.idNumber,
-        phone: updatedData.phone,
-        members_count: updatedData.membersCount,
-        location: updatedData.location,
-        status: updatedData.status,
-        dob: updatedData.dob,
-        wife_name: updatedData.wifeName,
-        wife_id: updatedData.wifeId,
-        wife_dob: updatedData.wifeDob,
-        notes: updatedData.notes
-      };
+      const payload = mapFamilyToSupabase(null, familyData, id);
+      // حذف الحقول التي لا تُحدَّث في Supabase بـ update
+      delete payload.id;
+      delete payload.camp_id;
+      delete payload.created_at;
       await supabase.from("families").update(payload).eq("id", id);
     } catch (e) {
       console.warn("Supabase updateFamily warning:", e);
@@ -2042,12 +204,11 @@ export const updateFamily = async (id, familyData) => {
   }
 
   initLocalStorage();
-  const ciphertext = localStorage.getItem("kareem_camp_families_v5");
-  const families = ciphertext ? decryptData(ciphertext) : [];
-  const index = families.findIndex(f => f.id === id);
+  const families = getFamiliesFromLocal();
+  const index = families.findIndex((f) => f.id === id);
   if (index !== -1) {
     families[index] = { ...families[index], ...updatedData };
-    localStorage.setItem("kareem_camp_families_v5", encryptData(families));
+    saveFamiliesToLocal(families);
   }
   notifyDemoSubscribers();
 };
@@ -2065,46 +226,33 @@ export const deleteFamily = async (id) => {
   }
 
   initLocalStorage();
-  const ciphertext = localStorage.getItem("kareem_camp_families_v5");
-  let families = ciphertext ? decryptData(ciphertext) : [];
-  families = families.filter(f => f.id !== id);
-  localStorage.setItem("kareem_camp_families_v5", encryptData(families));
+  saveFamiliesToLocal(getFamiliesFromLocal().filter((f) => f.id !== id));
   notifyDemoSubscribers();
 };
 
 /**
  * استيراد العائلات الافتراضية بالكامل لمخيم محدد
  */
-export const importDefaultFamiliesToFirestore = async (campId) => {
-  if (isSupabaseConfigured) {
-    try {
-      const rows = defaultFamilies.map((f, i) => ({
-        id: f.id || `csv-${i}-${Date.now()}`,
-        camp_id: campId,
-        name: f.name,
-        id_number: f.idNumber,
-        phone: f.phone,
-        members_count: parseInt(f.membersCount) || 1,
-        location: f.location,
-        status: f.status,
-        dob: f.dob,
-        wife_name: f.wifeName,
-        wife_id: f.wifeId,
-        wife_dob: f.wifeDob,
-        notes: f.notes,
-        created_at: f.createdAt || new Date().toISOString()
-      }));
-      const { error } = await supabase.from("families").upsert(rows);
-      if (error) throw error;
-      return { success: true };
-    } catch (error) {
-      console.error("Error during bulk import to Supabase:", error);
-      return { success: false, error: error.message };
-    }
+export const importDefaultFamiliesToSupabase = async (campId) => {
+  if (!isSupabaseConfigured) {
+    return { success: false, error: "النظام يعمل حالياً في الوضع التجريبي. يرجى ربط Supabase." };
   }
 
-  return { success: false, error: "النظام يعمل حالياً في الوضع التجريبي. يرجى ربط Supabase." };
+  try {
+    const rows = defaultFamilies.map((f, i) =>
+      mapFamilyToSupabase(campId, f, f.id || `csv-${i}-${Date.now()}`)
+    );
+    const { error } = await supabase.from("families").upsert(rows);
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error("Error during bulk import to Supabase:", error);
+    return { success: false, error: error.message };
+  }
 };
+
+// الاسم القديم للتوافق مع الكود الموجود
+export const importDefaultFamiliesToFirestore = importDefaultFamiliesToSupabase;
 
 /**
  * استيراد دفعة عائلات دفعة واحدة بشكل سريع
@@ -2114,56 +262,32 @@ export const batchAddFamilies = async (campId, familyList) => {
 
   if (isSupabaseConfigured) {
     try {
-      const rows = familyList.map((f, i) => ({
-        id: f.id || `family_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`,
-        camp_id: campId,
-        name: (f.name || "").trim(),
-        id_number: (f.idNumber || "").trim(),
-        phone: (f.phone || "").trim(),
-        members_count: parseInt(f.membersCount) || 1,
-        location: (f.location || "").trim(),
-        status: f.status ? f.status.trim() : "أعزب",
-        dob: (f.dob || "").trim(),
-        wife_name: (f.wifeName || "").trim(),
-        wife_id: (f.wifeId || "").trim(),
-        wife_dob: (f.wifeDob || "").trim(),
-        notes: (f.notes || "").trim(),
-        created_at: f.createdAt || new Date().toISOString()
-      }));
-      await supabase.from("families").upsert(rows);
+      const rows = familyList.map((f, i) =>
+        mapFamilyToSupabase(campId, f, f.id || `family_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`)
+      );
+      const chunkSize = 100;
+      for (let i = 0; i < rows.length; i += chunkSize) {
+        const { error } = await supabase.from("families").upsert(rows.slice(i, i + chunkSize));
+        if (error) console.error("Error upserting families chunk:", error);
+      }
     } catch (err) {
       console.warn("Supabase batchAddFamilies error, falling back to local:", err);
     }
   }
 
-  localStorage.removeItem("kareem_camp_families_cleared");
+  localStorage.removeItem(FAMILIES_CLEARED_KEY);
   initLocalStorage();
-  const ciphertext = localStorage.getItem("kareem_camp_families_v5");
-  let families = ciphertext ? decryptData(ciphertext) : [];
-  families = [...families, ...familyList.map((f, i) => ({
-    id: f.id || `family_${Date.now()}_${i}`,
-    campId: campId,
-    name: (f.name || "").trim(),
-    idNumber: (f.idNumber || "").trim(),
-    phone: (f.phone || "").trim(),
-    membersCount: parseInt(f.membersCount) || 1,
-    location: (f.location || "").trim(),
-    status: f.status ? f.status.trim() : "أعزب",
-    dob: (f.dob || "").trim(),
-    wifeName: (f.wifeName || "").trim(),
-    wifeId: (f.wifeId || "").trim(),
-    wifeDob: (f.wifeDob || "").trim(),
-    notes: (f.notes || "").trim(),
-    createdAt: f.createdAt || new Date().toISOString()
-  }))];
-  localStorage.setItem("kareem_camp_families_v5", encryptData(families));
+  const existing = getFamiliesFromLocal();
+  const newEntries = familyList.map((f, i) =>
+    mapFamilyToLocal(campId, f, f.id || `family_${Date.now()}_${i}`)
+  );
+  saveFamiliesToLocal([...existing, ...newEntries]);
   notifyDemoSubscribers();
   return true;
 };
 
 /**
  * حذف جميع عائلات المخيم الحالي
- * @param {string} campId - معرّف المخيم
  */
 export const deleteAllFamilies = async (campId) => {
   if (isSupabaseConfigured) {
@@ -2174,7 +298,7 @@ export const deleteAllFamilies = async (campId) => {
     }
   }
 
-  localStorage.setItem("kareem_camp_families_v5", encryptData([]));
-  localStorage.setItem("kareem_camp_families_cleared", "true");
+  saveFamiliesToLocal([]);
+  localStorage.setItem(FAMILIES_CLEARED_KEY, "true");
   notifyDemoSubscribers();
 };

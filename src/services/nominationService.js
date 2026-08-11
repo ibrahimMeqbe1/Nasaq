@@ -68,8 +68,8 @@ const mapSupabaseNominationToJS = (row) => ({
   shelterPhoneAlt: row.shelter_phone_alt || "",
   shelterAddress: row.shelter_address || "",
   shelterGps: row.shelter_gps || "",
-  dob: row.dob || "",
-  wifeDob: row.wife_dob || "",
+  dob: row.dob || row.birth_date || row.date_of_birth || row.birthDate || "",
+  wifeDob: row.wife_dob || row.wife_birth_date || row.wife_date_of_birth || row.wifeDob || "",
   notes: row.notes || "",
   createdAt: row.created_at || new Date().toISOString()
 });
@@ -81,16 +81,12 @@ export const subscribeNominations = (campId, callback) => {
         const { data, error } = await supabase
           .from("nominations")
           .select("*")
-          .eq("camp_id", campId)
           .order("created_at", { ascending: true });
 
-        if (!error && data && data.length > 0) {
-          callback(data.map(mapSupabaseNominationToJS));
-          return;
-        }
-
-        if (!error && data && data.length === 0 && localStorage.getItem("kareem_camp_nominations_cleared") === "true") {
-          callback([]);
+        if (!error && data) {
+          const target = campId || "kareem";
+          const filtered = data.filter(n => (n.camp_id || "kareem") === target);
+          callback(filtered.map(mapSupabaseNominationToJS));
           return;
         }
 
@@ -380,7 +376,14 @@ export const batchAddNominations = async (campId, nomList) => {
         notes: (nom.notes || "").trim(),
         created_at: nom.createdAt || new Date().toISOString()
       }));
-      await supabase.from("nominations").upsert(rows);
+      const chunkSize = 100;
+      for (let i = 0; i < rows.length; i += chunkSize) {
+        const chunk = rows.slice(i, i + chunkSize);
+        const { error } = await supabase.from("nominations").upsert(chunk);
+        if (error) {
+          console.error("Error upserting nominations chunk:", error);
+        }
+      }
     } catch (err) {
       console.warn("Supabase batchAddNominations error, falling back to local:", err);
     }

@@ -3,6 +3,7 @@
 import React, { useState, useRef } from "react";
 import { FaFileExcel, FaEye, FaSave, FaTimes, FaExclamationTriangle } from "react-icons/fa";
 import * as XLSX from "xlsx";
+import { formatDateForExcel } from "../utils/exportExcel";
 
 const ExcelImportModal = ({ isOpen, onClose, campId, onImportComplete, importType = "families" }) => {
   const [step, setStep] = useState(1); // 1: Upload, 2: Map, 3: Preview & Confirm
@@ -280,7 +281,9 @@ const ExcelImportModal = ({ isOpen, onClose, campId, onImportComplete, importTyp
         const colIndex = excelHeaders.indexOf(headerName);
         const rawVal = colIndex !== -1 ? String(row[colIndex] || "").trim() : "";
 
-        if (["hasDisabled", "hasChronicDisease", "isLactatingOrPregnant", "isFemaleHeaded"].includes(schemaKey)) {
+        if (schemaKey === "dob" || schemaKey === "wifeDob") {
+          record[schemaKey] = formatDateForExcel(rawVal);
+        } else if (["hasDisabled", "hasChronicDisease", "isLactatingOrPregnant", "isFemaleHeaded"].includes(schemaKey)) {
           // تحويل نعم/لا أو 1/0 إلى عدد صحيح 0 أو 1
           record[schemaKey] = (rawVal === "1" || rawVal === "نعم" || rawVal.toLowerCase() === "yes" || rawVal.toLowerCase() === "true" || rawVal === "يوجد") ? 1 : 0;
         } else if (["age_0_2_male", "age_0_2_female", "age_3_5_male", "age_3_5_female", "age_6_18_male", "age_6_18_female", "age_19_60_male", "age_19_60_female", "age_over_60_male", "age_over_60_female", "membersCount"].includes(schemaKey)) {

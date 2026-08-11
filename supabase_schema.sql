@@ -134,48 +134,77 @@ ON CONFLICT (id) DO UPDATE SET
   manager_name = EXCLUDED.manager_name,
   phone = EXCLUDED.phone;
 
--- إضافة المستخدمين الافتراضيين
-INSERT INTO public.users (id, username, password, role, camp_id, name)
-VALUES 
-  ('user-superadmin', 'Ibrahim', '123456', 'superadmin', 'system', 'Eng: Ibrahim Meqbel'),
-  ('user-y2000', 'Y2000', '123456', 'admin', 'kareem', 'مخيم كريم'),
-  ('user-i2000', 'I2000', '123456', 'admin', 'kareem', 'مخيم كريم')
-ON CONFLICT (username) DO NOTHING;
+-- ملاحظة: يتم إنشاء المستخدمين وكلمات المرور المشفرة عبر Supabase Auth و API التشفير بالخادم
+-- لا تقم بإدراج كلمات مرور مكشوفة (Plaintext) في قاعدة البيانات مباشرة.
 
 -- ========================================================
--- سياسات الوصول الشامل (Allow ALL Policies for anon / public)
+-- سياسات الأمان والحماية المتقدمة (Row Level Security - RLS)
 -- ========================================================
+
+-- 1. دوال مساعدة لربط جلسة Supabase Auth بالدواعي والأدوار
+CREATE OR REPLACE FUNCTION public.get_current_user_camp_id()
+RETURNS TEXT AS $$
+  SELECT camp_id FROM public.users WHERE id = auth.uid()::text
+  LIMIT 1;
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.is_superadmin()
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.users 
+    WHERE id = auth.uid()::text AND role = 'superadmin'
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
 DO $$
 BEGIN
-    -- جدول العائلات
-    ALTER TABLE public.families ENABLE ROW LEVEL SECURITY;
+    -- إلغاء السياسات القديمة إن وجدت لإمكانية إعادة تشغيل السكربت بدون أخطاء
     DROP POLICY IF EXISTS "allow_all_families" ON public.families;
-    CREATE POLICY "allow_all_families" ON public.families FOR ALL USING (true) WITH CHECK (true);
-
-    -- جدول الترشيحات
-    ALTER TABLE public.nominations ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "allow_all_nominations" ON public.nominations;
-    CREATE POLICY "allow_all_nominations" ON public.nominations FOR ALL USING (true) WITH CHECK (true);
-
-    -- جدول المخيمات
-    ALTER TABLE public.camps ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "allow_all_camps" ON public.camps;
-    CREATE POLICY "allow_all_camps" ON public.camps FOR ALL USING (true) WITH CHECK (true);
-
-    -- جدول المستخدمين
-    ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "allow_all_users" ON public.users;
-    CREATE POLICY "allow_all_users" ON public.users FOR ALL USING (true) WITH CHECK (true);
-
-    -- جدول طلبات التجديد
-    ALTER TABLE public.renewal_requests ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "allow_all_renewal_requests" ON public.renewal_requests;
-    CREATE POLICY "allow_all_renewal_requests" ON public.renewal_requests FOR ALL USING (true) WITH CHECK (true);
-
-    -- جدول الإعلانات
-    ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
     DROP POLICY IF EXISTS "allow_all_announcements" ON public.announcements;
-    CREATE POLICY "allow_all_announcements" ON public.announcements FOR ALL USING (true) WITH CHECK (true);
+
+    DROP POLICY IF EXISTS "families_camp_isolation" ON public.families;
+    DROP POLICY IF EXISTS "nominations_camp_isolation" ON public.nominations;
+    DROP POLICY IF EXISTS "camps_access_policy" ON public.camps;
+    DROP POLICY IF EXISTS "users_self_or_superadmin" ON public.users;
+    DROP POLICY IF EXISTS "renewal_requests_isolation" ON public.renewal_requests;
+    DROP POLICY IF EXISTS "announcements_read_authenticated" ON public.announcements;
+    DROP POLICY IF EXISTS "announcements_write_superadmin" ON public.announcements;
+
+    -- 1. جدول العائلات (تطبيق عزل البيانات بين المخيمات)
+    ALTER TABLE public.families ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY "families_camp_isolation" ON public.families FOR ALL TO authenticated
+    USING (is_superadmin() OR camp_id = get_current_user_camp_id())
+    WITH CHECK (is_superadmin() OR camp_id = get_current_user_camp_id());
+
+    -- 2. جدول الترشيحات (تطبيق عزل البيانات بين المخيمات)
+    ALTER TABLE public.nominations ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY "nominations_camp_isolation" ON public.nominations FOR ALL TO authenticated
+    USING (is_superadmin() OR camp_id = get_current_user_camp_id())
+    WITH CHECK (is_superadmin() OR camp_id = get_current_user_camp_id());
+
+    -- 3. جدول المخيمات
+    ALTER TABLE public.camps ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY "camps_access_policy" ON public.camps FOR ALL TO authenticated
+    USING (is_superadmin() OR id = get_current_user_camp_id());
+
+    -- 4. جدول المستخدمين (حظر الاستعلام المباشر لغير المالك أو المشرف العام)
+    ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY "users_self_or_superadmin" ON public.users FOR ALL TO authenticated
+    USING (is_superadmin() OR id = auth.uid()::text);
+
+    -- 5. جدول طلبات التجديد
+    ALTER TABLE public.renewal_requests ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY "renewal_requests_isolation" ON public.renewal_requests FOR ALL TO authenticated
+    USING (is_superadmin() OR camp_id = get_current_user_camp_id());
+
+    -- 6. جدول الإعلانات (متاح للقراءة لجميع المستخدمين الموثقين، وللتعديل للمشرف العام فقط)
+    ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY "announcements_read_authenticated" ON public.announcements FOR SELECT TO authenticated USING (true);
+    CREATE POLICY "announcements_write_superadmin" ON public.announcements FOR ALL TO authenticated USING (is_superadmin());
 END $$;
 
 -- ========================================================

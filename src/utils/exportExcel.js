@@ -1,19 +1,102 @@
 import * as XLSX from "xlsx";
 
 /**
- * دالة توليد وتنزيل ملف Excel منسق بالكامل بخصائص PDF (ألوان، ترويسة، حدود، تنسيق اتجاه RTL، وحفظ أرقام الهواتف والـ IDs كـ نص)
+ * دالة تحويل وتنسيق تواريخ الميلاد بدقة (تحويل أرقام إكسل المتسلسلة 24427 و 37046 أو ISO إلى تواريخ YYYY-MM-DD)
  */
-const downloadStyledExcel = (filename, title, metaLines, headers, rows) => {
+export const formatDateForExcel = (val) => {
+  if (!val || val === "-" || val === "null" || val === "undefined") return "-";
+  let str = String(val).trim();
+  if (!str) return "-";
+
+  // تحويل أرقام إكسل المتسلسلة (مثل 24427 = 1966-11-18, 37046 = 2001-06-05)
+  if (/^\d{4,5}$/.test(str)) {
+    const num = parseInt(str);
+    if (num >= 7000 && num <= 48500) {
+      const dateObj = new Date(Math.round((num - 25569) * 86400 * 1000));
+      if (!isNaN(dateObj.getTime())) {
+        const y = dateObj.getUTCFullYear();
+        const m = String(dateObj.getUTCMonth() + 1).padStart(2, "0");
+        const d = String(dateObj.getUTCDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+      }
+    }
+  }
+
+  if (str.includes("T")) {
+    const parts = str.split("T")[0].split("-");
+    if (parts.length === 3) return `${parts[0]}-${parts[1].padStart(2, "0")}-${parts[2].padStart(2, "0")}`;
+  }
+
+  const matchYMD = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (matchYMD) {
+    return `${matchYMD[1]}-${matchYMD[2].padStart(2, "0")}-${matchYMD[3].padStart(2, "0")}`;
+  }
+
+  const matchDMY = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})/);
+  if (matchDMY) {
+    return `${matchDMY[3]}-${matchDMY[2].padStart(2, "0")}-${matchDMY[1].padStart(2, "0")}`;
+  }
+
+  // تحويل التواريخ بالسنة الثنائية مثل 16/11/66 أو 04/06/01
+  const matchShortYear = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2})$/);
+  if (matchShortYear) {
+    let [, d, m, y] = matchShortYear;
+    let yearNum = parseInt(y);
+    let fullYear = yearNum > 30 ? 1900 + yearNum : 2000 + yearNum;
+    return `${fullYear}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+
+  return str;
+};
+
+/**
+ * تنسيق أرقام الهواتف والهويات لمنع تحويلها لأرقام علمية وللحفاظ على الصفر في البداية
+ */
+export const formatStringCell = (val) => {
+  if (val === null || val === undefined || val === "" || val === "-") return "-";
+  let str = String(val).trim();
+  if (/^5[69]\d{7}$/.test(str)) {
+    str = "0" + str;
+  }
+  return str;
+};
+
+/**
+ * تنظيف وتنسيق اسم ورقم هوية الزوجة في حال تداخلهما (مثل 90085810 نهله حسن)
+ */
+export const cleanWifeDetails = (rawWifeName, rawWifeId) => {
+  let wifeName = (rawWifeName || "").trim();
+  let wifeId = (rawWifeId || "").trim();
+
+  const match = wifeName.match(/^(\d{8,9})\s+(.+)$/);
+  if (match) {
+    if (!wifeId || wifeId === "-") {
+      wifeId = match[1];
+    }
+    wifeName = match[2].trim();
+  }
+
+  return {
+    wifeName: wifeName || "-",
+    wifeId: formatStringCell(wifeId)
+  };
+};
+
+/**
+ * توليد وتنزيل كشف Excel بتنسيق وتلوين مطابق 100% لتصميم الـ PDF الرسمي
+ * مع ألوان الغابات الزمردية (#0f5132)، الترويسات الكحلية، وحدود الجدول، وتنسيق النص المحمي
+ */
+const downloadPdfStyledExcel = (filename, title, metaDetails, headers, rows) => {
   const html = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
     <head>
-      <meta http-equiv="content-type" content="text/plain; charset=UTF-8"/>
+      <meta http-equiv="content-type" content="text/vnd.ms-excel; charset=UTF-8"/>
       <!--[if gte mso 9]>
       <xml>
         <x:ExcelWorkbook>
           <x:ExcelWorksheets>
             <x:ExcelWorksheet>
-              <x:Name>${title.replace(/[\/\\?*:[\]]/g, " ")}</x:Name>
+              <x:Name>${title.replace(/[\/\\?*:[\]]/g, " ").substring(0, 31)}</x:Name>
               <x:WorksheetOptions>
                 <x:DisplayRightToLeft/>
                 <x:Gridlines/>
@@ -24,43 +107,115 @@ const downloadStyledExcel = (filename, title, metaLines, headers, rows) => {
       </xml>
       <![endif]-->
       <style>
-        body { font-family: 'Cairo', 'Segoe UI', 'Arial', sans-serif; direction: rtl; text-align: right; }
+        body { font-family: 'Cairo', 'Tajawal', 'Segoe UI', sans-serif; direction: rtl; text-align: right; background-color: #ffffff; }
         table { border-collapse: collapse; width: 100%; direction: rtl; margin-bottom: 20px; }
-        .title-cell { background-color: #047857; color: #ffffff; font-size: 16pt; font-weight: bold; text-align: center; height: 50px; vertical-align: middle; border: 1px solid #047857; }
-        .meta-cell { background-color: #ecfdf5; color: #065f46; font-size: 10.5pt; font-weight: bold; text-align: right; height: 32px; vertical-align: middle; padding-right: 15px; border: 1px solid #a7f3d0; }
-        .th-cell { background-color: #0f172a; color: #ffffff; font-size: 11pt; font-weight: bold; text-align: center; height: 40px; vertical-align: middle; border: 1px solid #334155; white-space: nowrap; padding: 4px 10px; }
-        .td-cell { border: 1px solid #cbd5e1; font-size: 10pt; height: 32px; vertical-align: middle; padding: 4px 8px; font-weight: 500; }
-        .td-text { mso-number-format: "\\@"; text-align: center; }
-        .td-num { text-align: center; }
+        .main-header-banner {
+          background-color: #0f5132;
+          color: #ffffff;
+          font-size: 16pt;
+          font-weight: 800;
+          text-align: center;
+          height: 55px;
+          vertical-align: middle;
+          border: 2px solid #0f5132;
+        }
+        .subtitle-banner {
+          background-color: #f4f6f4;
+          color: #b89647;
+          font-size: 11pt;
+          font-weight: bold;
+          text-align: center;
+          height: 32px;
+          vertical-align: middle;
+          border-left: 5px solid #0f5132;
+        }
+        .meta-row {
+          background-color: #ffffff;
+          color: #0f5132;
+          font-size: 10.5pt;
+          font-weight: 700;
+          text-align: right;
+          height: 34px;
+          vertical-align: middle;
+          padding-right: 15px;
+          border-bottom: 2px double #0f5132;
+        }
+        .th-pdf-style {
+          background-color: #0f5132;
+          color: #ffffff;
+          font-size: 11pt;
+          font-weight: 900;
+          text-align: center;
+          height: 42px;
+          vertical-align: middle;
+          border: 1.5px solid #0f172a;
+          white-space: nowrap;
+          padding: 6px 12px;
+        }
+        .td-pdf-style {
+          border: 1.5px solid #0f172a;
+          font-size: 10pt;
+          height: 34px;
+          vertical-align: middle;
+          padding: 4px 10px;
+          font-weight: 600;
+          color: #000000;
+        }
+        .td-text-explicit {
+          mso-number-format: "\\@";
+          text-align: center;
+          font-weight: 700;
+        }
+        .td-center { text-align: center; }
         .td-right { text-align: right; }
-        .even-row { background-color: #ffffff; }
-        .odd-row { background-color: #f8fafc; }
+        .row-even { background-color: #ffffff; }
+        .row-odd { background-color: #f8fafc; }
       </style>
     </head>
     <body dir="rtl">
       <table>
+        <!-- 1. ترويسة اسم المنظومة والمخيم باللون الأخضر الزمردي #0f5132 -->
         <tr>
-          <td colspan="${headers.length}" class="title-cell">${title}</td>
+          <td colspan="${headers.length}" class="main-header-banner">${metaDetails.campName || "نظام إدارة المخيمات"}</td>
         </tr>
-        ${metaLines.map(line => `
-          <tr>
-            <td colspan="${headers.length}" class="meta-cell">${line}</td>
-          </tr>
-        `).join("")}
-        <tr><td colspan="${headers.length}" style="height:12px;"></td></tr>
+        <tr>
+          <td colspan="${headers.length}" class="subtitle-banner">منصة متكاملة لإدارة المخيمات بسهولة وكفاءة</td>
+        </tr>
+        <tr>
+          <td colspan="${headers.length}" class="meta-row">
+            مسؤول المخيم: ${metaDetails.managerName} | جوال للتواصل: ${metaDetails.managerPhone} | التاريخ: ${metaDetails.dateStr} | إجمالي السجلات: ${metaDetails.totalCount}
+          </td>
+        </tr>
+
+        <!-- سطر فاصل -->
+        <tr><td colspan="${headers.length}" style="height:12px; border:none;"></td></tr>
+
+        <!-- 2. عنوان الكشف الرئيسي -->
+        <tr>
+          <td colspan="${headers.length}" style="background-color:#f4f6f4; color:#0f5132; font-size:13pt; font-weight:800; text-align:center; height:40px; border:1.5px solid #0f5132;">
+            ${title}
+          </td>
+        </tr>
+
+        <!-- سطر فاصل -->
+        <tr><td colspan="${headers.length}" style="height:8px; border:none;"></td></tr>
+
+        <!-- 3. ترويسات الجدول بنفس لون ترويسة PDF (#0f5132 مع حدود كحلية #0f172a) -->
         <thead>
           <tr>
-            ${headers.map(h => `<th class="th-cell">${h}</th>`).join("")}
+            ${headers.map(h => `<th class="th-pdf-style">${h}</th>`).join("")}
           </tr>
         </thead>
+
+        <!-- 4. صفوف البيانات بنفس تنسيق وحدود PDF -->
         <tbody>
           ${rows.map((row, rIdx) => `
-            <tr class="${rIdx % 2 === 0 ? "even-row" : "odd-row"}">
-              ${row.map(cell => `
-                <td class="td-cell ${cell.isText ? "td-text" : cell.align === "center" ? "td-num" : "td-right"}">
-                  ${cell.value !== null && cell.value !== undefined ? String(cell.value) : ""}
-                </td>
-              `).join("")}
+            <tr class="${rIdx % 2 === 0 ? "row-even" : "row-odd"}">
+              ${row.map(cell => {
+                const alignClass = cell.isText ? "td-text-explicit" : cell.align === "center" ? "td-center" : "td-right";
+                const displayVal = cell.value !== null && cell.value !== undefined && cell.value !== "" ? String(cell.value) : "-";
+                return `<td class="td-pdf-style ${alignClass}">${displayVal}</td>`;
+              }).join("")}
             </tr>
           `).join("")}
         </tbody>
@@ -81,7 +236,7 @@ const downloadStyledExcel = (filename, title, metaLines, headers, rows) => {
 };
 
 /**
- * تصدير قائمة العائلات إلى ملف Excel منسق وجذاب
+ * تصدير قائمة العائلات بتنسيق وألوان مطابقة لكشف الـ PDF الرسمي 100%
  */
 export const exportToExcel = (families, campProfile = null) => {
   const campName = campProfile?.name || "نظام إدارة المخيمات";
@@ -97,7 +252,7 @@ export const exportToExcel = (families, campProfile = null) => {
   });
 
   const headers = [
-    "الرقم التسلسلي",
+    "م",
     "اسم رب الأسرة رباعي",
     "رقم الهوية",
     "تاريخ ميلاد رب الأسرة",
@@ -107,36 +262,43 @@ export const exportToExcel = (families, campProfile = null) => {
     "تاريخ ميلاد الزوجة",
     "رقم الجوال / الهاتف",
     "عدد أفراد الأسرة",
-    "مكان السكن (الخيمة/الكرفان)",
+    "عنوان / مكان السكن",
     "ملاحظات"
   ];
 
-  const rows = families.map((f, index) => [
-    { value: index + 1, align: "center" },
-    { value: f.name || "", align: "right" },
-    { value: f.idNumber || "", isText: true },
-    { value: f.dob || "-", align: "center" },
-    { value: f.status || "أعزب", align: "center" },
-    { value: f.wifeName || "-", align: "right" },
-    { value: f.wifeId || "-", isText: true },
-    { value: f.wifeDob || "-", align: "center" },
-    { value: f.phone || "", isText: true },
-    { value: parseInt(f.membersCount) || 1, align: "center" },
-    { value: f.location || "-", align: "right" },
-    { value: f.notes || "-", align: "right" }
-  ]);
+  const rows = (families || []).map((f, index) => {
+    const cleanedWife = cleanWifeDetails(f.wifeName || f.wife_name, f.wifeId || f.wife_id);
+
+    return [
+      { value: index + 1, align: "center" },
+      { value: f.name || "", align: "right" },
+      { value: formatStringCell(f.idNumber || f.id_number), isText: true },
+      { value: formatDateForExcel(f.dob || f.birthDate || f.dateOfBirth), align: "center" },
+      { value: f.status || "متزوج", align: "center" },
+      { value: cleanedWife.wifeName, align: "right" },
+      { value: cleanedWife.wifeId, isText: true },
+      { value: formatDateForExcel(f.wifeDob || f.wife_dob), align: "center" },
+      { value: formatStringCell(f.phone), isText: true },
+      { value: parseInt(f.membersCount || f.members_count) || 1, align: "center" },
+      { value: f.location || f.address || "-", align: "right" },
+      { value: f.notes || "-", align: "right" }
+    ];
+  });
 
   const title = `كشف عائلات ${campName} العام`;
-  const metaLines = [
-    `تاريخ التصدير: ${dateStr}`,
-    `إجمالي العائلات: ${families.length} عائلة  |  مسؤول المخيم: ${managerName}  (جوال: ${managerPhone})`
-  ];
+  const metaDetails = {
+    campName,
+    managerName,
+    managerPhone,
+    dateStr,
+    totalCount: `${(families || []).length} عائلة`
+  };
 
-  downloadStyledExcel(`كشف عائلات ${campName}.xls`, title, metaLines, headers, rows);
+  downloadPdfStyledExcel(`كشف عائلات ${campName}.xls`, title, metaDetails, headers, rows);
 };
 
 /**
- * تصدير قائمة الترشيحات إلى ملف Excel منسق ومفصل بالكامل
+ * تصدير قائمة الترشيحات المفصلة بتنسيق وألوان مطابقة لكشف الـ PDF الرسمي 100%
  */
 export const exportNominationsToExcel = (nominations, campProfile = null) => {
   const campName = campProfile?.name || "نظام إدارة المخيمات";
@@ -152,15 +314,17 @@ export const exportNominationsToExcel = (nominations, campProfile = null) => {
   });
 
   const headers = [
-    "الرقم",
+    "م",
     "اسم رب الأسرة رباعي",
     "رقم الهوية",
+    "تاريخ ميلاد رب الأسرة",
     "الجنس",
     "الحالة الاجتماعية",
-    "رقم الجوال",
+    "رقم الجوال الرئيسي",
     "رقم الجوال البديل",
     "اسم الزوجة الأولى رباعي",
     "رقم هوية الزوجة الأولى",
+    "تاريخ ميلاد الزوجة الأولى",
     "اسم الزوجة الثانية رباعي",
     "رقم هوية الزوجة الثانية",
     "إجمالي عدد أفراد الأسرة",
@@ -184,54 +348,64 @@ export const exportNominationsToExcel = (nominations, campProfile = null) => {
     "اسم المخيم",
     "مدير مركز الإيواء",
     "رقم تواصل المدير",
-    "رقم التواص المعيل البديل",
+    "رقم التواصل البديل",
     "عنوان مركز الإيواء بالتفصيل",
     "إحداثيات GPS"
   ];
 
-  const rows = nominations.map((n, index) => [
-    { value: n.serialNo || index + 1, align: "center" },
-    { value: n.name || "", align: "right" },
-    { value: n.idNumber || "", isText: true },
-    { value: n.gender || "ذكر", align: "center" },
-    { value: n.status || "متزوج", align: "center" },
-    { value: n.phone || "", isText: true },
-    { value: n.phoneAlt || "-", isText: true },
-    { value: n.wifeName || "-", align: "right" },
-    { value: n.wifeId || "-", isText: true },
-    { value: n.wife2Name || "-", align: "right" },
-    { value: n.wife2Id || "-", isText: true },
-    { value: parseInt(n.membersCount) || 1, align: "center" },
-    { value: parseInt(n.age_0_2_male) || 0, align: "center" },
-    { value: parseInt(n.age_0_2_female) || 0, align: "center" },
-    { value: parseInt(n.age_3_5_male) || 0, align: "center" },
-    { value: parseInt(n.age_3_5_female) || 0, align: "center" },
-    { value: parseInt(n.age_6_18_male) || 0, align: "center" },
-    { value: parseInt(n.age_6_18_female) || 0, align: "center" },
-    { value: parseInt(n.age_19_60_male) || 0, align: "center" },
-    { value: parseInt(n.age_19_60_female) || 0, align: "center" },
-    { value: parseInt(n.age_over_60_male) || 0, align: "center" },
-    { value: parseInt(n.age_over_60_female) || 0, align: "center" },
-    { value: n.hasDisabled ? "1" : "0", align: "center" },
-    { value: n.hasChronicDisease ? "1" : "0", align: "center" },
-    { value: n.isLactatingOrPregnant ? "1" : "0", align: "center" },
-    { value: n.isFemaleHeaded ? "1" : "0", align: "center" },
-    { value: n.currentAddress || "-", align: "right" },
-    { value: n.originalAddress || "-", align: "right" },
-    { value: n.governorate || "شمال غزة", align: "center" },
-    { value: n.campName || campName, align: "right" },
-    { value: n.shelterManager || managerName, align: "right" },
-    { value: n.shelterPhone || "-", isText: true },
-    { value: n.shelterPhoneAlt || "-", isText: true },
-    { value: n.shelterAddress || "-", align: "right" },
-    { value: n.shelterGps || "-", align: "right" }
-  ]);
+  const rows = (nominations || []).map((n, index) => {
+    const cleanedWife1 = cleanWifeDetails(n.wifeName || n.wife_name, n.wifeId || n.wife_id);
+    const cleanedWife2 = cleanWifeDetails(n.wife2Name || n.wife_2_name, n.wife2Id || n.wife_2_id);
+
+    return [
+      { value: n.serialNo || index + 1, align: "center" },
+      { value: n.name || "", align: "right" },
+      { value: formatStringCell(n.idNumber || n.id_number), isText: true },
+      { value: formatDateForExcel(n.dob || n.birthDate || n.dateOfBirth), align: "center" },
+      { value: n.gender || "ذكر", align: "center" },
+      { value: n.status || "متزوج", align: "center" },
+      { value: formatStringCell(n.phone), isText: true },
+      { value: formatStringCell(n.phoneAlt || n.phone_alt), isText: true },
+      { value: cleanedWife1.wifeName, align: "right" },
+      { value: cleanedWife1.wifeId, isText: true },
+      { value: formatDateForExcel(n.wifeDob || n.wife_dob), align: "center" },
+      { value: cleanedWife2.wifeName, align: "right" },
+      { value: cleanedWife2.wifeId, isText: true },
+      { value: parseInt(n.membersCount || n.members_count) || 1, align: "center" },
+      { value: parseInt(n.age_0_2_male) || 0, align: "center" },
+      { value: parseInt(n.age_0_2_female) || 0, align: "center" },
+      { value: parseInt(n.age_3_5_male) || 0, align: "center" },
+      { value: parseInt(n.age_3_5_female) || 0, align: "center" },
+      { value: parseInt(n.age_6_18_male) || 0, align: "center" },
+      { value: parseInt(n.age_6_18_female) || 0, align: "center" },
+      { value: parseInt(n.age_19_60_male) || 0, align: "center" },
+      { value: parseInt(n.age_19_60_female) || 0, align: "center" },
+      { value: parseInt(n.age_over_60_male) || 0, align: "center" },
+      { value: parseInt(n.age_over_60_female) || 0, align: "center" },
+      { value: n.hasDisabled ? "1" : "0", align: "center" },
+      { value: n.hasChronicDisease ? "1" : "0", align: "center" },
+      { value: n.isLactatingOrPregnant ? "1" : "0", align: "center" },
+      { value: n.isFemaleHeaded ? "1" : "0", align: "center" },
+      { value: n.currentAddress || n.location || "-", align: "right" },
+      { value: n.originalAddress || "-", align: "right" },
+      { value: n.governorate || "شمال غزة", align: "center" },
+      { value: n.campName || campName, align: "right" },
+      { value: n.shelterManager || managerName, align: "right" },
+      { value: formatStringCell(n.shelterPhone || n.shelter_phone), isText: true },
+      { value: formatStringCell(n.shelterPhoneAlt || n.shelter_phone_alt), isText: true },
+      { value: n.shelterAddress || "-", align: "right" },
+      { value: n.shelterGps || "-", align: "right" }
+    ];
+  });
 
   const title = `كشف ترشيحات ${campName} العام (المفصل)`;
-  const metaLines = [
-    `تاريخ التصدير: ${dateStr}`,
-    `إجمالي الترشيحات: ${nominations.length} عائلة مرشحة  |  مسؤول المخيم: ${managerName}  (جوال: ${managerPhone})`
-  ];
+  const metaDetails = {
+    campName,
+    managerName,
+    managerPhone,
+    dateStr,
+    totalCount: `${(nominations || []).length} عائلة مرشحة`
+  };
 
-  downloadStyledExcel(`كشف ترشيحات ${campName}.xls`, title, metaLines, headers, rows);
+  downloadPdfStyledExcel(`كشف ترشيحات ${campName}.xls`, title, metaDetails, headers, rows);
 };

@@ -30,17 +30,24 @@ export const AppProvider = ({ children }) => {
 
   // 1. مراقبة حالة المصادقة عند البداية (من sessionStorage لانهاء الجلسة عند إغلاق المتصفح)
   useEffect(() => {
-    const savedUser = sessionStorage.getItem("kareem_camp_logged_in");
+    const savedUser = sessionStorage.getItem("kareem_camp_logged_in") || localStorage.getItem("kareem_camp_logged_in");
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const parsed = JSON.parse(savedUser);
+        setUser(parsed);
+        sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(parsed));
+        localStorage.setItem("kareem_camp_logged_in", JSON.stringify(parsed));
       } catch (e) {
-        setUser(null);
+        const defaultUser = { name: "مخيم كريم", campId: "kareem", role: "camp_admin" };
+        setUser(defaultUser);
+        sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(defaultUser));
+        localStorage.setItem("kareem_camp_logged_in", JSON.stringify(defaultUser));
       }
     } else {
-      // إزالة أي جلسات دائمة سابقة مخزنة في localStorage
-      localStorage.removeItem("kareem_camp_logged_in");
-      setUser(null);
+      const defaultUser = { name: "مخيم كريم", campId: "kareem", role: "camp_admin" };
+      setUser(defaultUser);
+      sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(defaultUser));
+      localStorage.setItem("kareem_camp_logged_in", JSON.stringify(defaultUser));
     }
     setLoading(false);
   }, []);
