@@ -28,28 +28,42 @@ export const AppProvider = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
 
-  // 1. مراقبة حالة المصادقة عند البداية (من sessionStorage لانهاء الجلسة عند إغلاق المتصفح)
+  // 1. مراقبة حالة المصادقة عند البداية واستعادة الجلسة السحابية
   useEffect(() => {
-    const savedUser = sessionStorage.getItem("kareem_camp_logged_in") || localStorage.getItem("kareem_camp_logged_in");
-    if (savedUser) {
-      try {
-        const parsed = JSON.parse(savedUser);
-        setUser(parsed);
-        sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(parsed));
-        localStorage.setItem("kareem_camp_logged_in", JSON.stringify(parsed));
-      } catch (e) {
-        const defaultUser = { name: "مخيم كريم", campId: "kareem", role: "camp_admin" };
-        setUser(defaultUser);
-        sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(defaultUser));
-        localStorage.setItem("kareem_camp_logged_in", JSON.stringify(defaultUser));
+    const restoreSession = async () => {
+      const savedSession =
+        sessionStorage.getItem("kareem_camp_supabase_session") ||
+        localStorage.getItem("kareem_camp_supabase_session");
+
+      if (savedSession && isSupabaseConfigured && supabase) {
+        try {
+          const sessionObj = JSON.parse(savedSession);
+          await supabase.auth.setSession(sessionObj);
+        } catch (e) {
+          console.warn("Failed to restore Supabase auth session:", e);
+        }
       }
-    } else {
-      const defaultUser = { name: "مخيم كريم", campId: "kareem", role: "camp_admin" };
-      setUser(defaultUser);
-      sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(defaultUser));
-      localStorage.setItem("kareem_camp_logged_in", JSON.stringify(defaultUser));
-    }
-    setLoading(false);
+
+      const savedUser =
+        sessionStorage.getItem("kareem_camp_logged_in") ||
+        localStorage.getItem("kareem_camp_logged_in");
+
+      if (savedUser) {
+        try {
+          const parsed = JSON.parse(savedUser);
+          setUser(parsed);
+        } catch (e) {
+          setUser(null);
+          sessionStorage.removeItem("kareem_camp_logged_in");
+          localStorage.removeItem("kareem_camp_logged_in");
+        }
+      } else {
+        setUser(null);
+      }
+      setLoading(false);
+    };
+
+    restoreSession();
   }, []);
 
   // 2. التحقق من حالة اشتراك المخيم عند تسجيل الدخول
@@ -102,6 +116,8 @@ export const AppProvider = ({ children }) => {
   const handleLogout = async () => {
     sessionStorage.removeItem("kareem_camp_logged_in");
     localStorage.removeItem("kareem_camp_logged_in");
+    sessionStorage.removeItem("kareem_camp_supabase_session");
+    localStorage.removeItem("kareem_camp_supabase_session");
     if (isSupabaseConfigured && supabase) {
       try {
         await supabase.auth.signOut();
@@ -112,7 +128,7 @@ export const AppProvider = ({ children }) => {
     setUser(null);
     setCampProfile(null);
     setIsSubscriptionExpired(false);
-    router.push("/login");
+    router.replace("/login");
   };
 
   // 4. حماية المسارات والتوجيه التلقائي
@@ -123,14 +139,14 @@ export const AppProvider = ({ children }) => {
     const isSuperAdminPath = pathname === "/super-admin";
 
     if (!user && !isPublicPath) {
-      router.push("/login");
+      router.replace("/login");
     } else if (user && user.role !== "superadmin" && isSuperAdminPath) {
-      router.push("/");
+      router.replace("/");
     } else if (user && pathname === "/login") {
       if (user.role === "superadmin") {
-        router.push("/super-admin");
+        router.replace("/super-admin");
       } else {
-        router.push("/");
+        router.replace("/");
       }
     }
   }, [user, loading, pathname, router]);
@@ -140,12 +156,25 @@ export const AppProvider = ({ children }) => {
     setUser,
     families,
     nominations,
-    loading: false,
+    loading,
     campProfile,
     setCampProfile,
     isSubscriptionExpired,
     handleLogout
   };
+
+  // إذا لم يكن المستخدم مسجلاً لدخوله والصفحة غير عامة، نمنع عرض المحتوى ونتوجّه للوجين
+  if (!user && pathname !== "/login" && pathname !== "/print") {
+    return (
+      <AppContext.Provider value={contextValue}>
+        <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#f8fafc", direction: "rtl" }}>
+          <div style={{ textAlign: "center", padding: "2rem" }}>
+            <p style={{ color: "#475569", fontWeight: "bold", fontSize: "1.1rem" }}>جاري التوجيه لصفحة تسجيل الدخول...</p>
+          </div>
+        </div>
+      </AppContext.Provider>
+    );
+  }
 
   // إذا كان المسار للطباعة أو تسجيل الدخول
   if (pathname === "/print" || pathname === "/login") {
