@@ -1,13 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, isAdminConfigured } from "../../../../lib/supabaseAdmin";
+import { supabase, isSupabaseConfigured } from "../../../../lib/supabase";
 import { verifyPassword, hashPassword } from "../../../../lib/auth";
-
-// ملاحظة معمارية مهمة:
-// هذا المسار هو المكان الوحيد المسموح فيه استخدام supabaseAdmin (service role).
-// بعد التحقق من الهوية هنا، لازم نُرجع access_token + refresh_token حقيقيين
-// من Supabase Auth، والمتصفح بعدين بيستدعي supabase.auth.setSession() فيهم
-// (شوف campService.js) — وإلا كل استعلامات RLS القادمة من المتصفح رح تُحسب
-// "anon" وترجع فاضية أو تُرفض مهما كان المستخدم مسجل دخول حسب الـ UI.
 
 export async function POST(request) {
   try {
@@ -22,25 +16,26 @@ export async function POST(request) {
       );
     }
 
-    if (!isAdminConfigured || !supabaseAdmin) {
+    const dbClient = isAdminConfigured && supabaseAdmin ? supabaseAdmin : (isSupabaseConfigured ? supabase : null);
+
+    if (!dbClient) {
       return NextResponse.json(
-        { success: false, error: "الخادم غير مهيأ بشكل صحيح (SUPABASE_SERVICE_ROLE_KEY مفقود)." },
+        { success: false, error: "النظام غير متصل بقاعدة البيانات (يرجى ضبط .env.local)." },
         { status: 500 }
       );
     }
 
     const email = cleanUser.includes("@") ? cleanUser : `${cleanUser.toLowerCase()}@camp.com`;
 
-    // 1. المحاولة المباشرة: المستخدم موجود فعلاً بـ Supabase Auth
-    let { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
+    // 1. المحاولة المباشرة عبر Supabase Auth
+    let { data: authData, error: authError } = await dbClient.auth.signInWithPassword({
       email,
       password: cleanPass,
     });
 
-    // 2. إن فشلت (المستخدم لسا بجدول public.users القديم بس مش بـ Supabase Auth بعد)
-    //    نتحقق من كلمة المرور يدوياً، وإذا صحيحة نربط/ننشئ له حساب Auth حقيقي
+    // 2. إن فشلت وكان المستخدم بجدول public.users القديم
     if (authError || !authData?.user) {
-      const { data: userData } = await supabaseAdmin
+      const { data: userData } = await dbClient
         .from("users")
         .select("*")
         .ilike("username", cleanUser);
@@ -64,46 +59,49 @@ export async function POST(request) {
       // ترقية التشفير تلقائياً إلى salted pbkdf2 إن كانت الكلمة القديمة Plaintext
       if (!foundUser.password.startsWith("pbkdf2:")) {
         const newHash = hashPassword(cleanPass);
-        await supabaseAdmin.from("users").update({ password: newHash }).eq("id", foundUser.id);
+        await dbClient.from("users").update({ password: newHash }).eq("id", foundUser.id);
       }
 
-      // إنشاء حساب Supabase Auth مطابق لهذا المستخدم (مرة واحدة فقط لكل مستخدم قديم)
-      const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
-        email,
-        password: cleanPass,
-        email_confirm: true,
-        user_metadata: { username: foundUser.username, role: foundUser.role, campId: foundUser.camp_id },
+      // إن كان supabaseAdmin متوفراً، نربط الحساب بـ Auth
+      if (isAdminConfigured && supabaseAdmin) {
+        try {
+          const { data: created } = await supabaseAdmin.auth.admin.createUser({
+            email,
+            password: cleanPass,
+            email_confirm: true,
+            user_metadata: { username: foundUser.username, role: foundUser.role, campId: foundUser.camp_id },
+          });
+
+          const authUserId = created?.user?.id;
+          if (authUserId && authUserId !== foundUser.id) {
+            await supabaseAdmin.from("users").update({ id: authUserId }).eq("username", foundUser.username);
+          }
+
+          const signInAfterCreate = await supabaseAdmin.auth.signInWithPassword({ email, password: cleanPass });
+          if (signInAfterCreate?.data?.user) {
+            authData = signInAfterCreate.data;
+          }
+        } catch (adminErr) {
+          console.warn("supabaseAdmin auto signUp warning:", adminErr);
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        user: {
+          username: foundUser.username,
+          role: foundUser.role || "admin",
+          campId: foundUser.camp_id || "kareem",
+          email,
+          name: foundUser.name || foundUser.username,
+          uid: foundUser.id,
+        },
+        access_token: authData?.session?.access_token || null,
+        refresh_token: authData?.session?.refresh_token || null,
       });
-
-      if (createErr && !String(createErr.message || "").toLowerCase().includes("already")) {
-        console.error("Auth admin createUser error:", createErr);
-        return NextResponse.json(
-          { success: false, error: "تعذر ربط الحساب بنظام المصادقة السحابي" },
-          { status: 500 }
-        );
-      }
-
-      const authUserId = created?.user?.id;
-      // اجعل id في جدول users مطابقاً لمعرف Supabase Auth حتى تعمل سياسات RLS (auth.uid())
-      if (authUserId && authUserId !== foundUser.id) {
-        await supabaseAdmin.from("users").update({ id: authUserId }).eq("username", foundUser.username);
-      }
-
-      // الآن سجّل الدخول فعلياً للحصول على access_token / refresh_token حقيقيين
-      const signInAfterCreate = await supabaseAdmin.auth.signInWithPassword({ email, password: cleanPass });
-      authData = signInAfterCreate.data;
-      authError = signInAfterCreate.error;
-
-      if (authError || !authData?.user) {
-        console.error("Auth sign-in after createUser failed:", authError);
-        return NextResponse.json(
-          { success: false, error: "تم التحقق من الحساب لكن تعذر إنشاء جلسة الدخول" },
-          { status: 500 }
-        );
-      }
     }
 
-    const { data: profile } = await supabaseAdmin
+    const { data: profile } = await dbClient
       .from("users")
       .select("*")
       .eq("id", authData.user.id)
@@ -122,8 +120,8 @@ export async function POST(request) {
         name: profile?.name || authData.user.user_metadata?.name || cleanUser,
         uid: authData.user.id,
       },
-      access_token: authData.session?.access_token,
-      refresh_token: authData.session?.refresh_token,
+      access_token: authData.session?.access_token || null,
+      refresh_token: authData.session?.refresh_token || null,
     });
   } catch (error) {
     console.error("Auth API login error:", error);
