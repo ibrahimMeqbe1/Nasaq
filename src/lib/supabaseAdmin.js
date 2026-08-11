@@ -5,7 +5,11 @@ import { createClient } from "@supabase/supabase-js";
 // لأن SUPABASE_SERVICE_ROLE_KEY يتجاوز كل سياسات RLS بالكامل.
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+// المفتاح السري الجديد بتسمية Supabase (sb_secret_...) — يدعم الاسم القديم كذلك للتوافق
+const serviceRoleKey =
+  process.env.SUPABASE_SECRET_KEY ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  "";
 
 export const isAdminConfigured = Boolean(supabaseUrl && serviceRoleKey);
 
