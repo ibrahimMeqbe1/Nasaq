@@ -1,3 +1,4 @@
+import bcrypt from "bcryptjs";
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
 import { encryptData, decryptData } from "../utils/security";
 import {
@@ -725,17 +726,22 @@ export const updateCampFullDetails = async (campId, campDetails) => {
 
       if (adminUsername || adminPassword) {
         const { data: existingUsers } = await supabase
-          .from("users").select("id").eq("camp_id", campId).limit(1);
+          .from("users").select("id, password").eq("camp_id", campId).limit(1);
 
         if (existingUsers?.length) {
           const userPayload = {};
           if (adminUsername) userPayload.username = adminUsername;
-          if (adminPassword) userPayload.password = adminPassword;
+          if (adminPassword && adminPassword.trim() !== "") {
+            userPayload.password = await bcrypt.hash(adminPassword.trim(), 10);
+          }
           if (name) userPayload.name = name;
-          await supabase.from("users").update(userPayload).eq("camp_id", campId);
-        } else if (adminUsername && adminPassword) {
+          if (Object.keys(userPayload).length > 0) {
+            await supabase.from("users").update(userPayload).eq("camp_id", campId);
+          }
+        } else if (adminUsername) {
+          const hashed = adminPassword ? await bcrypt.hash(adminPassword.trim(), 10) : "";
           await supabase.from("users").insert([{
-            id: `user-${Date.now()}`, username: adminUsername, password: adminPassword,
+            id: `user-${Date.now()}`, username: adminUsername, password: hashed,
             role: "admin", camp_id: campId, name: name || campId,
           }]);
         }

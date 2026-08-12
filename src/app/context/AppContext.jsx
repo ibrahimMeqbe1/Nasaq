@@ -28,54 +28,20 @@ export const AppProvider = ({ children }) => {
   const pathname = usePathname();
   const router = useRouter();
 
-  // 1. مراقبة حالة المصادقة عند البداية واستعادة الجلسة السحابية
+  // 1. مراقبة حالة المصادقة عند البداية واستعادة الجلسة
   useEffect(() => {
     const restoreSession = async () => {
-      // إزالة مفاتيح التخزين القديمة من localStorage لتنظيف متصفح المستخدم تلقائياً
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("kareem_camp_logged_in");
-      }
+      const savedUserStr = typeof window !== "undefined" ? sessionStorage.getItem("kareem_camp_logged_in") : null;
 
-      const savedUser = typeof window !== "undefined" ? sessionStorage.getItem("kareem_camp_logged_in") : null;
-      const savedSession =
-        typeof window !== "undefined"
-          ? sessionStorage.getItem("kareem_camp_supabase_session") ||
-            localStorage.getItem("kareem_camp_supabase_session")
-          : null;
-
-      if (savedUser) {
+      if (savedUserStr) {
         try {
-          const parsed = JSON.parse(savedUser);
-
-          if (savedSession && isSupabaseConfigured && supabase) {
-            try {
-              const sessionObj = JSON.parse(savedSession);
-              const { error } = await supabase.auth.setSession(sessionObj);
-              if (error) {
-                console.warn("Expired or invalid Supabase session, clearing auth:", error);
-                await handleLogout();
-                setLoading(false);
-                return;
-              }
-            } catch (e) {
-              console.warn("Failed to restore Supabase auth session:", e);
-            }
-          }
-
+          const parsed = JSON.parse(savedUserStr);
           setUser(parsed);
-        } catch (e) {
-          await handleLogout();
-          setLoading(false);
-          return;
+        } catch {
+          setUser(null);
         }
       } else {
         setUser(null);
-        if (typeof window !== "undefined") {
-          sessionStorage.removeItem("kareem_camp_logged_in");
-          sessionStorage.removeItem("kareem_camp_supabase_session");
-          localStorage.removeItem("kareem_camp_logged_in");
-          localStorage.removeItem("kareem_camp_supabase_session");
-        }
       }
       setLoading(false);
     };
@@ -134,26 +100,12 @@ export const AppProvider = ({ children }) => {
     if (typeof window !== "undefined") {
       sessionStorage.clear();
       localStorage.removeItem("kareem_camp_logged_in");
-      localStorage.removeItem("kareem_camp_supabase_session");
+    }
 
-      // إخلاء كامل لأي رموز قديمة مخزنة بـ localStorage أو sessionStorage
-      Object.keys(localStorage).forEach((key) => {
-        if (key.includes("kareem") || key.includes("supabase") || key.startsWith("sb-")) {
-          localStorage.removeItem(key);
-        }
-      });
-      Object.keys(sessionStorage).forEach((key) => {
-        if (key.includes("kareem") || key.includes("supabase") || key.startsWith("sb-")) {
-          sessionStorage.removeItem(key);
-        }
-      });
-
-      // مسح كوكيز المتصفح
-      document.cookie.split(";").forEach((c) => {
-        document.cookie = c
-          .replace(/^ +/, "")
-          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-      });
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (e) {
+      console.warn("Logout fetch warning:", e);
     }
 
     if (isSupabaseConfigured && supabase) {
@@ -168,6 +120,7 @@ export const AppProvider = ({ children }) => {
     setCampProfile(null);
     setIsSubscriptionExpired(false);
 
+    // إعادة تحميل كاملة من المتصفح لتنظيف أي ذواكر متبقية بالـ React Memory / Closures
     if (typeof window !== "undefined") {
       window.location.href = "/login";
     } else {

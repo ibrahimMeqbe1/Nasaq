@@ -20,6 +20,7 @@ import {
   FaBuilding
 } from "react-icons/fa";
 import { authenticateUser } from "../services/campService";
+import { loginAndRedirect } from "../lib/authHelpers";
 
 const Login = ({ setUser }) => {
   const [username, setUsername] = useState("");
@@ -46,7 +47,7 @@ const Login = ({ setUser }) => {
     setLoading(true);
 
     try {
-      const result = await authenticateUser(username, password);
+      const result = await loginAndRedirect(username, password);
       
       if (result.success) {
         sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(result.user));
@@ -58,11 +59,7 @@ const Login = ({ setUser }) => {
         setUser(result.user);
         setLoading(false);
         
-        if (result.user.role === "superadmin") {
-          router.push("/super-admin");
-        } else {
-          router.push("/");
-        }
+        router.push(result.redirectPath || (result.user.role === "superadmin" ? "/super-admin" : "/"));
       } else {
         setError(result.error || "اسم المستخدم أو كلمة المرور غير صحيحة.");
         setLoading(false);

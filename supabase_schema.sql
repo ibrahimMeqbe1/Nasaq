@@ -191,10 +191,13 @@ BEGIN
     CREATE POLICY "camps_access_policy" ON public.camps FOR ALL TO authenticated
     USING (is_superadmin() OR id = get_current_user_camp_id());
 
-    -- 4. جدول المستخدمين (حظر الاستعلام المباشر لغير المالك أو المشرف العام)
+    -- 4. جدول المستخدمين (حظر الاستعلام المباشر لغير المالك أو المشرف العام مع السماح بالتحقق عند تسجيل الدخول)
     ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
     CREATE POLICY "users_self_or_superadmin" ON public.users FOR ALL TO authenticated
     USING (is_superadmin() OR id = auth.uid()::text);
+
+    DROP POLICY IF EXISTS "users_login_lookup" ON public.users;
+    CREATE POLICY "users_login_lookup" ON public.users FOR SELECT TO anon USING (true);
 
     -- 5. جدول طلبات التجديد
     ALTER TABLE public.renewal_requests ENABLE ROW LEVEL SECURITY;
@@ -206,6 +209,15 @@ BEGIN
     CREATE POLICY "announcements_read_authenticated" ON public.announcements FOR SELECT TO authenticated USING (true);
     CREATE POLICY "announcements_write_superadmin" ON public.announcements FOR ALL TO authenticated USING (is_superadmin());
 END $$;
+
+-- دالة مساعدة آمنة للتحقق من تسجيل الدخول للمستخدمين المعرفين يدوياً في Supabase
+CREATE OR REPLACE FUNCTION public.get_user_for_login(p_username TEXT)
+RETURNS SETOF public.users
+LANGUAGE sql SECURITY DEFINER
+AS $$
+  SELECT * FROM public.users WHERE lower(username) = lower(p_username) LIMIT 1;
+$$;
+
 
 -- ========================================================
 -- تفعيل التحديثات الفورية (Realtime) للجداول

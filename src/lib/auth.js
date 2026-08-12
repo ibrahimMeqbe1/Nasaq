@@ -1,25 +1,36 @@
+import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
+const SALT_ROUNDS = 10;
+
 /**
- * التشفير الآمن لكلمات المرور باستخدام PBKDF2 مع Salt عشوائي
- * النمط المخزن: pbkdf2:10000:<salt_hex>:<hash_hex>
+ * التشفير الآمن لكلمات المرور باستخدام bcryptjs (سريع ومتوافق 100% مع Vercel/Next.js)
  */
 export function hashPassword(password) {
   if (!password) return "";
-  const salt = crypto.randomBytes(16).toString("hex");
-  const iterations = 10000;
-  const hash = crypto
-    .pbkdf2Sync(password, salt, iterations, 32, "sha256")
-    .toString("hex");
-  return `pbkdf2:${iterations}:${salt}:${hash}`;
+  return bcrypt.hashSync(password, SALT_ROUNDS);
 }
 
 /**
- * التحقق من كلمة المرور مع مقارنة آمنة زمنيًا تمنع هجمات التوقيت
+ * التحقق من كلمة المرور مع دعم bcryptjs وتوافق مع الحسابات القديمة (pbkdf2 و plaintext)
  */
 export function verifyPassword(password, storedHash) {
   if (!password || !storedHash) return false;
 
+  // 1. التوافق مع تشفير bcryptjs ($2a$, $2b$, $2y$)
+  if (
+    storedHash.startsWith("$2a$") ||
+    storedHash.startsWith("$2b$") ||
+    storedHash.startsWith("$2y$")
+  ) {
+    try {
+      return bcrypt.compareSync(password, storedHash);
+    } catch {
+      return false;
+    }
+  }
+
+  // 2. التوافق مع التشفير القديم pbkdf2
   if (storedHash.startsWith("pbkdf2:")) {
     const parts = storedHash.split(":");
     if (parts.length !== 4) return false;
@@ -37,6 +48,7 @@ export function verifyPassword(password, storedHash) {
     );
   }
 
-  // التوافق مع الحسابات القديمة المكتوبة بصيغة plaintext لمطابقتها مرة واحدة
+  // 3. التوافق مع الحسابات القديمة المكتوبة بصيغة Plaintext
   return password === storedHash;
 }
+
