@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { jwtVerify } from "jose";
+import { jwtVerify } from "jose/jwt/verify";
 
 // المسارات التي تتطلب حماية ومصادقة على مستوى السيرفر
 const publicRoutes = ["/login"];

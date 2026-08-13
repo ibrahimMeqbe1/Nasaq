@@ -1,0 +1,799 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>تقرير QA الشامل</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0f1c17; --bg-panel:#16261f; --bg-panel-2:#1c2f27; --border:#2a4438;
+    --gold:#c9a961; --gold-soft:#e3cd8f; --text:#e8ece9; --text-dim:#9fb3a8;
+    --critical:#e5484d; --high:#f0973e; --medium:#e8c547; --low:#6fbf8c; --info:#7aa8d9;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:linear-gradient(180deg,var(--bg) 0%,#0b1512 100%); color:var(--text);
+    font-family:'Cairo',sans-serif; line-height:1.7; padding:32px 24px 80px; overflow-x:hidden; }
+  .wrap { max-width:960px; margin:0 auto; width:100%; }
+
+  header.top { border-bottom:1px solid var(--border); padding-bottom:24px; margin-bottom:28px; }
+  header.top h1 { font-size:26px; font-weight:900; margin:0 0 8px; color:var(--gold-soft); }
+  header.top .meta { color:var(--text-dim); font-size:14px; margin:2px 0; word-break:break-word; }
+  header.top .meta code { color:var(--gold); }
+
+  .warnings { background:#2a1f13; border:1px solid #6b4a1f; color:#f0c987; border-radius:10px; padding:12px 16px; font-size:13px; margin-bottom:24px; }
+  .warnings div { margin:2px 0; }
+
+  .summary-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:12px; margin-bottom:16px; }
+  .stat { background:var(--bg-panel); border:1px solid var(--border); border-radius:12px; padding:16px; text-align:center; }
+  .stat .num { font-size:26px; font-weight:900; font-family:'IBM Plex Mono',monospace; }
+  .stat .lbl { font-size:12px; color:var(--text-dim); margin-top:4px; }
+  .stat.total .num { color:var(--gold-soft); }
+  .stat.critical .num { color:var(--critical); } .stat.high .num { color:var(--high); }
+  .stat.medium .num { color:var(--medium); } .stat.low .num { color:var(--low); } .stat.info .num { color:var(--info); }
+
+  .category-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:32px; }
+  .cat-chip { background:var(--bg-panel-2); border:1px solid var(--border); border-radius:10px; padding:10px 14px; font-size:13px; display:flex; justify-content:space-between; }
+  .cat-chip b { color:var(--gold-soft); }
+
+  h2.category-title { font-size:18px; color:var(--gold-soft); margin:40px 0 12px; padding-bottom:8px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; }
+  .count-pill { background:var(--bg-panel-2); border:1px solid var(--border); border-radius:999px; padding:2px 10px; font-size:12px; color:var(--text-dim); margin-inline-start:4px; }
+  h3.severity-subtitle { font-size:13px; color:var(--gold); text-transform:uppercase; letter-spacing:1px; border-right:3px solid var(--gold); padding-right:10px; margin:20px 0 10px; }
+
+  .finding { background:var(--bg-panel); border:1px solid var(--border); border-radius:10px; margin-bottom:8px; overflow:hidden; }
+  .finding[open] { background:var(--bg-panel-2); }
+  .finding summary { cursor:pointer; padding:12px 14px; font-size:13.5px; list-style:none; }
+  .finding summary::-webkit-details-marker { display:none; }
+  .finding summary::before { content:"◀"; font-size:10px; color:var(--text-dim); display:inline-block; transition:transform .15s ease; margin-left:6px; }
+  .finding[open] summary::before { transform:rotate(-90deg); }
+
+  .badge, .finding-tool, .finding-file, .finding-rule { display:inline-block; vertical-align:middle; margin-left:8px; }
+  .finding-tool { color:var(--text-dim); font-size:12px; }
+  .finding-file { font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--gold-soft); }
+  .finding-rule { color:var(--text-dim); font-size:11.5px; direction:ltr; }
+
+  .finding-body { padding:0 16px 16px; }
+  .finding-message { margin:0 0 8px; font-size:13.5px; }
+  .row-meta, .row-secret { font-size:12px; color:var(--text-dim); margin-bottom:6px; }
+  .row-secret code, .row-meta code { color:var(--gold); }
+  .row-snippet { direction:ltr; text-align:left; background:#0b1512; border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-family:'IBM Plex Mono',monospace; font-size:12px; overflow-x:auto; color:#b9d4c4; white-space:pre-wrap; }
+
+  .badge { font-size:11px; font-weight:700; padding:3px 10px; border-radius:999px; white-space:nowrap; }
+  .badge-critical { background:rgba(229,72,77,.15); color:var(--critical); border:1px solid rgba(229,72,77,.4); }
+  .badge-high { background:rgba(240,151,62,.15); color:var(--high); border:1px solid rgba(240,151,62,.4); }
+  .badge-medium { background:rgba(232,197,71,.15); color:var(--medium); border:1px solid rgba(232,197,71,.4); }
+  .badge-low { background:rgba(111,191,140,.15); color:var(--low); border:1px solid rgba(111,191,140,.4); }
+  .badge-info { background:rgba(122,168,217,.15); color:var(--info); border:1px solid rgba(122,168,217,.4); }
+
+  .ai-review { background:var(--bg-panel); border:1px solid var(--border); border-radius:12px; padding:20px; font-size:14px; }
+  .ai-review p { margin:0 0 12px; }
+
+  .empty-state { text-align:center; padding:60px 20px; color:var(--text-dim); }
+  .empty-state .icon { font-size:40px; margin-bottom:10px; }
+
+  footer { margin-top:48px; text-align:center; font-size:12px; color:var(--text-dim); border-top:1px solid var(--border); padding-top:20px; }
+  @media print { body { background:#fff; color:#000; } .finding { break-inside:avoid; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>تقرير QA الشامل</h1>
+    <div class="meta">المشروع: <code>C:\Users\Ibrahim\Downloads\kareem-camp-main</code></div>
+    <div class="meta">تاريخ الفحص: ١٣‏/٠٨‏/٢٠٢٦، ١٢:٤٧ م — Semgrep · Gitleaks · npm audit · ESLint · فحوصات نمطية</div>
+  </header>
+
+  <div class="warnings"><div>⚠ Semgrep: semgrep غير مثبت (pip install semgrep --break-system-packages)</div><div>⚠ Gitleaks: gitleaks غير مثبت (https://github.com/gitleaks/gitleaks)</div><div>⚠ npm audit: تعذّر تشغيل npm audit (تحقق من الاتصال بالإنترنت أو وجود package-lock.json).</div><div>⚠ ESLint: لا يوجد إعداد ESLint بالمشروع — تم تخطي هذا الفحص (أضف .eslintrc وnode_modules لتفعيله).</div></div>
+
+  <div class="summary-grid">
+    <div class="stat total"><div class="num">51</div><div class="lbl">إجمالي المشاكل</div></div>
+    <div class="stat critical"><div class="num">0</div><div class="lbl">حرج</div></div>
+    <div class="stat high"><div class="num">0</div><div class="lbl">عالي</div></div>
+    <div class="stat medium"><div class="num">3</div><div class="lbl">متوسط</div></div>
+    <div class="stat low"><div class="num">48</div><div class="lbl">منخفض</div></div>
+  </div>
+
+  <div class="category-grid">
+    <div class="cat-chip"><span>🛡️ الأمان</span><b>0</b></div><div class="cat-chip"><span>🧹 جودة الكود</span><b>23</b></div><div class="cat-chip"><span>⚡ الأداء</span><b>7</b></div><div class="cat-chip"><span>🎨 التصميم وإمكانية الوصول</span><b>21</b></div>
+  </div>
+
+  
+  
+
+  <section class="category-section">
+    <h2 class="category-title">🧹 جودة الكود <span class="count-pill">23</span></h2>
+    
+      <h3 class="severity-subtitle">منخفض (23)</h3>
+      
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scratch\inspect.js:35</span>
+      <span class="finding-rule">no-console</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام console.log متروك بالكود — يُفضّل إزالته أو استبداله بنظام logging.</p>
+      <pre class="row-snippet">console.log('Detected Header Row Index:', headerRowIndex);</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scratch\inspect.js:41</span>
+      <span class="finding-rule">no-console</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام console.log متروك بالكود — يُفضّل إزالته أو استبداله بنظام logging.</p>
+      <pre class="row-snippet">console.log('Headers:', headers);</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scratch\inspect.js:52</span>
+      <span class="finding-rule">no-console</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام console.log متروك بالكود — يُفضّل إزالته أو استبداله بنظام logging.</p>
+      <pre class="row-snippet">console.log('\nColumn Mapping:', columnMapping);</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scratch\inspect.js:57</span>
+      <span class="finding-rule">no-console</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام console.log متروك بالكود — يُفضّل إزالته أو استبداله بنظام logging.</p>
+      <pre class="row-snippet">console.log('Total Data Rows:', dataRows.length);</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scratch\inspect.js:73</span>
+      <span class="finding-rule">no-console</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام console.log متروك بالكود — يُفضّل إزالته أو استبداله بنظام logging.</p>
+      <pre class="row-snippet">console.log('\nTotal Mapped records:', mapped.length);</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scratch\inspect.js:74</span>
+      <span class="finding-rule">no-console</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام console.log متروك بالكود — يُفضّل إزالته أو استبداله بنظام logging.</p>
+      <pre class="row-snippet">console.log('Total Filtered records (having name &amp; idNumber):', filtered.length);</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scratch\inspect.js:77</span>
+      <span class="finding-rule">no-console</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام console.log متروك بالكود — يُفضّل إزالته أو استبداله بنظام logging.</p>
+      <pre class="row-snippet">console.log('\nFirst 3 mapped records:', filtered.slice(0, 3));</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scratch\inspect.js:79</span>
+      <span class="finding-rule">no-console</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام console.log متروك بالكود — يُفضّل إزالته أو استبداله بنظام logging.</p>
+      <pre class="row-snippet">console.log('\nSample raw rows first 3 to debug why name &amp; idNumber are empty:');</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scratch\inspect.js:81</span>
+      <span class="finding-rule">no-console</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام console.log متروك بالكود — يُفضّل إزالته أو استبداله بنظام logging.</p>
+      <pre class="row-snippet">console.log(`Raw Row ${i}:`, dataRows[i]);</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scratch\inspect.js:83</span>
+      <span class="finding-rule">no-console</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام console.log متروك بالكود — يُفضّل إزالته أو استبداله بنظام logging.</p>
+      <pre class="row-snippet">console.log('\nSample mapped records first 3 (without filter):', mapped.slice(0, 3));</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scripts\migratePasswords.mjs:35</span>
+      <span class="finding-rule">no-console</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام console.log متروك بالكود — يُفضّل إزالته أو استبداله بنظام logging.</p>
+      <pre class="row-snippet">console.log(&quot;🔄 جاري قراءة حسابات المستخدمين من Supabase (جدول users)...&quot;);</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scripts\migratePasswords.mjs:53</span>
+      <span class="finding-rule">no-console</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام console.log متروك بالكود — يُفضّل إزالته أو استبداله بنظام logging.</p>
+      <pre class="row-snippet">console.log(&quot;ℹ️ لم يتم العثور على أي حسابات في جدول users.&quot;);</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scripts\migratePasswords.mjs:57</span>
+      <span class="finding-rule">no-console</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام console.log متروك بالكود — يُفضّل إزالته أو استبداله بنظام logging.</p>
+      <pre class="row-snippet">console.log(`📋 تم العثور على ${users.length} حساب/حسابات. جاري الفحص والتشفير لـ bcryptjs...\n`);</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scripts\migratePasswords.mjs:64</span>
+      <span class="finding-rule">no-console</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام console.log متروك بالكود — يُفضّل إزالته أو استبداله بنظام logging.</p>
+      <pre class="row-snippet">console.log(`✅ الحساب [${user.username}] مشفّر بـ bcrypt مسبقاً (${user.password.slice(0, 15)}...)`);</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scripts\migratePasswords.mjs:80</span>
+      <span class="finding-rule">no-console</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام console.log متروك بالكود — يُفضّل إزالته أو استبداله بنظام logging.</p>
+      <pre class="row-snippet">console.log(`🔒 تم تحويل كلمة مرور الحساب [${user.username}] إلى bcrypt hash بنجاح!`);</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scripts\migratePasswords.mjs:84</span>
+      <span class="finding-rule">no-console</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام console.log متروك بالكود — يُفضّل إزالته أو استبداله بنظام logging.</p>
+      <pre class="row-snippet">console.log(&quot;\n🎉 اكتملت عملية ترحيل وتشفير كافة الحسابات القديمة بنجاح!&quot;);</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">session-fix-patch\src\services\campService.js</span>
+      <span class="finding-rule">large-file</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">ملف كبير الحجم (774 سطر) — يُفضّل تقسيمه لتحسين القابلية للصيانة.</p>
+      
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\components\NominationForm.jsx</span>
+      <span class="finding-rule">large-file</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">ملف كبير الحجم (732 سطر) — يُفضّل تقسيمه لتحسين القابلية للصيانة.</p>
+      
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\components\NominationTable.jsx</span>
+      <span class="finding-rule">large-file</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">ملف كبير الحجم (676 سطر) — يُفضّل تقسيمه لتحسين القابلية للصيانة.</p>
+      
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\services\campService.js</span>
+      <span class="finding-rule">large-file</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">ملف كبير الحجم (780 سطر) — يُفضّل تقسيمه لتحسين القابلية للصيانة.</p>
+      
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\views\Dashboard.jsx</span>
+      <span class="finding-rule">large-file</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">ملف كبير الحجم (544 سطر) — يُفضّل تقسيمه لتحسين القابلية للصيانة.</p>
+      
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\views\PrintPage.jsx</span>
+      <span class="finding-rule">large-file</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">ملف كبير الحجم (547 سطر) — يُفضّل تقسيمه لتحسين القابلية للصيانة.</p>
+      
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\views\SuperAdmin.jsx</span>
+      <span class="finding-rule">large-file</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">ملف كبير الحجم (1427 سطر) — يُفضّل تقسيمه لتحسين القابلية للصيانة.</p>
+      
+    </div>
+  </details>
+    
+  </section>
+
+  <section class="category-section">
+    <h2 class="category-title">⚡ الأداء <span class="count-pill">7</span></h2>
+    
+      <h3 class="severity-subtitle">متوسط (2)</h3>
+      
+  <details class="finding sev-medium">
+    <summary>
+      <span class="badge badge-medium">متوسط</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scripts\migratePasswords.mjs:8</span>
+      <span class="finding-rule">sync-fs</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام دالة *Sync من fs يحجب event loop في الخادم أثناء التنفيذ.</p>
+      <pre class="row-snippet">if (fs.existsSync(envPath)) {</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-medium">
+    <summary>
+      <span class="badge badge-medium">متوسط</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">scripts\migratePasswords.mjs:9</span>
+      <span class="finding-rule">sync-fs</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام دالة *Sync من fs يحجب event loop في الخادم أثناء التنفيذ.</p>
+      <pre class="row-snippet">const envConfig = fs.readFileSync(envPath, &quot;utf8&quot;);</pre>
+    </div>
+  </details>
+    
+
+      <h3 class="severity-subtitle">منخفض (5)</h3>
+      
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\components\Navbar.jsx:36</span>
+      <span class="finding-rule">raw-img-tag</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام &lt;img&gt; عادي بدل next/image يفوّت تحسينات الصور التلقائية (lazy loading، تغيير الحجم).</p>
+      <pre class="row-snippet">&lt;img</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\views\CampSettings.jsx:209</span>
+      <span class="finding-rule">raw-img-tag</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام &lt;img&gt; عادي بدل next/image يفوّت تحسينات الصور التلقائية (lazy loading، تغيير الحجم).</p>
+      <pre class="row-snippet">&lt;img</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\views\Dashboard.jsx:179</span>
+      <span class="finding-rule">raw-img-tag</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام &lt;img&gt; عادي بدل next/image يفوّت تحسينات الصور التلقائية (lazy loading، تغيير الحجم).</p>
+      <pre class="row-snippet">&lt;img</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\views\PerformanceDashboard.jsx:162</span>
+      <span class="finding-rule">raw-img-tag</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام &lt;img&gt; عادي بدل next/image يفوّت تحسينات الصور التلقائية (lazy loading، تغيير الحجم).</p>
+      <pre class="row-snippet">&lt;img</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\views\PrintPage.jsx:282</span>
+      <span class="finding-rule">raw-img-tag</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">استخدام &lt;img&gt; عادي بدل next/image يفوّت تحسينات الصور التلقائية (lazy loading، تغيير الحجم).</p>
+      <pre class="row-snippet">&lt;img className=&quot;logo&quot; src={campProfile?.logoUrl || &quot;/logo.jpg&quot;} alt=&quot;شعار المخيم&quot; style={{ width: &quot;75px&quot;, height: &quot;75px&quot;, objectFit: &quot;contain&quot;, borderRadius: &quot;5</pre>
+    </div>
+  </details>
+    
+  </section>
+
+  <section class="category-section">
+    <h2 class="category-title">🎨 التصميم وإمكانية الوصول <span class="count-pill">21</span></h2>
+    
+      <h3 class="severity-subtitle">متوسط (1)</h3>
+      
+  <details class="finding sev-medium">
+    <summary>
+      <span class="badge badge-medium">متوسط</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\components\ExcelImportModal.jsx:379</span>
+      <span class="finding-rule">div-onclick-no-role</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">عنصر div يحتوي onClick بدون role/tabIndex مناسب — قد لا يكون قابلاً للاستخدام عبر لوحة المفاتيح.</p>
+      <pre class="row-snippet">&lt;div className=&quot;import-file-upload-zone&quot; onClick={triggerFileSelect}&gt;</pre>
+    </div>
+  </details>
+    
+
+      <h3 class="severity-subtitle">منخفض (20)</h3>
+      
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">public\index.html:7</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">&lt;meta name=&quot;theme-color&quot; content=&quot;#000000&quot; /&gt;</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\app\context\AppContext.jsx:167</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">&lt;div style={{ display: &quot;flex&quot;, justifyContent: &quot;center&quot;, alignItems: &quot;center&quot;, minHeight: &quot;100vh&quot;, background: &quot;#f8fafc&quot;, direction: &quot;rtl&quot; }}&gt;</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\app\context\AppContext.jsx:169</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">&lt;p style={{ color: &quot;#475569&quot;, fontWeight: &quot;bold&quot;, fontSize: &quot;1.1rem&quot; }}&gt;جاري التوجيه لصفحة تسجيل الدخول...&lt;/p&gt;</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\App.css:8</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">--primary-color: #059669;</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\App.css:9</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">--primary-dark: #047857;</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\App.css:10</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">--primary-deep: #064e3b;</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\App.css:11</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">--primary-light: #ecfdf5;</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\App.css:12</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">--primary-gradient: linear-gradient(135deg, #059669 0%, #047857 50%, #064e3b 100%);</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\components\AnimatedNumber.jsx:50</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">export const AnimatedDonut = ({ percent, color, label, subText, textColor = &quot;#ffffff&quot; }) =&gt; {</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\components\AnimatedNumber.jsx:82</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">background: `conic-gradient(${color} 0% ${animatedPercent.toFixed(1)}%, #1e293b ${animatedPercent.toFixed(1)}% 100%)`,</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\components\AnimatedNumber.jsx:95</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">backgroundColor: &quot;#ffffff&quot;,</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\components\AnimatedNumber.jsx:101</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">color: &quot;#0f172a&quot;,</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\components\AnimatedNumber.jsx:123</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">&lt;span style={{ fontSize: &quot;0.82rem&quot;, fontWeight: &quot;700&quot;, color: &quot;#64748b&quot;, background: &quot;#ffffff&quot;, padding: &quot;4px 12px&quot;, borderRadius: &quot;20px&quot;, border: &quot;1px solid #c</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\components\AnnouncementBar.jsx:36</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">let bgGradient = &quot;linear-gradient(90deg, #7f1d1d, #991b1b)&quot;; // urgent / red</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\components\AnnouncementBar.jsx:37</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">let labelBg = &quot;#450a0a&quot;;</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\components\AnnouncementBar.jsx:42</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">bgGradient = &quot;linear-gradient(90deg, #78350f, #92400e)&quot;; // gold/amber / warning</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\components\AnnouncementBar.jsx:43</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">labelBg = &quot;#451a03&quot;;</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\components\AnnouncementBar.jsx:47</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">bgGradient = &quot;linear-gradient(90deg, #0f5132, #1e3d59)&quot;; // deep emerald / info</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\components\DeveloperModal.jsx:20</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">&lt;div className=&quot;modal-content developer-modal-card&quot; style={{ maxWidth: &quot;650px&quot;, borderTop: &quot;6px solid #b89647&quot; }}&gt;</pre>
+    </div>
+  </details>
+
+  <details class="finding sev-low">
+    <summary>
+      <span class="badge badge-low">منخفض</span>
+      <span class="finding-tool">فحص نمطي</span>
+      <span class="finding-file">src\components\DeveloperModal.jsx:21</span>
+      <span class="finding-rule">hardcoded-hex-color</span>
+    </summary>
+    <div class="finding-body">
+      <p class="finding-message">لون مكتوب مباشرة (hex) بدل استخدام متغيرات تصميم (design tokens) — يصعّب توحيد الهوية البصرية لاحقاً.</p>
+      <pre class="row-snippet">&lt;div className=&quot;modal-header&quot; style={{ borderBottom: &quot;1px solid #e2e8f0&quot; }}&gt;</pre>
+    </div>
+  </details>
+    
+  </section>
+  
+
+  <footer>تم توليد هذا التقرير محلياً بواسطة qa-scan.js — لا يتم رفع أي كود لأي خادم خارجي (باستثناء طلب --ai-review الاختياري الذي يرسل عيّنة محدودة إلى Anthropic API إذا فعّلته).</footer>
+</div>
+</body>
+</html>
