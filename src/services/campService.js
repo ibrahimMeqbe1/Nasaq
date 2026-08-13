@@ -375,12 +375,38 @@ export const updatePaymentMethods = async (methods) => {
   return { success: true };
 };
 
-// ─── Renewal requests ──────────────────────────────�����G����ƭy�.push({
+// ─── Renewal requests ─────────────────────────────────────────────────────────
+
+export const submitRenewalRequest = async (requestData) => {
+  const { campId, campName, requestedMonths, notes } = requestData;
+  const newRequest = {
+    id: "req-" + Date.now(),
+    camp_id: campId,
+    camp_name: campName,
+    requested_months: parseInt(requestedMonths) || 1,
+    notes: notes || "",
+    status: "pending",
+    request_date: new Date().toISOString(),
+  };
+
+  if (isSupabaseConfigured) {
+    try {
+      const { error } = await supabase.from("renewal_requests").insert([newRequest]);
+      if (error) throw error;
+      return { success: true };
+    } catch (err) {
+      console.error("Supabase submit renewal request error:", err);
+    }
+  }
+
+  initCampLocalStorage();
+  const requests = localStorageGetJSON(PAYMENT_REQUESTS_KEY, []);
+  requests.push({
     id: newRequest.id, campId, campName,
     requestedMonths: newRequest.requested_months,
     notes: newRequest.notes, status: "pending", createdAt: newRequest.request_date,
   });
-  localStorage.setItem(PAYMENT_REQUESTS_KEY, JSON.stringify(requests));
+  localStorageSetJSON(PAYMENT_REQUESTS_KEY, requests);
   return { success: true };
 };
 

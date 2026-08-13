@@ -20,8 +20,7 @@ import {
   FaClipboardList,
   FaUserCheck,
   FaEdit,
-  FaChartPie,
-  FaTrash
+  FaChartPie
 } from "react-icons/fa";
 import AnimatedNumber, { AnimatedDonut } from "../components/AnimatedNumber";
 import { 
@@ -39,7 +38,6 @@ import {
   getGlobalSystemMetrics,
   getCampAdminUser,
   updateCampFullDetails,
-  deleteCampPermanently,
   getSuperAdminUsername,
   updateSuperAdminUsername
 } from "../services/campService";
@@ -174,10 +172,6 @@ const SuperAdmin = ({ user, onLogout }) => {
       setError("ูุฑุฌู ุชุนุจุฆุฉ ุงูุญููู ุงูุฅูุฒุงู…ูุฉ.");
       return;
     }
-    if (newCamp.adminPassword.length < 6) {
-      setError("ููู…ุฉ ู…ุฑูุฑ ู…ุฏูุฑ ุงูู…ุฎูู… ูุฌุจ ุฃูุง ุชูู ุนู 6 ุฃุญุฑู.");
-      return;
-    }
 
     try {
       const res = await createCamp({
@@ -191,7 +185,7 @@ const SuperAdmin = ({ user, onLogout }) => {
       });
 
       if (res.success) {
-        setSuccess(`ุชู… ุฅูุดุงุก ุงูู…ุฎูู… ุจูุฌุงุญ. ูู…ูู ุงูุฏุฎูู ุจุงุณู… ุงูู…ุณุชุฎุฏู…: ${newCamp.adminUsername.trim()} ุฃู ุจุงุณู… ุงูู…ุฎูู…: ${newCamp.name.trim()}`);
+        setSuccess("ุชู… ุฅูุดุงุก ุงูู…ุฎูู… ูุญุณุงุจ ุงูู…ุฏูุฑ ุจูุฌุงุญ!");
         setIsAddCampOpen(false);
         setNewCamp({
           id: "",
@@ -330,31 +324,6 @@ const SuperAdmin = ({ user, onLogout }) => {
     }
   };
 
-  const handleDeleteCamp = async (camp) => {
-    const accepted = window.confirm(
-      `ุชุญุฐูุฑ: ุณูุชู… ุญุฐู ุงูู…ุฎูู… "${camp.name}" ููุงุฆููุง ู…ุน ุฌู…ูุน ุงูุนุงุฆูุงุช ูุงูุชุฑุดูุญุงุช ูุงูุญุณุงุจุงุช ูุทูุจุงุช ุงูุชุฌุฏูุฏ. ูุง ูู…ูู ุงูุชุฑุงุฌุน. ูู ุชุฑูุฏ ุงูู…ุชุงุจุนุฉุ`
-    );
-    if (!accepted) return;
-
-    const typedId = window.prompt(`ููุชุฃููุฏ ุงูููุงุฆูุ ุงูุชุจ ู…ุนุฑู‘ู ุงูู…ุฎูู… ูู…ุง ูู: ${camp.id}`);
-    if (typedId !== camp.id) {
-      setError("ุชู… ุฅูุบุงุก ุงูุญุฐู ูุฃู ู…ุนุฑู‘ู ุงูู…ุฎูู… ุบูุฑ ู…ุทุงุจู.");
-      return;
-    }
-
-    setLoading(true);
-    setError("");
-    setSuccess("");
-    const result = await deleteCampPermanently(camp.id);
-    if (result.success) {
-      setSuccess(`ุชู… ุญุฐู ุงูู…ุฎูู… "${camp.name}" ูุฌู…ูุน ุจูุงูุงุชู ูุญุณุงุจุงุชู ููุงุฆููุง.`);
-      await loadData();
-    } else {
-      setError(result.error || "ุชุนุฐุฑ ุญุฐู ุงูู…ุฎูู….");
-      setLoading(false);
-    }
-  };
-
   const handleApproveRequest = async (requestId, campId) => {
     setError("");
     setSuccess("");
@@ -456,4 +425,1002 @@ const SuperAdmin = ({ user, onLogout }) => {
       const daysAgo = Math.floor(expiredMs / (1000 * 60 * 60 * 24));
       const hoursAgo = Math.floor((expiredMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       
-      const timeืฝ๎ฺ$z{-ฎ้ÜjืV'67&—F–๖ไW—'”–็WB๒ๆWrFFR7V'67&—F–๖ไW—'”–็WB’ขๆWrFFR“ฐข6๖็7BF&vWBาๆWrFFRึFๆึ&6RๆvWEF–ึR’ยFFRๆๆ๗r’’“ฐขF&vWB็6WD๗W'2F&vWBๆvWD๗W'2’ฒ“ฐข6๖็7BGค๖fg6WBาF&vWBๆvWEF–ึWฆ๖ๆT๖fg6WB’ขcฐข6WE7V'67&—F–๖ไW—'”–็WBๆWrFFRF&vWBาGค๖fg6WB’’็F๔•4๕7G&–ๆr’็6ฦ–6Rยb’“ฐขืะข6ฦ74ๆึSา'V–6ฒึWFVๆBึ'Fโ ขเขฒ=}’}Ýýขย๖'WGF๖ใเขฦ'WGF๖เขG—Sา&'WGF๖โ ข๖ไ6ฦ–6ณืฒ’ำโฐข6๖็7Bๆ๗rาๆWrFFR“ฐขๆ๗r็6WDFFRๆ๗rๆvWDFFR’ฒ“ฐข6WE7V'67&—F–๖ไW—'”–็WBf๗&ึDFFUF๔ฦ๖6ฤ–็WBๆ๗r’“ฐขืะข6ฦ74ๆึSา'V–6ฒึWFVๆBึ'Fโ ขเขฒญR}Ý๐ขย๖'WGF๖ใเขฦ'WGF๖เขG—Sา&'WGF๖โ ข๖ไ6ฦ–6ณืฒ’ำโฐข6๖็7Bๆ๗rาๆWrFFR“ฐขๆ๗r็6WDFFRๆ๗rๆvWDFFR’ฒr“ฐข6WE7V'67&—F–๖ไW—'”–็WBf๗&ึDFFUF๔ฦ๖6ฤ–็WBๆ๗r’“ฐขืะข6ฦ74ๆึSา'V–6ฒึWFVๆBึ'Fโ ขเขฒ==’}Ý๐ขย๖'WGF๖ใเขฦ'WGF๖เขG—Sา&'WGF๖โ ข๖ไ6ฦ–6ณืฒ’ำโฐข6๖็7Bๆ๗rาๆWrFFR“ฐขๆ๗r็6WDึ๖็Fๆ๗rๆvWDึ๖็F’ฒ“ฐข6WE7V'67&—F–๖ไW—'”–็WBf๗&ึDFFUF๔ฦ๖6ฤ–็WBๆ๗r’“ฐขืะข6ฦ74ๆึSา'V–6ฒึWFVๆBึ'Fโ ขเขฒM}}Ý๐ขย๖'WGF๖ใเขฦ'WGF๖เขG—Sา&'WGF๖โ ข๖ไ6ฦ–6ณืฒ’ำโฐข6๖็7Bๆ๗rาๆWrFFR“ฐขๆ๗r็6WDึ๖็Fๆ๗rๆvWDึ๖็F’ฒb“ฐข6WE7V'67&—F–๖ไW—'”–็WBf๗&ึDFFUF๔ฦ๖6ฤ–็WBๆ๗r’“ฐขืะข6ฦ74ๆึSา'V–6ฒึWFVๆBึ'Fโ ขเขฒb=M}ขย๖'WGF๖ใเขฦ'WGF๖เขG—Sา&'WGF๖โ ข๖ไ6ฦ–6ณืฒ’ำโฐข6๖็7Bๆ๗rาๆWrFFR“ฐขๆ๗r็6WDgVฦล–V"ๆ๗rๆvWDgVฦล–V"’ฒ“ฐข6WE7V'67&—F–๖ไW—'”–็WBf๗&ึDFFUF๔ฦ๖6ฤ–็WBๆ๗r’“ฐขืะข6ฦ74ๆึSา'V–6ฒึWFVๆBึ'Fโ ขเขฒ=m’}Ýýขย๖'WGF๖ใเขฦ'WGF๖เขG—Sา&'WGF๖โ ข๖ไ6ฦ–6ณืฒ’ำโฐข6WE7V'67&—F–๖ไW—'”–็WB##“’ำ"ำ3C#3ฃS’"“ฐขืะข6ฦ74ๆึSา'V–6ฒึWFVๆBึ'Fโ ข7G–ฦSืทฒ&6ถw&๗VๆD6๖ฦ๗#ข'&v&RยยSยใ’"ย6๖ฦ๗#ข"3cS3""ยf๖็EvV–vCข&&๖ฦB"ืะขเข)๎๛๒ý}mR]ญาขย๖'WGF๖ใเขฦ'WGF๖เขG—Sา&'WGF๖โ ข๖ไ6ฦ–6ณืฒ’ำโฐข6๖็7B7BาๆWrFFRFFRๆๆ๗r’าRขcข“ฐข6WE7V'67&—F–๖ไW—'”–็WBf๗&ึDFFUF๔ฦ๖6ฤ–็WB7B’“ฐขืะข6ฦ74ๆึSา'V–6ฒึWFVๆBึ'FโFๆvW"ึ'Fโ ขเข]m}}}M-b)น@ขย๖'WGF๖ใเขย๖F—cเขย๖F—cเ ขฒ๒ขÝ-B-ข}M}mญ}}}Mý-ญ"ญýข}M-m}]’}M-ขข๗ะขฦF—b6ฦ74ๆึSา&f๗&าึw&๗W"7G–ฦSืทฒ&6ถw&๗VๆCข"6cff2"ยFF–ๆsข#'"ย&๗&FW%&F—W3ข#"ย&๗&FW#ข#6๖ฦ–B6S&Sc"ืำเขฦฦ&VยFึฤf๗#า&W—'”–็WB"7G–ฦSืทฒf๖็EvV–vCข#s"ยF—7ฦ“ข&fฦW"ยฦ–vไ—FVื3ข&6V็FW""ยvข#g"ย6๖ฦ๗#ข"333CSR"ืำเขฤf6ฦVๆF$วB7G–ฦSืทฒ6๖ฦ๗#ข"6#“cCr"ืา๓เขว7ใํญÝýญ๒ญ}ญโ-ข}mญ}}}M}Mญ}2}Mý-ญ"ฃย๗7ใเขย๖ฦ&Vรเขฦ–็W@ขG—Sา&FFWF–ึRึฦ๖6ย ข–Cา&W—'”–็WB ขfวVSืท7V'67&—F–๖ไW—'”–็WGะข๖ไ6ๆvSืฒR’ำโ6WE7V'67&—F–๖ไW—'”–็WBR็F&vWB็fวVR—ะข&WV—&V@ข7G–ฦSืทฐขv–GFข#R"ภขFF–ๆsข#'"ภข&๗&FW#ข#ใW6๖ฦ–B6#“cCr"ภข&๗&FW%&F—W3ข#g"ภขึ&v–ๅF๗ข#g"ภขf๖็Dfึ–ว“ข&–ๆW&—B"ภขf๖็E6—ฆSข#&Vา"ภขf๖็EvV–vCข#c"ภข๗WFฦ–ๆSข&ๆ๖ๆR"ภข&๗…6—ฆ–ๆsข&&๗&FW"ึ&๗"ภข&6ถw&๗VๆD6๖ฦ๗#ข'v—FR ขืะข๓เขท7V'67&—F–๖ไW—'”–็WBbb€ขฦF—b7G–ฦSืทฒf๖็E6—ฆSข#ใ'&Vา"ย6๖ฦ๗#ข"3cS3""ยึ&v–ๅF๗ข#g"ยf๖็EvV–vCข#c"ืำเข	๙8R}M]๒}M]Ýý๓ขถๆWrFFR7V'67&—F–๖ไW—'”–็WB’็F๔ฦ๖6ฦU7G&–ๆr&"ิTr"ยฒvVVถF“ข&ฦ๖ๆr"ย–V#ข&็VึW&–2"ยึ๖็Fข&ฦ๖ๆr"ยF“ข&็VึW&–2"ย๗W#ข#"ึF–v—B"ยึ–็WFSข#"ึF–v—B"า—ะขย๖F—cเข—ะขย๖F—cเ ขย๖F—cเขฦF—b6ฦ74ๆึSา&ึ๖Fยึf๖๗FW"#เขฦ'WGF๖โG—Sา&'WGF๖โ"๖ไ6ฦ–6ณืฒ’ำโ6WD—57V'67&—F–๖ไึ๖Fฤ๗Vโfว6R—า6ฦ74ๆึSา&'Fโึ6ๆ6Vย#ํ]Mญ}ย๖'WGF๖ใเขฦ'WGF๖โG—Sา'7V&ึ—B"6ฦ74ๆึSา&'Fโื7V&ึ—B"7G–ฦSืทฒ&6ถw&๗VๆD6๖ฦ๗#ข"6#“cCr"ย&๗&FW$6๖ฦ๗#ข"6#“cCr"ืำํÝญýญCย๖'WGF๖ใเขย๖F—cเขย๖f๗&ำเขย๖F—cเขย๖F—cเข—ะ ขฒ๒ขm}’ญýญB=}’ญ}m}ข}M]ํญRÝ=}}M]ýญ]mฝ-’ข๗ะขถ—4VF—D6ืึ๖Fฤ๗Vโbb€ขฦF—b6ฦ74ๆึSา&ึ๖Fยึ๗fW&ฦ’"7G–ฦSืทฒ&6ถw&๗VๆCข'&v&Rย#2ยC"ยใsR’"ย&6ถG&๗f–วFW#ข&&วW"’"ืำเขฦF—b6ฦ74ๆึSา&ึ๖Fยึ6๖็FV็B"7G–ฦSืทฒึ…v–GFข#c#"ยv–GFข#“"R"ย&๗&FW%&F—W3ข##"ยFF–ๆsข#ใsW&Vา"ย&๗…6F๗sข##WSำ'&v&ยยยใ#R’"ืำเขฦF—b6ฦ74ๆึSา&ึ๖FยึVFW""7G–ฦSืทฒF—7ฦ“ข&fฦW"ยงW7F–g”6๖็FV็Cข'76Rึ&WGvVVโ"ยฦ–vไ—FVื3ข&6V็FW""ยFF–ๆt&๗GF๖ำข#&Vา"ย&๗&FW$&๗GF๖ำข#6๖ฦ–B6S&Sc"ยึ&v–ไ&๗GF๖ำข#ใ#W&Vา"ืำเขฦ"7G–ฦSืทฒF—7ฦ“ข&fฦW"ยฦ–vไ—FVื3ข&6V็FW""ยvข#"ย6๖ฦ๗#ข"3#Sc6V""ยึ&v–ใขยf๖็E6—ฆSข#ใ#W&Vา"ยf๖็EvV–vCข#"ืำเขฤfVF—B7G–ฦSืทฒ6๖ฦ๗#ข"3#Sc6V""ืา๓เขว7ใํญýญB=}’ญ}m}ข}M]ํญRÝ=}}M]ýญถVF—F–ๆt6ืๆ–Gา“ย๗7ใเขย๖#เขฦ'WGF๖โG—Sา&'WGF๖โ"๖ไ6ฦ–6ณืฒ’ำโ6WD—4VF—D6ืึ๖Fฤ๗Vโfว6R—า6ฦ74ๆึSา&'Fโึ6ฦ๗6R"F—FฦSา-]ญM}""7G–ฦSืทฒ&6ถw&๗VๆCข"6ccVc’"ย&๗&FW#ข&ๆ๖ๆR"ยv–GFข#3'"ยV–vCข#3'"ย&๗&FW%&F—W3ข#SR"ย7W'6๗#ข'๖–็FW""ยF—7ฦ“ข&fฦW"ยฦ–vไ—FVื3ข&6V็FW""ยงW7F–g”6๖็FV็Cข&6V็FW""ย6๖ฦ๗#ข"3cCsC""ืำเขฤfF–ึW2๓เขย๖'WGF๖ใเขย๖F—cเข ขถฦ๖F–ๆtVF—D6ื๒€ขฦF—b6ฦ74ๆึSา'FWBึ6V็FW"’ำB"7G–ฦSืทฒFF–ๆsข#'&Vา"ย6๖ฦ๗#ข"3cCsC""ืำเขฤf7–ๆๆW"6ฦ74ๆึSา'7–ๆๆW""๓โอ}ขญÝ]ญBญ}m}ข}MÝ=}}M]ํญRโโเขย๖F—cเข’ข€ขฦf๗&า๖ๅ7V&ึ—CืถๆFฦU6fTVF—D6ืำเขฦF—b6ฦ74ๆึSา&ึ๖Fยึ&๖G’"7G–ฦSืทฒF—7ฦ“ข&fฦW"ยfฦWF—&V7F–๖ใข&6๖วVึโ"ยvข#G"ืำเขฦF—b7G–ฦSืทฒF—7ฦ“ข&w&–B"ยw&–EFVืฦFT6๖วVึ็3ข#g"g""ยvข#G"ืำเขฦF—cเขฦฦ&Vย7G–ฦSืทฒF—7ฦ“ข&&ฦ๖6ฒ"ยf๖็EvV–vCข#s"ยf๖็E6—ฆSข#ใW&Vา"ย6๖ฦ๗#ข"333CSR"ยึ&v–ไ&๗GF๖ำข#g"ืำํ]}M]ํญR6ื”B“ย๖ฦ&Vรเขฦ–็WB ขG—Sา'FWB" ขfวVSืถVF—F–ๆt6ืๆ–GะขF—6&ฦV@ข7G–ฦSืทฒv–GFข#R"ยFF–ๆsข#G"ย&๗&FW#ข#ใW6๖ฦ–B6S&Sc"ย&๗&FW%&F—W3ข#"ยf๖็E6—ฆSข#ใ“'&Vา"ย&๗…6—ฆ–ๆsข&&๗&FW"ึ&๗"ย&6ถw&๗VๆD6๖ฦ๗#ข"6cff2"ย6๖ฦ๗#ข"3cCsC""ยf๖็EvV–vCข#s"ืะข๓เขย๖F—cเขฦF—cเขฦฦ&Vย7G–ฦSืทฒF—7ฦ“ข&&ฦ๖6ฒ"ยf๖็EvV–vCข#s"ยf๖็E6—ฆSข#ใW&Vา"ย6๖ฦ๗#ข"333CSR"ยึ&v–ไ&๗GF๖ำข#g"ืำํ}=R}M]ํญR}M=}]Bฃย๖ฦ&Vรเขฦ–็WB ขG—Sา'FWB" ขฦ6V๖ฦFW#า-}=R}M]ํญR" ขfวVSืถVF—F–ๆt6ืๆๆึWะข๖ไ6ๆvSืฒR’ำโ6WDVF—F–ๆt6ืฒโโๆVF—F–ๆt6ืยๆึSขR็F&vWB็fวVRา—ะข&WV—&VB ข7G–ฦSืทฒv–GFข#R"ยFF–ๆsข#G"ย&๗&FW#ข#ใW6๖ฦ–B66&CVS"ย&๗&FW%&F—W3ข#"ยf๖็E6—ฆSข#ใ“'&Vา"ย&๗…6—ฆ–ๆsข&&๗&FW"ึ&๗"ย๗WFฦ–ๆSข&ๆ๖ๆR"ืะข๓เขย๖F—cเขย๖F—cเ ขฦF—b7G–ฦSืทฒF—7ฦ“ข&w&–B"ยw&–EFVืฦFT6๖วVึ็3ข#g"g""ยvข#G"ืำเขฦF—cเขฦฦ&Vย7G–ฦSืทฒF—7ฦ“ข&&ฦ๖6ฒ"ยf๖็EvV–vCข#s"ยf๖็E6—ฆSข#ใW&Vา"ย6๖ฦ๗#ข"333CSR"ยึ&v–ไ&๗GF๖ำข#g"ืำํ}=R}M]=MB}M]ýญ“ย๖ฦ&Vรเขฦ–็WB ขG—Sา'FWB" ขฦ6V๖ฦFW#า-}=R}M]ýญ}M]=MB" ขfวVSืถVF—F–ๆt6ืๆึๆvW$ๆึWะข๖ไ6ๆvSืฒR’ำโ6WDVF—F–ๆt6ืฒโโๆVF—F–ๆt6ืยึๆvW$ๆึSขR็F&vWB็fวVRา—ะข7G–ฦSืทฒv–GFข#R"ยFF–ๆsข#G"ย&๗&FW#ข#ใW6๖ฦ–B66&CVS"ย&๗&FW%&F—W3ข#"ยf๖็E6—ฆSข#ใ“'&Vา"ย&๗…6—ฆ–ๆsข&&๗&FW"ึ&๗"ย๗WFฦ–ๆSข&ๆ๖ๆR"ืะข๓เขย๖F—cเขฦF—cเขฦฦ&Vย7G–ฦSืทฒF—7ฦ“ข&&ฦ๖6ฒ"ยf๖็EvV–vCข#s"ยf๖็E6—ฆSข#ใW&Vา"ย6๖ฦ๗#ข"333CSR"ยึ&v–ไ&๗GF๖ำข#g"ืำํ-Rอ}B}Mญ}]Cย๖ฦ&Vรเขฦ–็WB ขG—Sา'FWB" ขฦ6V๖ฦFW#า#S““" ขfวVSืถVF—F–ๆt6ืๆึๆvW%๖ๆWะข๖ไ6ๆvSืฒR’ำโ6WDVF—F–ๆt6ืฒโโๆVF—F–ๆt6ืยึๆvW%๖ๆSขR็F&vWB็fวVRา—ะข7G–ฦSืทฒv–GFข#R"ยFF–ๆsข#G"ย&๗&FW#ข#ใW6๖ฦ–B66&CVS"ย&๗&FW%&F—W3ข#"ยf๖็E6—ฆSข#ใ“'&Vา"ย&๗…6—ฆ–ๆsข&&๗&FW"ึ&๗"ย๗WFฦ–ๆSข&ๆ๖ๆR"ืะข๓เขย๖F—cเขย๖F—cเ ขฦF—cเขฦฦ&Vย7G–ฦSืทฒF—7ฦ“ข&&ฦ๖6ฒ"ยf๖็EvV–vCข#s"ยf๖็E6—ฆSข#ใW&Vา"ย6๖ฦ๗#ข"333CSR"ยึ&v–ไ&๗GF๖ำข#g"ืำํ}M]m}-’๒}Mm}b}Mญ}]ญCย๖ฦ&Vรเขฦ–็WB ขG—Sา'FWB" ขฦ6V๖ฦFW#า-]ฝ}CขÝข}M-]}]ญาอ}Mญr" ขfวVSืถVF—F–ๆt6ืๆFG&W77ะข๖ไ6ๆvSืฒR’ำโ6WDVF—F–ๆt6ืฒโโๆVF—F–ๆt6ืยFG&W73ขR็F&vWB็fวVRา—ะข7G–ฦSืทฒv–GFข#R"ยFF–ๆsข#G"ย&๗&FW#ข#ใW6๖ฦ–B66&CVS"ย&๗&FW%&F—W3ข#"ยf๖็E6—ฆSข#ใ“'&Vา"ย&๗…6—ฆ–ๆsข&&๗&FW"ึ&๗"ย๗WFฦ–ๆSข&ๆ๖ๆR"ืะข๓เขย๖F—cเ ขฦF—b7G–ฦSืทฒ&6ถw&๗VๆCข'&v&3rย“’ย#3RยใR’"ย&๗&FW#ข#6๖ฦ–B&v&3rย“’ย#3Rยใ"’"ย&๗&FW%&F—W3ข#'"ยFF–ๆsข#&Vา"ยึ&v–ๅF๗ข#G"ืำเขฦB7G–ฦSืทฒf๖็E6—ฆSข#ใ—&Vา"ย6๖ฦ๗#ข"3#Sc6V""ยึ&v–ใข#"ยf๖็EvV–vCข#"ืำ๏	๙IญýญBญ}m}ขญ=อญBýํB]ýญ}M]ํญRÝ=}}MMÝ’“ย๖CเขฦF—b7G–ฦSืทฒF—7ฦ“ข&w&–B"ยw&–EFVืฦFT6๖วVึ็3ข#g"g""ยvข#G"ืำเขฦF—cเขฦฦ&Vย7G–ฦSืทฒF—7ฦ“ข&&ฦ๖6ฒ"ยf๖็EvV–vCข#s"ยf๖็E6—ฆSข#ใ'&Vา"ย6๖ฦ๗#ข"333CSR"ยึ&v–ไ&๗GF๖ำข#g"ืำํ}=R}M]=ญํýRMMÝ’ฃย๖ฦ&Vรเขฦ–็WB ขG—Sา'FWB" ขฦ6V๖ฦFW#า-}=R}M]=ญํýR" ขfวVSืถVF—F–ๆt6ืๆFึ–ๅW6W&ๆึWะข๖ไ6ๆvSืฒR’ำโ6WDVF—F–ๆt6ืฒโโๆVF—F–ๆt6ืยFึ–ๅW6W&ๆึSขR็F&vWB็fวVRา—ะข&WV—&VB ข7G–ฦSืทฒv–GFข#R"ยFF–ๆsข#—'"ย&๗&FW#ข#ใW6๖ฦ–B66&CVS"ย&๗&FW%&F—W3ข#"ยf๖็E6—ฆSข#ใ—&Vา"ย&๗…6—ฆ–ๆsข&&๗&FW"ึ&๗"ย&6ถw&๗VๆD6๖ฦ๗#ข'v—FR"ืะข๓เขย๖F—cเขฦF—cเขฦฦ&Vย7G–ฦSืทฒF—7ฦ“ข&&ฦ๖6ฒ"ยf๖็EvV–vCข#s"ยf๖็E6—ฆSข#ใ'&Vา"ย6๖ฦ๗#ข"333CSR"ยึ&v–ไ&๗GF๖ำข#g"ืำํ=M]’}M]}Mอýญý’ฃย๖ฦ&Vรเขฦ–็WB ขG—Sา'FWB" ขฦ6V๖ฦFW#า-=M]’}M]" ขfวVSืถVF—F–ๆt6ืๆFึ–ๅ77v๗&Gะข๖ไ6ๆvSืฒR’ำโ6WDVF—F–ๆt6ืฒโโๆVF—F–ๆt6ืยFึ–ๅ77v๗&CขR็F&vWB็fวVRา—ะข&WV—&VB ข7G–ฦSืทฒv–GFข#R"ยFF–ๆsข#—'"ย&๗&FW#ข#ใW6๖ฦ–B66&CVS"ย&๗&FW%&F—W3ข#"ยf๖็E6—ฆSข#ใ—&Vา"ย&๗…6—ฆ–ๆsข&&๗&FW"ึ&๗"ย&6ถw&๗VๆD6๖ฦ๗#ข'v—FR"ืะข๓เขย๖F—cเขย๖F—cเขย๖F—cเขย๖F—cเ ขฦF—b6ฦ74ๆึSา&ึ๖Fยึf๖๗FW""7G–ฦSืทฒF—7ฦ“ข&fฦW"ยงW7F–g”6๖็FV็Cข&fฦWึVๆB"ยvข#'"ยึ&v–ๅF๗ข#ใW&Vา"ยFF–ๆuF๗ข#&Vา"ย&๗&FW%F๗ข#6๖ฦ–B6S&Sc"ืำเขฦ'WGF๖โG—Sา&'WGF๖โ"๖ไ6ฦ–6ณืฒ’ำโ6WD—4VF—D6ืึ๖Fฤ๗Vโfว6R—า7G–ฦSืทฒ&6ถw&๗VๆCข"6ccVc’"ย6๖ฦ๗#ข"3CsSSc’"ย&๗&FW#ข#6๖ฦ–B66&CVS"ยFF–ๆsข#—#"ย&๗&FW%&F—W3ข#"ยf๖็EvV–vCข#s"ย7W'6๗#ข'๖–็FW""ยf๖็E6—ฆSข#ใ—&Vา"ืำํ]Mญ}ย๖'WGF๖ใเขฦ'WGF๖โG—Sา'7V&ึ—B"7G–ฦSืทฒ&6ถw&๗VๆCข&ฦ–ๆV"ึw&F–V็B3VFVrย3#Sc6V"Rย3CFVCR’"ย6๖ฦ๗#ข'v—FR"ย&๗&FW#ข&ๆ๖ๆR"ยFF–ๆsข#—#G"ย&๗&FW%&F—W3ข#"ยf๖็EvV–vCข#"ย7W'6๗#ข'๖–็FW""ยf๖็E6—ฆSข#ใ—&Vา"ย&๗…6F๗sข#G'&v&3rย“’ย#3Rยใ2’"ืำํÝ}MญýญM}ข}M}cย๖'WGF๖ใเขย๖F—cเขย๖f๗&ำเข—ะขย๖F—cเขย๖F—cเข—ะขย๖F—cเข“ฐงำฐ ฆW๗'BFVfVวB7WW$Fึ–ใฐ
+      const timeText = daysAgo > 0 
+        ? `ู…ูุชูู (ู…ูุฐ ${daysAgo} ููู… ู ${hoursAgo} ุณุงุนุฉ)`
+        : `ู…ูุชูู (ู…ูุฐ ${hoursAgo} ุณุงุนุฉ)`;
+
+      return {
+        text: timeText,
+        percent: 0,
+        isExpired: true,
+        badgeClass: "usage-badge expired-time",
+        color: "#dc2626"
+      };
+    } else {
+      const remainingDays = Math.floor(remainingMs / (1000 * 60 * 60 * 24));
+      const remainingHours = Math.floor((remainingMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      
+      const percent = Math.min(100, Math.max(5, Math.round((remainingMs / totalDurationMs) * 100)));
+      
+      let badgeClass = "usage-badge active-time";
+      let color = "#059669";
+      
+      if (remainingDays <= 15) {
+        badgeClass = "usage-badge warning-time";
+        color = "#d97706";
+      }
+
+      const timeText = remainingDays > 0
+        ? `ู…ุชุจูู ${remainingDays} ููู… ู ${remainingHours} ุณุงุนุฉ`
+        : `ู…ุชุจูู ${remainingHours} ุณุงุนุฉ ููุท`;
+
+      return {
+        text: timeText,
+        percent,
+        isExpired: false,
+        badgeClass,
+        color
+      };
+    }
+  };
+
+  const filteredCamps = camps.filter(c => {
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase().trim();
+    return (
+      (c.id && c.id.toLowerCase().includes(q)) ||
+      (c.name && c.name.toLowerCase().includes(q)) ||
+      (c.managerName && c.managerName.toLowerCase().includes(q)) ||
+      (c.managerPhone && c.managerPhone.includes(q))
+    );
+  });
+
+  return (
+    <div className="super-admin-layout">
+      {/* ููุฏุฑ ุงูู…ุดุฑู ุงูุนุงู… ุงููุงุฎุฑ */}
+      <header className="super-admin-header-luxury">
+        <div className="super-admin-brand">
+          <div className="super-admin-brand-icon">
+            <FaUserShield />
+          </div>
+          <div className="super-admin-brand-text">
+            <h1>ููุญุฉ ุชุญูู… ุงูู…ุดุฑู ุงูุนุงู… ูุงูู…ูุธูู…ุฉ ุงูุฑูู…ูุฉ</h1>
+            <span className="sub-title">
+              <span>๐‘จโ€๐’ป ู…. ุฅุจุฑุงููู… ู…ูุจู - ู…ุฏูุฑ ุงูู…ุดุฑููู</span>
+            </span>
+          </div>
+        </div>
+
+        <div className="super-admin-actions">
+          <div className="system-status-pill">
+            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", boxShadow: "0 0 8px #10b981" }}></span>
+            <span>ู…ุชุตู ุจู€ Supabase (ุงูู…ูุธูู…ุฉ ูุดุทุฉ)</span>
+          </div>
+          <button onClick={onLogout} className="btn-super-logout-luxury">
+            <FaSignOutAlt /> ุฎุฑูุฌ ู…ู ุงููุธุงู…
+          </button>
+        </div>
+      </header>
+
+      {/* ุงูู…ุญุชูู ุงูุฑุฆูุณู */}
+      <main className="super-admin-content" dir="rtl" style={{ padding: "2rem", maxWidth: "1400px", margin: "0 auto" }}>
+        {/* ุงูุชูุจููุงุช ุงูุณุฑูุนุฉ */}
+        {error && <div className="login-error-badge mb-4">{error}</div>}
+        {success && (
+          <div className="renewal-success-box mb-4">
+            <FaCheckCircle className="inline-icon" /> {success}
+          </div>
+        )}
+
+        {/* ุจุทุงูุงุช ุงูุฅุญุตุงุฆูุงุช ุงููุงุฎุฑุฉ */}
+        <div className="super-stats-grid-luxury">
+          <div className="stat-card-luxury" style={{ "--card-accent": "#059669" }}>
+            <div className="stat-card-top">
+              <div className="stat-card-info">
+                <span className="stat-label">ุงูู…ุฎูู…ุงุช ุงูู…ุณุฌูุฉ ุจุงูู…ูุธูู…ุฉ</span>
+                <div className="stat-value"><AnimatedNumber value={stats.totalCamps} /></div>
+              </div>
+              <div className="stat-card-icon-wrap" style={{ "--icon-bg": "rgba(5, 150, 105, 0.12)", "--icon-color": "#059669" }}>
+                <FaCampground />
+              </div>
+            </div>
+            <div className="stat-card-bottom">
+              <span style={{ color: "#059669" }}>๐ข ูุดุท: <AnimatedNumber value={stats.activeCamps} /></span>
+              <span style={{ color: "#ef4444" }}>๐”ด ู…ูุชูู: <AnimatedNumber value={stats.expiredCamps} /></span>
+            </div>
+          </div>
+
+          <div className="stat-card-luxury" style={{ "--card-accent": "#d97706" }}>
+            <div className="stat-card-top">
+              <div className="stat-card-info">
+                <span className="stat-label">ุฅุฌู…ุงูู ุงูุนุงุฆูุงุช ุงูู…ุณุฌูุฉ</span>
+                <div className="stat-value"><AnimatedNumber value={stats.totalFamilies} /></div>
+              </div>
+              <div className="stat-card-icon-wrap" style={{ "--icon-bg": "rgba(217, 119, 6, 0.12)", "--icon-color": "#d97706" }}>
+                <FaUsers />
+              </div>
+            </div>
+            <div className="stat-card-bottom">
+              <span>ู…ุณุฌูุฉ ุจูุงูุฉ ุงูู…ุฎูู…ุงุช</span>
+            </div>
+          </div>
+
+          <div className="stat-card-luxury" style={{ "--card-accent": "#0d9488" }}>
+            <div className="stat-card-top">
+              <div className="stat-card-info">
+                <span className="stat-label">ุฅุฌู…ุงูู ุงูุฃูุฑุงุฏ ุจุงูู…ุฎูู…ุงุช</span>
+                <div className="stat-value"><AnimatedNumber value={stats.totalMembers} /></div>
+              </div>
+              <div className="stat-card-icon-wrap" style={{ "--icon-bg": "rgba(13, 148, 136, 0.12)", "--icon-color": "#0d9488" }}>
+                <FaUserFriends />
+              </div>
+            </div>
+            <div className="stat-card-bottom">
+              <span>ุฃูุฑุงุฏ ู…ุณุชููุฏูู ู…ุญุตูู</span>
+            </div>
+          </div>
+
+          <div className="stat-card-luxury" style={{ "--card-accent": "#2563eb" }}>
+            <div className="stat-card-top">
+              <div className="stat-card-info">
+                <span className="stat-label">ุฅุฌู…ุงูู ูุดููุงุช ุงูุชุฑุดูุญุงุช</span>
+                <div className="stat-value"><AnimatedNumber value={stats.totalNominations} /></div>
+              </div>
+              <div className="stat-card-icon-wrap" style={{ "--icon-bg": "rgba(37, 99, 235, 0.12)", "--icon-color": "#2563eb" }}>
+                <FaClipboardList />
+              </div>
+            </div>
+            <div className="stat-card-bottom">
+              <span>ุญุงูุงุช ุทุงุฑุฆุฉ ูู…ุนุชู…ุฏุฉ</span>
+            </div>
+          </div>
+
+          <div className="stat-card-luxury" style={{ "--card-accent": "#7c3aed" }}>
+            <div className="stat-card-top">
+              <div className="stat-card-info">
+                <span className="stat-label">ุญุณุงุจุงุช ุงูู…ุฏุฑุงุก ูุงูุฅุดุฑุงู</span>
+                <div className="stat-value">{stats.totalUsers}</div>
+              </div>
+              <div className="stat-card-icon-wrap" style={{ "--icon-bg": "rgba(124, 58, 237, 0.12)", "--icon-color": "#7c3aed" }}>
+                <FaUserCheck />
+              </div>
+            </div>
+            <div className="stat-card-bottom">
+              <span style={{ color: "#059669" }}>ู…ุฏุฑุงุก ูุดุทูู: {stats.activeUsersCount}</span>
+            </div>
+          </div>
+
+          <div className="stat-card-luxury" style={{ "--card-accent": "#ef4444" }}>
+            <div className="stat-card-top">
+              <div className="stat-card-info">
+                <span className="stat-label">ุทูุจุงุช ุงูุชุฌุฏูุฏ ุงูู…ุนููุฉ</span>
+                <div className="stat-value" style={{ color: stats.pendingRequests > 0 ? "#ef4444" : "#0f172a" }}>{stats.pendingRequests}</div>
+              </div>
+              <div className="stat-card-icon-wrap" style={{ "--icon-bg": "rgba(239, 68, 68, 0.12)", "--icon-color": "#ef4444" }}>
+                <FaCoins />
+              </div>
+            </div>
+            <div className="stat-card-bottom">
+              <span style={{ color: stats.pendingRequests > 0 ? "#ef4444" : "#64748b" }}>
+                {stats.pendingRequests > 0 ? "โ ๏ธ ุชุญุชุงุฌ ู…ุฑุงุฌุนุฉ ููุฑูุฉ" : "ูุง ุชูุฌุฏ ุทูุจุงุช ุฌุฏูุฏุฉ"}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* ูุณู… ุงูู…ุฎุทุทุงุช ุงูุฏุงุฆุฑูุฉ ุงูุชูุงุนููุฉ ุงูู…ุชุญุฑูุฉ ูุตูุญุฉ ุงูู…ุดุฑู ุงูุนุงู… */}
+        {globalMetrics && (
+          <section style={{ background: "#ffffff", padding: "2rem", borderRadius: "24px", border: "1px solid #e2e8f0", margin: "2rem 0", boxShadow: "0 4px 20px rgba(0,0,0,0.03)" }}>
+            <h2 style={{ fontSize: "1.25rem", fontWeight: "900", color: "#1e293b", marginBottom: "1.75rem", textAlign: "right", display: "flex", alignItems: "center", gap: "10px" }}>
+              <FaChartPie style={{ color: "#0d9488" }} /> ูุณุจ ูู…ุคุดุฑุงุช ุงูุชูุฒูุน ูุงูุฅุบุงุซุฉ ุงูู…ูุธูู…ูุฉ ุงูุดุงู…ูุฉ (ููุงูุฉ ุงูู…ุฎูู…ุงุช)
+            </h2>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "2.5rem", justifyItems: "center" }}>
+              {/* ู…ุฎุทุท 1: ุงูุญุงูุงุช ุงูุฎุงุตุฉ */}
+              <AnimatedDonut 
+                percent={globalMetrics.percentSpecial}
+                color="#38bdf8"
+                textColor="#0f172a"
+                label="ุงูุญุงูุงุช ุงูุฎุงุตุฉ ูุงูุญุฑุฌุฉ"
+                subText={<><AnimatedNumber value={globalMetrics.familiesWithSpecialCases} /> ุนุงุฆูุฉ ู…ู ุฃุตู <AnimatedNumber value={globalMetrics.totalNominationsCount} /></>}
+              />
+
+              {/* ู…ุฎุทุท 2: ูุณุจุฉ ุงูุฃุทูุงู ูุงูุทูุจุฉ */}
+              <AnimatedDonut 
+                percent={globalMetrics.percentChildren}
+                color="#2dd4bf"
+                textColor="#0f172a"
+                label="ูุณุจุฉ ุงูุฃุทูุงู ูุงูุทูุงุจ"
+                subText={<><AnimatedNumber value={globalMetrics.totalChildrenCount} /> ุทูู ู…ู ุฃุตู <AnimatedNumber value={globalMetrics.grandAgeTotal} /> ูุฑุฏ</>}
+              />
+
+              {/* ู…ุฎุทุท 3: ุชุบุทูุฉ ุงูุชุฑุดูุญุงุช */}
+              <AnimatedDonut 
+                percent={globalMetrics.percentCoverage}
+                color="#f59e0b"
+                textColor="#ffffff"
+                label="ูุณุจุฉ ุดู…ูููุฉ ุงูุชุฑุดูุญ"
+                subText={<><AnimatedNumber value={globalMetrics.totalNominationsCount} /> ู…ุฑุดุญุฉ ู…ู ุฃุตู <AnimatedNumber value={globalMetrics.totalFamiliesCount} /> ุนุงุฆูุฉ</>}
+              />
+
+              {/* ู…ุฎุทุท 4: ูุณุจุฉ ุงูุดุจุงุจ ูุงูุจุงูุบูู */}
+              <AnimatedDonut 
+                percent={globalMetrics.percentAdults}
+                color="#8b5cf6"
+                textColor="#ffffff"
+                label="ูุณุจุฉ ุงูุดุจุงุจ ูุงูุจุงูุบูู"
+                subText={<><AnimatedNumber value={globalMetrics.totalAdultsCount} /> ูุฑุฏ ุจุงูุบ ู…ู ุฃุตู <AnimatedNumber value={globalMetrics.grandAgeTotal} /></>}
+              />
+            </div>
+          </section>
+        )}
+
+        {/* ุฃุดุฑุทุฉ ุงูุชููู ุงููุงุฎุฑุฉ */}
+        <div className="super-tabs-pill-bar">
+          <button 
+            className={`super-tab-pill-btn ${activeTab === "camps" ? "active" : ""}`}
+            onClick={() => setActiveTab("camps")}
+          >
+            <FaCampground /> ุณุฌู ุงูู…ุฎูู…ุงุช ููุชุฑุงุช ุงูุงุณุชุฎุฏุงู…
+          </button>
+          <button 
+            className={`super-tab-pill-btn ${activeTab === "requests" ? "active" : ""}`}
+            onClick={() => setActiveTab("requests")}
+          >
+            <FaCoins /> ู…ุนุงู…ูุงุช ูุทูุจุงุช ุงูุชุฌุฏูุฏ {stats.pendingRequests > 0 && <span className="tab-notification-count">{stats.pendingRequests}</span>}
+          </button>
+          <button 
+            className={`super-tab-pill-btn ${activeTab === "announcement" ? "active" : ""}`}
+            onClick={() => setActiveTab("announcement")}
+          >
+            <FaBullhorn /> ุงูุชุนู…ูู…ุงุช ูุงูุดุฑูุท ุงูุฅุฎุจุงุฑู ุงูุนุงุฌู
+          </button>
+          <button 
+            className={`super-tab-pill-btn ${activeTab === "settings" ? "active" : ""}`}
+            onClick={() => setActiveTab("settings")}
+          >
+            <FaWallet /> ูููุงุช ุงูุชุญุตูู ูุญุณุงุจุงุช ุงูุณุฏุงุฏ
+          </button>
+        </div>
+
+        {/* ุชุจููุจ 1: ุฅุฏุงุฑุฉ ุงูู…ุฎูู…ุงุช ูู…ุฏุฉ ุงูุงุณุชุฎุฏุงู… */}
+        {activeTab === "camps" && (
+          <div className="super-content-card-luxury">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem", flexWrap: "wrap", gap: "1rem" }}>
+              <div>
+                <h2 style={{ fontSize: "1.3rem", fontWeight: "800", color: "#0f172a", margin: 0 }}>ุงูู…ุฎูู…ุงุช ุงูู…ุณุฌูุฉ ุจุงููุธุงู… ูู…ูุงุนูุฏ ุงูุงุดุชุฑุงู ({filteredCamps.length})</h2>
+                <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: "0.85rem" }}>
+                  ุชุงุจุน ู…ุฏุฉ ุงูุงุณุชุฎุฏุงู… ุงูู…ุชุจููุฉุ ูุชูุงุฑูุฎ ุงูุงูุชูุงุก ูุฅุฌุฑุงุกุงุช ุงูุชุฌุฏูุฏ ูุงูุชู…ุฏูุฏ ููู ู…ุฎูู….
+                </p>
+              </div>
+
+              <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                <input 
+                  type="text"
+                  placeholder="๐” ุจุญุซ ุจุงุณู… ุงูู…ุฎูู…ุ ุงูู…ุฏูุฑุ ุฃู ุงูู…ุนุฑู..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    padding: "10px 14px",
+                    borderRadius: "10px",
+                    border: "1.5px solid #cbd5e1",
+                    fontSize: "0.88rem",
+                    minWidth: "260px"
+                  }}
+                />
+
+                <button onClick={() => setIsAddCampOpen(true)} className="btn btn-primary" style={{ padding: "10px 18px", borderRadius: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <FaPlus /> ุฅูุดุงุก ู…ุฎูู… ุฌุฏูุฏ
+                </button>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="text-center py-4"><FaSpinner className="spinner" /> ุฌุงุฑู ุชุญู…ูู ุจูุงูุงุช ุงูู…ุฎูู…ุงุช...</div>
+            ) : filteredCamps.length === 0 ? (
+              <div className="empty-latest">ูุง ุชูุฌุฏ ู…ุฎูู…ุงุช ู…ุทุงุจูุฉ ููุจุญุซ ุฃู ู…ุถุงูุฉ ุจุงููุธุงู… ุญุงููุงู.</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="family-table">
+                  <thead>
+                    <tr>
+                      <th>ู…ุนุฑู‘ู ุงูู…ุฎูู…</th>
+                      <th>ุงุณู… ุงูู…ุฎูู… ูุงูู…ูุทูุฉ</th>
+                      <th>ุงูู…ุฏูุฑ ุงูู…ุณุคูู</th>
+                      <th>ุฑูู… ุงูุฌูุงู</th>
+                      <th>ุชุงุฑูุฎ ุงูุชูุงุก ุงูุงุดุชุฑุงู</th>
+                      <th>ููุช ุงูุงุณุชุฎุฏุงู… / ุงูู…ุชุจูู</th>
+                      <th>ุญุงูุฉ ุงูุงุดุชุฑุงู</th>
+                      <th>ุงูุฅุฌุฑุงุกุงุช ูุงูุนู…ููุงุช</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredCamps.map((camp) => {
+                      const usageInfo = getSubscriptionUsageInfo(camp.createdAt, camp.subscriptionExpiry);
+                      return (
+                        <tr key={camp.id}>
+                          <td>
+                            <code style={{ background: "#f1f5f9", padding: "4px 8px", borderRadius: "6px", color: "#0f172a", fontWeight: "700" }}>{camp.id}</code>
+                          </td>
+                          <td>
+                            <strong style={{ fontSize: "0.98rem", color: "#0f172a" }}>{camp.name}</strong>
+                            {camp.address && <div style={{ fontSize: "0.78rem", color: "#64748b" }}>{camp.address}</div>}
+                          </td>
+                          <td>{camp.managerName || "-"}</td>
+                          <td>{camp.managerPhone || "-"}</td>
+                          <td>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", color: "#334155", fontWeight: "600", fontSize: "0.88rem" }}>
+                              <FaCalendarAlt style={{ color: "#d97706" }} />
+                              {formatDate(camp.subscriptionExpiry)}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="usage-time-cell">
+                              <div className={usageInfo.badgeClass}>
+                                <FaClock />
+                                <span>{usageInfo.text}</span>
+                              </div>
+                              <div className="usage-mini-bar">
+                                <div className="usage-mini-progress" style={{ width: `${usageInfo.percent}%`, backgroundColor: usageInfo.color }}></div>
+                              </div>
+                            </div>
+                          </td>
+                          <td>{getStatusBadge(camp)}</td>
+                          <td>
+                            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+                              <button 
+                                onClick={() => handleOpenEditCampModal(camp)} 
+                                className="btn btn-primary"
+                                style={{ padding: "6px 12px", fontSize: "0.82rem", borderRadius: "8px", display: "flex", alignItems: "center", gap: "6px", backgroundColor: "#2563eb", borderColor: "#2563eb", color: "white", fontWeight: "700", cursor: "pointer" }}
+                              >
+                                <FaEdit /> ุชุนุฏูู ุงูุจูุงูุงุช
+                              </button>
+                              <button 
+                                onClick={() => handleOpenSubscriptionModal(camp)} 
+                                className="btn btn-secondary"
+                                style={{ padding: "6px 12px", fontSize: "0.82rem", borderRadius: "8px", display: "flex", alignItems: "center", gap: "6px", borderColor: "#d97706", color: "#d97706", fontWeight: "700", cursor: "pointer" }}
+                              >
+                                <FaClock /> ุชู…ุฏูุฏ ุงูุงุดุชุฑุงู
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ุชุจููุจ 2: ุทูุจุงุช ุงูุชุฌุฏูุฏ ูุงูุฏูุน */}
+        {activeTab === "requests" && (
+          <div className="super-card">
+            <h2>ุฅูุตุงูุงุช ูุทูุจุงุช ุงูุชุฌุฏูุฏ ุงูู…ุณุชูู…ุฉ ({requests.length})</h2>
+            
+            {loading ? (
+              <div className="text-center py-4"><FaSpinner className="spinner" /> ุฌุงุฑู ุงูุชุญู…ูู...</div>
+            ) : requests.length === 0 ? (
+              <div className="empty-latest">ูุง ุชูุฌุฏ ุฃู ุทูุจุงุช ุชุฌุฏูุฏ ุญุงููุงู.</div>
+            ) : (
+              <div className="table-responsive">
+                <table className="family-table">
+                  <thead>
+                    <tr>
+                      <th>ุงุณู… ุงูู…ุฎูู…</th>
+                      <th>ุทุฑููุฉ ุงูุฏูุน</th>
+                      <th>ุฑูู… ุงูู…ุนุงู…ูุฉ / ุงูุนู…ููุฉ (TxID)</th>
+                      <th>ุงูู…ุจูุบ</th>
+                      <th>ุชุงุฑูุฎ ุงูุฅุฑุณุงู</th>
+                      <th>ุญุงูุฉ ุงูุทูุจ</th>
+                      <th>ุงูุฅุฌุฑุงุกุงุช ูุงููุฑุงุฑ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {requests.map((req) => (
+                      <tr key={req.id}>
+                        <td><strong>{req.campName}</strong></td>
+                        <td>{req.method}</td>
+                        <td><code>{req.txId}</code></td>
+                        <td><strong>{req.amount}</strong></td>
+                        <td className="date-td">{formatDate(req.createdAt)}</td>
+                        <td>
+                          {req.status === "pending" && <span className="badge-members" style={{ backgroundColor: "#ffeeba", color: "#856404" }}>ุจุงูุชุธุงุฑ ุงูุชุญูู</span>}
+                          {req.status === "approved" && <span className="badge-members" style={{ backgroundColor: "#d4edda", color: "#155724" }}>ุชู… ุงููุจูู ูุงูุชูุนูู</span>}
+                          {req.status === "declined" && <span className="badge-members" style={{ backgroundColor: "#f8d7da", color: "#721c24" }}>ุชู… ุงูุฑูุถ</span>}
+                        </td>
+                        <td>
+                          {req.status === "pending" ? (
+                            <div style={{ display: "flex", gap: "8px" }}>
+                              <button 
+                                onClick={() => handleApproveRequest(req.id, req.campId)} 
+                                className="btn btn-primary btn-sm"
+                                style={{ padding: "4px 8px" }}
+                              >
+                                <FaCheckCircle /> ูุจูู ูุชู…ุฏูุฏ
+                              </button>
+                              <button 
+                                onClick={() => handleDeclineRequest(req.id)} 
+                                className="btn btn-pdf btn-sm"
+                                style={{ padding: "4px 8px" }}
+                              >
+                                <FaTimesCircle /> ุฑูุถ ุงูู…ุนุงู…ูุฉ
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-muted" style={{ fontSize: "0.8rem" }}>ู…ูุชูู ุงูู…ุนุงูุฌุฉ</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ุชุจููุจ 3: ุฅุฏุงุฑุฉ ุงูุฅุนูุงูุงุช ูุดุฑูุท ุงูุฃุฎุจุงุฑ ุงูุนุงุฌูุฉ */}
+        {activeTab === "announcement" && (
+          <div className="super-card">
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "1.5rem" }}>
+              <div style={{ background: "rgba(220, 53, 69, 0.1)", padding: "12px", borderRadius: "50%", color: "#dc3545" }}>
+                <FaBullhorn style={{ fontSize: "1.8rem" }} />
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: "1.3rem" }}>ุฅุฏุงุฑุฉ ุงูุฅุนูุงูุงุช ูุดุฑูุท ุงูุฃุฎุจุงุฑ ุงูุนุงุฌูุฉ</h2>
+                <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: "0.88rem" }}>
+                  ูุดุฑ ุฅุนูุงู ุดุฑูุท ุฅุฎุจุงุฑู ุนุงุฌู ูุธูุฑ ูู ุฃุนูู ุฌู…ูุน ุตูุญุงุช ุงูู…ุฎูู…ุงุช ููุฑุงู
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveAnnouncement} style={{ display: "flex", flexDirection: "column", gap: "1.4rem", maxWidth: "750px", background: "#f8fafc", padding: "20px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
+              <div className="form-group">
+                <label style={{ fontWeight: "700", display: "block", marginBottom: "8px", color: "#334155" }}>ุญุงูุฉ ูุดุฑ ุงูุฅุนูุงู:</label>
+                <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: "600" }}>
+                    <input 
+                      type="radio" 
+                      name="isActive" 
+                      checked={announcementForm.isActive === true} 
+                      onChange={() => setAnnouncementForm(prev => ({ ...prev, isActive: true }))} 
+                    />
+                    <span style={{ color: "#16a34a" }}>๐ข ุชูุนูู ููุดุฑ ุงูุฅุนูุงู ููุฑุงู ููู ุงูู…ุฎูู…ุงุช</span>
+                  </label>
+                  <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: "600" }}>
+                    <input 
+                      type="radio" 
+                      name="isActive" 
+                      checked={announcementForm.isActive === false} 
+                      onChange={() => setAnnouncementForm(prev => ({ ...prev, isActive: false }))} 
+                    />
+                    <span style={{ color: "#dc3545" }}>๐”ด ุฅููุงู ุงูุฅุนูุงู ูุฅุฎูุงุคู ุญุงููุงู</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label style={{ fontWeight: "700", display: "block", marginBottom: "8px", color: "#334155" }}>ููุน ุงูุฅุนูุงู ูุงููู…ุท ุงูุจุตุฑู:</label>
+                <select 
+                  value={announcementForm.type} 
+                  onChange={(e) => setAnnouncementForm(prev => ({ ...prev, type: e.target.value }))}
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1.5px solid #cbd5e1", fontWeight: "600", fontSize: "0.95rem", backgroundColor: "white" }}
+                >
+                  <option value="urgent">๐”ด ุฎุจุฑ ุนุงุฌู (ุดุฑูุท ุฃุญู…ุฑ ุจุงุฑุฒ)</option>
+                  <option value="warning">๐ก ุชูุจูู ูุงู… (ุดุฑูุท ุฐูุจู ุชูุจููู)</option>
+                  <option value="info">๐”ต ุฅุนูุงู… ุฑุณู…ู (ุดุฑูุท ุฃุฒุฑู ุฑุณู…ู)</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label style={{ fontWeight: "700", display: "block", marginBottom: "8px", color: "#334155" }}>ูุต ุงูุฅุนูุงู (ุงูุฎุจุฑ ุงูุนุงุฌู ุงูู…ุชุญุฑู):</label>
+                <textarea 
+                  rows="3" 
+                  value={announcementForm.text} 
+                  onChange={(e) => setAnnouncementForm(prev => ({ ...prev, text: e.target.value }))} 
+                  placeholder="ุงูุชุจ ูุต ุงูุฅุนูุงู ุงูุฐู ุณูุธูุฑ ู…ุชุญุฑูุงู ูู ุฃุนูู ุฌู…ูุน ุงูุตูุญุงุช..."
+                  required
+                  style={{ width: "100%", padding: "12px", borderRadius: "6px", border: "1.5px solid #cbd5e1", fontFamily: "inherit", fontSize: "0.95rem", lineHeight: "1.6", boxSizing: "border-box" }}
+                />
+              </div>
+
+              <button type="submit" disabled={savingAnnouncement} className="btn btn-primary" style={{ alignSelf: "flex-start", padding: "10px 24px", fontSize: "0.95rem", display: "flex", alignItems: "center", gap: "8px" }}>
+                {savingAnnouncement ? <FaSpinner className="spinner" /> : <FaBullhorn />}
+                <span>ุญูุธ ูุชุนู…ูู… ุงูุฅุนูุงู ุงูุงู</span>
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* ุชุจููุจ 4: ุทุฑู ุงูุฏูุน ูุฅุนุฏุงุฏุงุช ุญุณุงุจ ุงูู…ุดุฑู ุงูุนุงู… */}
+        {activeTab === "settings" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "2rem" }}>
+            {/* 1. ุจุทุงูุฉ ุชุบููุฑ ุงุณู… ุงูู…ุณุชุฎุฏู… ููู…ุดุฑู ุงูุนุงู… */}
+            <div className="super-card" style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "20px", padding: "1.75rem", boxShadow: "0 10px 30px rgba(0,0,0,0.04)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "1.5rem", borderBottom: "2px solid #f1f5f9", paddingBottom: "1rem" }}>
+                <div style={{ background: "rgba(245, 158, 11, 0.12)", width: "48px", height: "48px", borderRadius: "14px", display: "flex", alignItems: "center", justifyContent: "center", color: "#d97706" }}>
+                  <FaUserShield style={{ fontSize: "1.6rem" }} />
+                </div>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: "1.25rem", fontWeight: "900", color: "#0f172a" }}>๐‘‘ ุชุบููุฑ ุงุณู… ุญุณุงุจ ุงูู…ุดุฑู ุงูุนุงู… (Developer / SuperAdmin)</h2>
+                  <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: "0.88rem", fontWeight: "500" }}>
+                    ุชุฎุตูุต ูุชุบููุฑ ุงุณู… ุงูู…ุณุชุฎุฏู… ุงูุฎุงุต ุจุงูู…ุดุฑู ุงูุนุงู… ููุฏุฎูู ูููุธุงู… ูุงูุชุญูู… ุงูู…ุจุงุดุฑ.
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleSaveSuperAdminUsername} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
+                  <label style={{ fontWeight: "800", color: "#334155", fontSize: "0.92rem" }}>ุงุณู… ุงูู…ุณุชุฎุฏู… ุงูุฌุฏูุฏ ููู…ุดุฑู ุงูุนุงู…:</label>
+                  <input 
+                    type="text" 
+                    value={superAdminUsernameInput} 
+                    onChange={(e) => setSuperAdminUsernameInput(e.target.value)} 
+                    placeholder="ุฃุฏุฎู ุงุณู… ุงูู…ุณุชุฎุฏู… ุงูุฌุฏูุฏ (ู…ุซุงู: Ibrahim)" 
+                    required
+                    style={{ width: "100%", boxSizing: "border-box", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #cbd5e1", fontSize: "0.95rem", fontWeight: "700", outline: "none", backgroundColor: "#f8fafc", color: "#0f172a" }}
+                  />
+                </div>
+                <button type="submit" disabled={savingSuperAdminUser} className="btn btn-primary" style={{ width: "fit-content", background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)", border: "none", padding: "12px 28px", borderRadius: "12px", fontSize: "0.95rem", fontWeight: "800", boxShadow: "0 4px 14px rgba(245, 158, 11, 0.3)" }}>
+                  {savingSuperAdminUser ? <FaSpinner className="spinner" /> : <FaCheckCircle />}
+                  <span>ุญูุธ ุงุณู… ุงูู…ุณุชุฎุฏู… ุงูุฌุฏูุฏ ููู…ุดุฑู ุงูุนุงู…</span>
+                </button>
+              </form>
+            </div>
+
+            {/* 2. ุจุทุงูุฉ ูููุงุช ุงูุชุญุตูู ูุงูุณุฏุงุฏ */}
+            <div className="super-card" style={{ background: "#ffffff", border: "1px solid #cbd5e1", borderRadius: "20px", padding: "1.75rem", boxShadow: "0 10px 30px rgba(0,0,0,0.04)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "1.5rem", borderBottom: "2px solid #f1f5f9", paddingBottom: "1rem" }}>
+                <div style={{ background: "rgba(16, 185, 129, 0.12)", width: "48px", height: "48px", borderRadius: "14px", display: "flex", alignItems: "center", justifyContent: "center", color: "#059669" }}>
+                  <FaWallet style={{ fontSize: "1.6rem" }} />
+                </div>
+                <div>
+                  <h2 style={{ fontSize: "1.25rem", color: "#0f172a", margin: 0, fontWeight: "900" }}>
+                    ุฅุนุฏุงุฏุงุช ูููุงุช ุงูุชุญุตูู ูุญุณุงุจุงุช ุงูุณุฏุงุฏ ุงูุฑุณู…ูุฉ
+                  </h2>
+                  <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: "0.88rem", fontWeight: "500" }}>
+                    ูุฐู ุงูุญุณุงุจุงุช ุชุธูุฑ ูุฌู…ูุน ู…ุฏุฑุงุก ุงูู…ุฎูู…ุงุช ูู ูุงุฌูุฉ ุชุฌุฏูุฏ ุงูุงุดุชุฑุงู ูุฅุฑุณุงู ุฅูุตุงูุงุช ุงูุฏูุน.
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleUpdateSettings} style={{ display: "flex", flexDirection: "column", gap: "1.4rem" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
+                  <label style={{ fontWeight: "800", color: "#334155", fontSize: "0.92rem" }}>๐ฆ ุญุณุงุจ ุจูู ููุณุทูู ุงูุฑุณู…ู (Bank of Palestine):</label>
+                  <input 
+                    type="text" 
+                    value={paymentMethods.bankOfPalestine || ""} 
+                    onChange={(e) => setPaymentMethods({ ...paymentMethods, bankOfPalestine: e.target.value })}
+                    placeholder="ู…ุซุงู: ุญุณุงุจ ุจูู ููุณุทูู: 1234567-001-9010" 
+                    style={{ width: "100%", boxSizing: "border-box", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #cbd5e1", fontSize: "0.95rem", fontWeight: "600", outline: "none", backgroundColor: "#f8fafc", color: "#0f172a" }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
+                  <label style={{ fontWeight: "800", color: "#334155", fontSize: "0.92rem" }}>๐“ฑ ุชูุงุตูู ุญุณุงุจ ุฌูุงู ุจุงู (Jawwal Pay):</label>
+                  <input 
+                    type="text" 
+                    value={paymentMethods.jawwalPay || ""} 
+                    onChange={(e) => setPaymentMethods({ ...paymentMethods, jawwalPay: e.target.value })}
+                    placeholder="ู…ุซุงู: ุฑูู… ู…ุญูุธุฉ ุฌูุงู ุจุงู: 0599000000" 
+                    style={{ width: "100%", boxSizing: "border-box", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #cbd5e1", fontSize: "0.95rem", fontWeight: "600", outline: "none", backgroundColor: "#f8fafc", color: "#0f172a" }}
+                  />
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
+                  <label style={{ fontWeight: "800", color: "#334155", fontSize: "0.92rem" }}>๐’ณ ุชูุงุตูู ุญุณุงุจ ุจุงู ุจุงู (PalPay):</label>
+                  <input 
+                    type="text" 
+                    value={paymentMethods.palPay || ""} 
+                    onChange={(e) => setPaymentMethods({ ...paymentMethods, palPay: e.target.value })}
+                    placeholder="ู…ุซุงู: ุฑูู… ุญุณุงุจ ุจุงู ุจุงู: 998877" 
+                    style={{ width: "100%", boxSizing: "border-box", padding: "12px 16px", borderRadius: "12px", border: "1.5px solid #cbd5e1", fontSize: "0.95rem", fontWeight: "600", outline: "none", backgroundColor: "#f8fafc", color: "#0f172a" }}
+                  />
+                </div>
+
+                <button type="submit" className="btn btn-primary" style={{ width: "fit-content", background: "linear-gradient(135deg, #10b981 0%, #059669 100%)", border: "none", padding: "12px 28px", borderRadius: "12px", fontSize: "0.95rem", fontWeight: "800", boxShadow: "0 4px 14px rgba(16, 185, 129, 0.3)" }}>
+                  <FaCheckCircle />
+                  <span>ุญูุธ ุจูุงูุงุช ูููุงุช ุงูุฏูุน ูุงูุชุญุตูู</span>
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* ูุงูุฐุฉ ุฅุถุงูุฉ ู…ุฎูู… ู…ูุจุซูุฉ */}
+      {isAddCampOpen && (
+        <div className="modal-overlay" style={{ background: "rgba(15, 23, 42, 0.75)", backdropFilter: "blur(8px)" }}>
+          <div className="modal-content" style={{ maxWidth: "620px", width: "92%", borderRadius: "20px", padding: "1.75rem", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }}>
+            <div className="modal-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "1rem", borderBottom: "1px solid #e2e8f0", marginBottom: "1.25rem" }}>
+              <h2 style={{ display: "flex", alignItems: "center", gap: "10px", color: "#059669", margin: 0, fontSize: "1.25rem", fontWeight: "800" }}>
+                <FaCampground style={{ color: "#059669" }} />
+                <span>ุฅูุดุงุก ู…ุฎูู… ุฌุฏูุฏ ูุญุณุงุจ ููู…ุฏูุฑ</span>
+              </h2>
+              <button type="button" onClick={() => setIsAddCampOpen(false)} className="btn-close" title="ุฅุบูุงู" style={{ background: "#f1f5f9", border: "none", width: "32px", height: "32px", borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}>
+                <FaTimes />
+              </button>
+            </div>
+            
+            <form onSubmit={handleCreateCamp}>
+              <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                  <div>
+                    <label style={{ display: "block", fontWeight: "700", fontSize: "0.85rem", color: "#334155", marginBottom: "6px" }}>ู…ุนุฑู‘ู ุงูู…ุฎูู… (Camp ID) *</label>
+                    <input 
+                      type="text" 
+                      placeholder="ู…ุซุงู: zad-al-khair" 
+                      value={newCamp.id}
+                      onChange={(e) => setNewCamp({ ...newCamp, id: e.target.value })}
+                      required 
+                      style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #cbd5e1", borderRadius: "10px", fontSize: "0.92rem", boxSizing: "border-box", outline: "none" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontWeight: "700", fontSize: "0.85rem", color: "#334155", marginBottom: "6px" }}>ุงุณู… ุงูู…ุฎูู… ุจุงููุงู…ู *</label>
+                    <input 
+                      type="text" 
+                      placeholder="ู…ุซุงู: ู…ุฎูู… ุฒุงุฏ ุงูุฎูุฑ ุงูุนุงู…" 
+                      value={newCamp.name}
+                      onChange={(e) => setNewCamp({ ...newCamp, name: e.target.value })}
+                      required 
+                      style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #cbd5e1", borderRadius: "10px", fontSize: "0.92rem", boxSizing: "border-box", outline: "none" }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                  <div>
+                    <label style={{ display: "block", fontWeight: "700", fontSize: "0.85rem", color: "#334155", marginBottom: "6px" }}>ุงุณู… ุงูู…ุณุคูู (ุงูู…ุฏูุฑ)</label>
+                    <input 
+                      type="text" 
+                      placeholder="ุฃุจู ุณููู… ุฃุญู…ุฏ" 
+                      value={newCamp.managerName}
+                      onChange={(e) => setNewCamp({ ...newCamp, managerName: e.target.value })}
+                      style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #cbd5e1", borderRadius: "10px", fontSize: "0.92rem", boxSizing: "border-box", outline: "none" }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: "block", fontWeight: "700", fontSize: "0.85rem", color: "#334155", marginBottom: "6px" }}>ุฑูู… ุฌูุงู ุงูู…ุฏูุฑ</label>
+                    <input 
+                      type="text" 
+                      placeholder="0599000000" 
+                      value={newCamp.managerPhone}
+                      onChange={(e) => setNewCamp({ ...newCamp, managerPhone: e.target.value })}
+                      style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #cbd5e1", borderRadius: "10px", fontSize: "0.92rem", boxSizing: "border-box", outline: "none" }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontWeight: "700", fontSize: "0.85rem", color: "#334155", marginBottom: "6px" }}>ูุชุฑุฉ ุตูุงุญูุฉ ุงูุชุฌุฑุจุฉ / ุงูุงุดุชุฑุงู ุงูุจุฏุฆูุฉ *</label>
+                  <select 
+                    value={newCamp.trialPeriod} 
+                    onChange={(e) => setNewCamp({ ...newCamp, trialPeriod: e.target.value })}
+                    style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #cbd5e1", borderRadius: "10px", fontSize: "0.92rem", backgroundColor: "white", fontWeight: "600", color: "#1e293b", boxSizing: "border-box", outline: "none" }}
+                  >
+                    <option value="1-hour">ุณุงุนุฉ ูุงุญุฏุฉ ููุชุฌุฑุจุฉ</option>
+                    <option value="1-day">ููู… ูุงุญุฏ ููุชุฌุฑุจุฉ</option>
+                    <option value="1-week">ุฃุณุจูุน ูุงุญุฏ ููุชุฌุฑุจุฉ</option>
+                    <option value="1-month">ุดูุฑ ูุงุญุฏ (ุงูุงูุชุฑุงุถู)</option>
+                    <option value="6-months">6 ุฃุดูุฑ</option>
+                    <option value="1-year">ุณูุฉ ูุงู…ูุฉ</option>
+                    <option value="unlimited">ู…ูุชูุญ / ุบูุฑ ู…ุญุฏูุฏ</option>
+                  </select>
+                </div>
+
+                <div style={{ background: "rgba(5, 150, 105, 0.05)", border: "1px solid rgba(5, 150, 105, 0.2)", borderRadius: "12px", padding: "1rem", marginTop: "4px" }}>
+                  <h4 style={{ fontSize: "0.9rem", color: "#059669", margin: "0 0 10px 0", fontWeight: "800" }}>๐”‘ ุจูุงูุงุช ุชุณุฌูู ุฏุฎูู ู…ุฏูุฑ ุงูู…ุฎูู… ูููุญุฉ</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                    <div>
+                      <label style={{ display: "block", fontWeight: "700", fontSize: "0.82rem", color: "#334155", marginBottom: "6px" }}>ุงุณู… ุงูู…ุณุชุฎุฏู… ูููุญุฉ *</label>
+                      <input 
+                        type="text" 
+                        placeholder="zad-admin" 
+                        value={newCamp.adminUsername}
+                        onChange={(e) => setNewCamp({ ...newCamp, adminUsername: e.target.value })}
+                        required 
+                        style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #cbd5e1", borderRadius: "8px", fontSize: "0.9rem", boxSizing: "border-box", backgroundColor: "white" }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontWeight: "700", fontSize: "0.82rem", color: "#334155", marginBottom: "6px" }}>ููู…ุฉ ุงูู…ุฑูุฑ *</label>
+                      <input 
+                        type="password" 
+                        placeholder="ููู…ุฉ ู…ุฑูุฑ ุงูุฏุฎูู" 
+                        value={newCamp.adminPassword}
+                        onChange={(e) => setNewCamp({ ...newCamp, adminPassword: e.target.value })}
+                        required 
+                        style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #cbd5e1", borderRadius: "8px", fontSize: "0.9rem", boxSizing: "border-box", backgroundColor: "white" }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-footer" style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "1.5rem", paddingTop: "1rem", borderTop: "1px solid #e2e8f0" }}>
+                <button type="button" onClick={() => setIsAddCampOpen(false)} style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1", padding: "9px 20px", borderRadius: "10px", fontWeight: "700", cursor: "pointer", fontSize: "0.9rem" }}>ุฅูุบุงุก</button>
+                <button type="submit" style={{ background: "linear-gradient(135deg, #059669 0%, #047857 100%)", color: "white", border: "none", padding: "9px 24px", borderRadius: "10px", fontWeight: "800", cursor: "pointer", fontSize: "0.9rem", boxShadow: "0 4px 12px rgba(5, 150, 105, 0.3)" }}>ุชุฃููุฏ ูุฅูุดุงุก ุงูู…ุฎูู…</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ูุงูุฐุฉ ุชุนุฏูู ุชุงุฑูุฎ ุงูุชูุงุก ุงูุงุดุชุฑุงู ู…ูุจุซูุฉ */}
+      {isSubscriptionModalOpen && selectedCampForSubscription && (
+        <div className="modal-overlay">
+          <div className="modal-content gold-modal-header" style={{ maxWidth: "550px", width: "95%" }}>
+            <div className="modal-header">
+              <h2 className="gold-modal-title" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <FaClock />
+                <span>ุชุนุฏูู ูุชุฑุฉ ุงุดุชุฑุงู: {selectedCampForSubscription.name}</span>
+              </h2>
+              <button type="button" onClick={() => setIsSubscriptionModalOpen(false)} className="btn-close" title="ุฅุบูุงู">
+                <FaTimes />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateSubscriptionExpiry}>
+              <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                
+                {/* ุงูุชู…ุฏูุฏ ุงูุณุฑูุน */}
+                <div>
+                  <label style={{ fontWeight: "700", display: "block", marginBottom: "8px", fontSize: "0.9rem", color: "#334155" }}>โก ุชู…ุฏูุฏ ุณุฑูุน ุฅูู:</label>
+                  <div className="quick-extend-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))" }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const base = subscriptionExpiryInput ? new Date(subscriptionExpiryInput) : new Date();
+                        const target = new Date(Math.max(base.getTime(), Date.now()));
+                        target.setHours(target.getHours() + 1);
+                        const tzOffset = target.getTimezoneOffset() * 60000;
+                        setSubscriptionExpiryInput((new Date(target - tzOffset)).toISOString().slice(0, 16));
+                      }}
+                      className="quick-extend-btn"
+                    >
+                      + ุณุงุนุฉ ูุงุญุฏุฉ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const now = new Date();
+                        now.setDate(now.getDate() + 1);
+                        setSubscriptionExpiryInput(formatDateToLocalInput(now));
+                      }}
+                      className="quick-extend-btn"
+                    >
+                      + ููู… ูุงุญุฏ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const now = new Date();
+                        now.setDate(now.getDate() + 7);
+                        setSubscriptionExpiryInput(formatDateToLocalInput(now));
+                      }}
+                      className="quick-extend-btn"
+                    >
+                      + ุฃุณุจูุน ูุงุญุฏ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const now = new Date();
+                        now.setMonth(now.getMonth() + 1);
+                        setSubscriptionExpiryInput(formatDateToLocalInput(now));
+                      }}
+                      className="quick-extend-btn"
+                    >
+                      + ุดูุฑ ูุงุญุฏ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const now = new Date();
+                        now.setMonth(now.getMonth() + 6);
+                        setSubscriptionExpiryInput(formatDateToLocalInput(now));
+                      }}
+                      className="quick-extend-btn"
+                    >
+                      + 6 ุฃุดูุฑ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const now = new Date();
+                        now.setFullYear(now.getFullYear() + 1);
+                        setSubscriptionExpiryInput(formatDateToLocalInput(now));
+                      }}
+                      className="quick-extend-btn"
+                    >
+                      + ุณูุฉ ูุงุญุฏุฉ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSubscriptionExpiryInput("2099-12-31T23:59");
+                      }}
+                      className="quick-extend-btn"
+                      style={{ backgroundColor: "rgba(15, 81, 50, 0.1)", color: "#0f5132", fontWeight: "bold" }}
+                    >
+                      โพ๏ธ ุฏุงุฆู… (ู…ูุชูุญ)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const past = new Date(Date.now() - 5 * 60 * 1000);
+                        setSubscriptionExpiryInput(formatDateToLocalInput(past));
+                      }}
+                      className="quick-extend-btn danger-btn"
+                    >
+                      ุฅููุงุก ุงูุขู โ”
+                    </button>
+                  </div>
+                </div>
+
+                {/* ุญูู ููุช ุงูุงูุชูุงุก ุงูุฏููู ูุฏูู ุจุงูุฑูุฒูุงู…ุฉ ูุงูููุช */}
+                <div className="form-group" style={{ background: "#f8fafc", padding: "12px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                  <label htmlFor="expiryInput" style={{ fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", color: "#334155" }}>
+                    <FaCalendarAlt style={{ color: "#b89647" }} />
+                    <span>ุชุญุฏูุฏ ุชุงุฑูุฎ ูููุช ุงูุชูุงุก ุงูุงุดุชุฑุงู ุงูุฏููู *</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    id="expiryInput"
+                    value={subscriptionExpiryInput}
+                    onChange={(e) => setSubscriptionExpiryInput(e.target.value)}
+                    required
+                    style={{
+                      width: "100%",
+                      padding: "10px 12px",
+                      border: "1.5px solid #b89647",
+                      borderRadius: "6px",
+                      marginTop: "6px",
+                      fontFamily: "inherit",
+                      fontSize: "1rem",
+                      fontWeight: "600",
+                      outline: "none",
+                      boxSizing: "border-box",
+                      backgroundColor: "white"
+                    }}
+                  />
+                  {subscriptionExpiryInput && (
+                    <div style={{ fontSize: "0.82rem", color: "#0f5132", marginTop: "6px", fontWeight: "600" }}>
+                      ๐“… ุงูู…ูุนุฏ ุงูู…ุญุฏุฏ: {new Date(subscriptionExpiryInput).toLocaleString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+              <div className="modal-footer">
+                <button type="button" onClick={() => setIsSubscriptionModalOpen(false)} className="btn-cancel">ุฅูุบุงุก</button>
+                <button type="submit" className="btn-submit" style={{ backgroundColor: "#b89647", borderColor: "#b89647" }}>ุญูุธ ูุชุนุฏูู</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ูุงูุฐุฉ ุชุนุฏูู ูุงูุฉ ุจูุงูุงุช ุงูู…ุฎูู… ูุญุณุงุจ ุงูู…ุฏูุฑ ู…ูุจุซูุฉ */}
+      {isEditCampModalOpen && (
+        <div className="modal-overlay" style={{ background: "rgba(15, 23, 42, 0.75)", backdropFilter: "blur(8px)" }}>
+          <div className="modal-content" style={{ maxWidth: "620px", width: "92%", borderRadius: "20px", padding: "1.75rem", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }}>
+            <div className="modal-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "1rem", borderBottom: "1px solid #e2e8f0", marginBottom: "1.25rem" }}>
+              <h2 style={{ display: "flex", alignItems: "center", gap: "10px", color: "#2563eb", margin: 0, fontSize: "1.25rem", fontWeight: "800" }}>
+                <FaEdit style={{ color: "#2563eb" }} />
+                <span>ุชุนุฏูู ูุงูุฉ ุจูุงูุงุช ุงูู…ุฎูู… ูุญุณุงุจ ุงูู…ุฏูุฑ ({editingCamp.id})</span>
+              </h2>
+              <button type="button" onClick={() => setIsEditCampModalOpen(false)} className="btn-close" title="ุฅุบูุงู" style={{ background: "#f1f5f9", border: "none", width: "32px", height: "32px", borderRadius: "50%", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}>
+                <FaTimes />
+              </button>
+            </div>
+            
+            {loadingEditCamp ? (
+              <div className="text-center py-4" style={{ padding: "2rem", color: "#64748b" }}>
+                <FaSpinner className="spinner" /> ุฌุงุฑู ุชุญู…ูู ุจูุงูุงุช ุงูุญุณุงุจ ูุงูู…ุฎูู…...
+              </div>
+            ) : (
+              <form onSubmit={handleSaveEditCamp}>
+                <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                    <div>
+                      <label style={{ display: "block", fontWeight: "700", fontSize: "0.85rem", color: "#334155", marginBottom: "6px" }}>ู…ุนุฑู‘ู ุงูู…ุฎูู… (Camp ID)</label>
+                      <input 
+                        type="text" 
+                        value={editingCamp.id}
+                        disabled
+                        style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #e2e8f0", borderRadius: "10px", fontSize: "0.92rem", boxSizing: "border-box", backgroundColor: "#f8fafc", color: "#64748b", fontWeight: "700" }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontWeight: "700", fontSize: "0.85rem", color: "#334155", marginBottom: "6px" }}>ุงุณู… ุงูู…ุฎูู… ุจุงููุงู…ู *</label>
+                      <input 
+                        type="text" 
+                        placeholder="ุงุณู… ุงูู…ุฎูู…" 
+                        value={editingCamp.name}
+                        onChange={(e) => setEditingCamp({ ...editingCamp, name: e.target.value })}
+                        required 
+                        style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #cbd5e1", borderRadius: "10px", fontSize: "0.92rem", boxSizing: "border-box", outline: "none" }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                    <div>
+                      <label style={{ display: "block", fontWeight: "700", fontSize: "0.85rem", color: "#334155", marginBottom: "6px" }}>ุงุณู… ุงูู…ุณุคูู (ุงูู…ุฏูุฑ)</label>
+                      <input 
+                        type="text" 
+                        placeholder="ุงุณู… ุงูู…ุฏูุฑ ุงูู…ุณุคูู" 
+                        value={editingCamp.managerName}
+                        onChange={(e) => setEditingCamp({ ...editingCamp, managerName: e.target.value })}
+                        style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #cbd5e1", borderRadius: "10px", fontSize: "0.92rem", boxSizing: "border-box", outline: "none" }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontWeight: "700", fontSize: "0.85rem", color: "#334155", marginBottom: "6px" }}>ุฑูู… ุฌูุงู ุงูุชูุงุตู</label>
+                      <input 
+                        type="text" 
+                        placeholder="0599000000" 
+                        value={editingCamp.managerPhone}
+                        onChange={(e) => setEditingCamp({ ...editingCamp, managerPhone: e.target.value })}
+                        style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #cbd5e1", borderRadius: "10px", fontSize: "0.92rem", boxSizing: "border-box", outline: "none" }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label style={{ display: "block", fontWeight: "700", fontSize: "0.85rem", color: "#334155", marginBottom: "6px" }}>ุงูู…ูุทูุฉ / ุงูุนููุงู ูุงูุชูุงุตูู</label>
+                    <input 
+                      type="text" 
+                      placeholder="ู…ุซุงู: ุญู ุงููุตุงุตูุจ - ุฌุจุงููุง" 
+                      value={editingCamp.address}
+                      onChange={(e) => setEditingCamp({ ...editingCamp, address: e.target.value })}
+                      style={{ width: "100%", padding: "10px 14px", border: "1.5px solid #cbd5e1", borderRadius: "10px", fontSize: "0.92rem", boxSizing: "border-box", outline: "none" }}
+                    />
+                  </div>
+
+                  <div style={{ background: "rgba(37, 99, 235, 0.05)", border: "1px solid rgba(37, 99, 235, 0.2)", borderRadius: "12px", padding: "1rem", marginTop: "4px" }}>
+                    <h4 style={{ fontSize: "0.9rem", color: "#2563eb", margin: "0 0 10px 0", fontWeight: "800" }}>๐”‘ ุชุนุฏูู ุจูุงูุงุช ุชุณุฌูู ุฏุฎูู ู…ุฏูุฑ ุงูู…ุฎูู… (ุญุณุงุจ ุงูููุญุฉ)</h4>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+                      <div>
+                        <label style={{ display: "block", fontWeight: "700", fontSize: "0.82rem", color: "#334155", marginBottom: "6px" }}>ุงุณู… ุงูู…ุณุชุฎุฏู… ูููุญุฉ *</label>
+                        <input 
+                          type="text" 
+                          placeholder="ุงุณู… ุงูู…ุณุชุฎุฏู…" 
+                          value={editingCamp.adminUsername}
+                          onChange={(e) => setEditingCamp({ ...editingCamp, adminUsername: e.target.value })}
+                          required 
+                          style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #cbd5e1", borderRadius: "8px", fontSize: "0.9rem", boxSizing: "border-box", backgroundColor: "white" }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: "block", fontWeight: "700", fontSize: "0.82rem", color: "#334155", marginBottom: "6px" }}>ููู…ุฉ ุงูู…ุฑูุฑ ุงูุฌุฏูุฏุฉ *</label>
+                        <input 
+                          type="text" 
+                          placeholder="ููู…ุฉ ุงูู…ุฑูุฑ" 
+                          value={editingCamp.adminPassword}
+                          onChange={(e) => setEditingCamp({ ...editingCamp, adminPassword: e.target.value })}
+                          required 
+                          style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #cbd5e1", borderRadius: "8px", fontSize: "0.9rem", boxSizing: "border-box", backgroundColor: "white" }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="modal-footer" style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "1.5rem", paddingTop: "1rem", borderTop: "1px solid #e2e8f0" }}>
+                  <button type="button" onClick={() => setIsEditCampModalOpen(false)} style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1", padding: "9px 20px", borderRadius: "10px", fontWeight: "700", cursor: "pointer", fontSize: "0.9rem" }}>ุฅูุบุงุก</button>
+                  <button type="submit" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)", color: "white", border: "none", padding: "9px 24px", borderRadius: "10px", fontWeight: "800", cursor: "pointer", fontSize: "0.9rem", boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)" }}>ุญูุธ ุงูุชุนุฏููุงุช ุงูุงู</button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default SuperAdmin;
