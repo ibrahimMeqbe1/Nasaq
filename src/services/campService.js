@@ -327,6 +327,41 @@ export const createCamp = async (campData) => {
   return { success: true };
 };
 
+export const deleteCampPermanently = async (campId) => {
+  if (!campId || campId === "system") {
+    return { success: false, error: "معرّف المخيم غير صالح للحذف" };
+  }
+
+  if (isSupabaseConfigured) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch("/api/admin/delete-camp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token || ""}`,
+        },
+        body: JSON.stringify({ campId, confirmation: campId }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "فشل حذف المخيم");
+      }
+      return result;
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  initCampLocalStorage();
+  const camps = getCampsFromLocal();
+  if (!camps[campId]) return { success: false, error: "المخيم غير موجود" };
+  delete camps[campId];
+  saveCampsToLocal(camps);
+  saveUsersToLocal(getUsersFromLocal().filter((item) => item.campId !== campId));
+  return { success: true, deleted: { local: true } };
+};
+
 // ─── Payment methods ──────────────────────────────────────────────────────────
 
 export const getPaymentMethods = async () => {
@@ -340,33 +375,7 @@ export const updatePaymentMethods = async (methods) => {
   return { success: true };
 };
 
-// ─── Renewal requests ─────────────────────────────────────────────────────────
-
-export const submitRenewalRequest = async (requestData) => {
-  const { campId, campName, requestedMonths, notes } = requestData;
-  const newRequest = {
-    id: "req-" + Date.now(),
-    camp_id: campId,
-    camp_name: campName,
-    requested_months: parseInt(requestedMonths) || 1,
-    notes: notes || "",
-    status: "pending",
-    request_date: new Date().toISOString(),
-  };
-
-  if (isSupabaseConfigured) {
-    try {
-      const { error } = await supabase.from("renewal_requests").insert([newRequest]);
-      if (error) throw error;
-      return { success: true };
-    } catch (err) {
-      console.error("Supabase submit renewal request error:", err);
-    }
-  }
-
-  initCampLocalStorage();
-  const requests = localStorageGetJSON(PAYMENT_REQUESTS_KEY, []);
-  requests.push({
+// ─── Renewal requests ──────────────────────────────�����G����ƭy�.push({
     id: newRequest.id, campId, campName,
     requestedMonths: newRequest.requested_months,
     notes: newRequest.notes, status: "pending", createdAt: newRequest.request_date,
@@ -696,7 +705,7 @@ export const getCampAdminUser = async (campId) => {
     try {
       const { data, error } = await supabase
         .from("users").select("*").eq("camp_id", campId).limit(1).single();
-      if (!error && data) return { username: data.username || "", password: data.password || "" };
+      if (!error && data) return { username: data.username || "", password: "" };
     } catch (err) {
       console.warn("Supabase fetch camp user error:", err);
     }
@@ -714,40 +723,20 @@ export const updateCampFullDetails = async (campId, campDetails) => {
 
   if (isSupabaseConfigured) {
     try {
-      const campPayload = {};
-      if (name !== undefined)         campPayload.name = name;
-      if (managerName !== undefined)   campPayload.manager_name = managerName;
-      if (managerPhone !== undefined)  campPayload.phone = managerPhone;
-      if (address !== undefined)       campPayload.location = address;
-
-      if (Object.keys(campPayload).length > 0) {
-        await supabase.from("camps").update(campPayload).eq("id", campId);
-      }
-
-      if (adminUsername || adminPassword) {
-        const { data: existingUsers } = await supabase
-          .from("users").select("id, password").eq("camp_id", campId).limit(1);
-
-        if (existingUsers?.length) {
-          const userPayload = {};
-          if (adminUsername) userPayload.username = adminUsername;
-          if (adminPassword && adminPassword.trim() !== "") {
-            userPayload.password = await bcrypt.hash(adminPassword.trim(), 10);
-          }
-          if (name) userPayload.name = name;
-          if (Object.keys(userPayload).length > 0) {
-            await supabase.from("users").update(userPayload).eq("camp_id", campId);
-          }
-        } else if (adminUsername) {
-          const hashed = adminPassword ? await bcrypt.hash(adminPassword.trim(), 10) : "";
-          await supabase.from("users").insert([{
-            id: `user-${Date.now()}`, username: adminUsername, password: hashed,
-            role: "admin", camp_id: campId, name: name || campId,
-          }]);
-        }
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch("/api/admin/update-camp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session?.access_token || ""}`,
+        },
+        body: JSON.stringify({ campId, name, managerName, managerPhone, address, adminUsername, adminPassword }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || !result.success) throw new Error(result.error || "فشل تحديث حساب المخيم");
     } catch (err) {
       console.error("Supabase updateCampFullDetails error:", err);
+      return { success: false, error: err.message };
     }
   }
 

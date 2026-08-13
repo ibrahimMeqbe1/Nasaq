@@ -49,6 +49,13 @@ export async function POST(request) {
       );
     }
 
+    if (String(adminPassword).length < 6) {
+      return NextResponse.json(
+        { success: false, error: "كلمة مرور مدير المخيم يجب ألا تقل عن 6 أحرف" },
+        { status: 400 }
+      );
+    }
+
     const { error: campError } = await supabaseAdmin.from("camps").upsert([{
       id, name, manager_name: managerName, phone: managerPhone,
       is_active: true, subscription_expiry: expiryDate,
@@ -62,7 +69,8 @@ export async function POST(request) {
       email,
       password: adminPassword,
       email_confirm: true,
-      user_metadata: { username: adminUsername, role: "admin", campId: id },
+      user_metadata: { username: adminUsername },
+      app_metadata: { role: "admin", campId: id },
     });
     if (createErr) throw createErr;
 
@@ -76,7 +84,7 @@ export async function POST(request) {
     }]);
     if (userError) throw userError;
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, username: adminUsername, campId: id });
   } catch (error) {
     console.error("create-camp API error:", error);
     return NextResponse.json(

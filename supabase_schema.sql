@@ -141,20 +141,29 @@ ON CONFLICT (id) DO UPDATE SET
 -- سياسات الأمان والحماية المتقدمة (Row Level Security - RLS)
 -- ========================================================
 
--- 1. دوال مساعدة لربط جلسة Supabase Auth بالدواعي والأدوار
-CREATE OR REPLACE FUNCTION public.get_current_user_camp_id()
+-- 1. دوال داخل مخطط غير مكشوف للـ Data API
+CREATE SCHEMA IF NOT EXISTS private;
+REVOKE ALL ON SCHEMA private FROM PUBLIC, anon;
+GRANT USAGE ON SCHEMA private TO authenticated;
+
+CREATE OR REPLACE FUNCTION private.get_current_user_camp_id()
 RETURNS TEXT AS $$
   SELECT camp_id FROM public.users WHERE id = auth.uid()::text
   LIMIT 1;
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '';
 
-CREATE OR REPLACE FUNCTION public.is_superadmin()
+CREATE OR REPLACE FUNCTION private.is_superadmin()
 RETURNS BOOLEAN AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.users 
     WHERE id = auth.uid()::text AND role = 'superadmin'
   );
-$$ LANGUAGE sql STABLE SECURITY DEFINER;
+$$ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '';
+
+REVOKE ALL ON FUNCTION private.get_current_user_camp_id() FROM PUBLIC, anon;
+REVOKE ALL ON FUNCTION private.is_superadmin() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION private.get_current_user_camp_id() TO authenticated;
+GRANT EXECUTE ON FUNCTION private.is_superadmin() TO authenticated;
 
 DO $$
 BEGIN
@@ -173,50 +182,68 @@ BEGIN
     DROP POLICY IF EXISTS "renewal_requests_isolation" ON public.renewal_requests;
     DROP POLICY IF EXISTS "announcements_read_authenticated" ON public.announcements;
     DROP POLICY IF EXISTS "announcements_write_superadmin" ON public.announcements;
+    DROP POLICY IF EXISTS "announcements_insert_superadmin" ON public.announcements;
+    DROP POLICY IF EXISTS "announcements_update_superadmin" ON public.announcements;
+    DROP POLICY IF EXISTS "announcements_delete_superadmin" ON public.announcements;
 
     -- 1. جدول العائلات (تطبيق عزل البيانات بين المخيمات)
     ALTER TABLE public.families ENABLE ROW LEVEL SECURITY;
     CREATE POLICY "families_camp_isolation" ON public.families FOR ALL TO authenticated
-    USING (is_superadmin() OR camp_id = get_current_user_camp_id())
-    WITH CHECK (is_superadmin() OR camp_id = get_current_user_camp_id());
+    USING (private.is_superadmin() OR camp_id = private.get_current_user_camp_id())
+    WITH CHECK (private.is_superadmin() OR camp_id = private.get_current_user_camp_id());
 
     -- 2. جدول الترشيحات (تطبيق عزل البيانات بين المخيمات)
     ALTER TABLE public.nominations ENABLE ROW LEVEL SECURITY;
     CREATE POLICY "nominations_camp_isolation" ON public.nominations FOR ALL TO authenticated
-    USING (is_superadmin() OR camp_id = get_current_user_camp_id())
-    WITH CHECK (is_superadmin() OR camp_id = get_current_user_camp_id());
+    USING (private.is_superadmin() OR camp_id = private.get_current_user_camp_id())
+    WITH CHECK (private.is_superadmin() OR camp_id = private.get_current_user_camp_id());
 
     -- 3. جدول المخيمات
     ALTER TABLE public.camps ENABLE ROW LEVEL SECURITY;
     CREATE POLICY "camps_access_policy" ON public.camps FOR ALL TO authenticated
-    USING (is_superadmin() OR id = get_current_user_camp_id());
+    USING (private.is_superadmin() OR id = private.get_current_user_camp_id())
+    WITH CHECK (private.is_superadmin() OR id = private.get_current_user_camp_id());
 
     -- 4. جدول المستخدمين (حظر الاستعلام المباشر لغير المالك أو المشرف العام مع السماح بالتحقق عند تسجيل الدخول)
     ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
     CREATE POLICY "users_self_or_superadmin" ON public.users FOR ALL TO authenticated
-    USING (is_superadmin() OR id = auth.uid()::text);
+    USING (private.is_superadmin() OR id = (SELECT auth.uid())::text)
+    WITH CHECK (private.is_superadmin() OR id = (SELECT auth.uid())::text);
 
     DROP POLICY IF EXISTS "users_login_lookup" ON public.users;
-    CREATE POLICY "users_login_lookup" ON public.users FOR SELECT TO anon USING (true);
 
     -- 5. جدول طلبات التجديد
     ALTER TABLE public.renewal_requests ENABLE ROW LEVEL SECURITY;
     CREATE POLICY "renewal_requests_isolation" ON public.renewal_requests FOR ALL TO authenticated
-    USING (is_superadmin() OR camp_id = get_current_user_camp_id());
+    USING (private.is_superadmin() OR camp_id = private.get_current_user_camp_id())
+    WITH CHECK (private.is_superadmin() OR camp_id = private.get_current_user_camp_id());
 
     -- 6. جدول الإعلانات (متاح للقراءة لجميع المستخدمين الموثقين، وللتعديل للمشرف العام فقط)
     ALTER TABLE public.announcements ENABLE ROW LEVEL SECURITY;
     CREATE POLICY "announcements_read_authenticated" ON public.announcements FOR SELECT TO authenticated USING (true);
-    CREATE POLICY "announcements_write_superadmin" ON public.announcements FOR ALL TO authenticated USING (is_superadmin());
+    CREATE POLICY "announcements_insert_superadmin" ON public.announcements FOR INSERT TO authenticated
+    WITH CHECK (private.is_superadmin());
+    CREATE POLICY "announcements_update_superadmin" ON public.announcements FOR UPDATE TO authenticated
+    USING (private.is_superadmin()) WITH CHECK (private.is_superadmin());
+    CREATE POLICY "announcements_delete_superadmin" ON public.announcements FOR DELETE TO authenticated
+    USING (private.is_superadmin());
 END $$;
 
--- دالة مساعدة آمنة للتحقق من تسجيل الدخول للمستخدمين المعرفين يدوياً في Supabase
-CREATE OR REPLACE FUNCTION public.get_user_for_login(p_username TEXT)
-RETURNS SETOF public.users
-LANGUAGE sql SECURITY DEFINER
-AS $$
-  SELECT * FROM public.users WHERE lower(username) = lower(p_username) LIMIT 1;
-$$;
+DROP FUNCTION IF EXISTS public.get_current_user_camp_id();
+DROP FUNCTION IF EXISTS public.is_superadmin();
+
+-- إزالة مسار تسجيل الدخول القديم الذي كان يعيد صف المستخدم (بما فيه حقل كلمة المرور).
+DROP FUNCTION IF EXISTS public.get_user_for_login(TEXT);
+
+-- Explicit Data API grants (required for newer Supabase projects). RLS still
+-- determines which rows each authenticated user may access.
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.families TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.nominations TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.camps TO authenticated;
+GRANT SELECT, UPDATE ON public.users TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.renewal_requests TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.announcements TO authenticated;
 
 
 -- ========================================================

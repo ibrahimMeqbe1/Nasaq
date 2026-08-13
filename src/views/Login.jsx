@@ -19,7 +19,6 @@ import {
   FaGlobe,
   FaBuilding
 } from "react-icons/fa";
-import { authenticateUser } from "../services/campService";
 import { loginAndRedirect } from "../lib/authHelpers";
 
 const Login = ({ setUser }) => {

@@ -1,20 +1,24 @@
 import { SignJWT, jwtVerify } from "jose";
 
-const secretKey = new TextEncoder().encode(
-  process.env.JWT_SECRET || "kareem_camp_super_secret_jwt_key_2026_x89f7a2b91c"
-);
+function getSecretKey() {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || secret.length < 32) {
+    throw new Error("JWT_SECRET must be configured with at least 32 characters");
+  }
+  return new TextEncoder().encode(secret);
+}
 
 export async function createSessionToken(payload) {
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("8h")
-    .sign(secretKey);
+    .sign(getSecretKey());
 }
 
 export async function verifySessionToken(token) {
   try {
-    const { payload } = await jwtVerify(token, secretKey);
+    const { payload } = await jwtVerify(token, getSecretKey());
     return payload;
   } catch (err) {
     return null;

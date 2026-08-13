@@ -1,19 +1,15 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-const secretKey = new TextEncoder().encode(
-  process.env.JWT_SECRET || "kareem_camp_super_secret_jwt_key_2026_x89f7a2b91c"
-);
-
 // المسارات التي تتطلب حماية ومصادقة على مستوى السيرفر
-const protectedRoutes = ["/super-admin", "/admin"];
+const publicRoutes = ["/login"];
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  const isProtected = protectedRoutes.some((route) => pathname.startsWith(route));
-
-  if (!isProtected) return NextResponse.next();
+  if (publicRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
+    return NextResponse.next();
+  }
 
   const token = request.cookies.get("session")?.value;
 
@@ -23,6 +19,10 @@ export async function middleware(request) {
   }
 
   try {
+    if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+      throw new Error("JWT_SECRET is not configured");
+    }
+    const secretKey = new TextEncoder().encode(process.env.JWT_SECRET);
     const { payload } = await jwtVerify(token, secretKey);
 
     // حماية صفحة superadmin ومنع الوصول إليها لغير الحسابات ذات الدور superadmin
@@ -48,5 +48,5 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ["/super-admin/:path*", "/admin/:path*"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|manifest.json|robots.txt|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico)$).*)"],
 };
