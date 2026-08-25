@@ -95,3 +95,17 @@ test("spreadsheet imports are bounded and avoid vulnerable legacy parsers", asyn
   assert.match(importer, /MAX_IMPORT_ROWS/);
   assert.doesNotMatch(importer, /readAsBinaryString/);
 });
+
+test("camp editing exposes validation errors and makes password changes opt-in", async () => {
+  const [superAdmin, updateRoute] = await Promise.all([
+    read("src/views/SuperAdmin.jsx"),
+    read("src/app/api/admin/update-camp/route.js"),
+  ]);
+
+  assert.match(superAdmin, /editCampError/);
+  assert.match(superAdmin, /changeCampPassword/);
+  assert.match(superAdmin, /isSavingEditCamp/);
+  assert.match(superAdmin, /ستبقى كلمة المرور الحالية دون تغيير/);
+  assert.match(updateRoute, /select\("id"\)/);
+  assert.match(updateRoute, /المخيم المطلوب غير موجود/);
+});

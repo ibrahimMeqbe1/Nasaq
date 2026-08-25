@@ -111,6 +111,9 @@ const SuperAdmin = ({ user, onLogout }) => {
   // حالة نموذج تعديل كافة بيانات المخيم
   const [isEditCampModalOpen, setIsEditCampModalOpen] = useState(false);
   const [loadingEditCamp, setLoadingEditCamp] = useState(false);
+  const [isSavingEditCamp, setIsSavingEditCamp] = useState(false);
+  const [editCampError, setEditCampError] = useState("");
+  const [changeCampPassword, setChangeCampPassword] = useState(false);
   const [editingCamp, setEditingCamp] = useState({
     id: "",
     name: "",
@@ -292,6 +295,9 @@ const SuperAdmin = ({ user, onLogout }) => {
   const handleOpenEditCampModal = async (camp) => {
     setError("");
     setSuccess("");
+    setEditCampError("");
+    setChangeCampPassword(false);
+    setIsSavingEditCamp(false);
     setLoadingEditCamp(true);
     setIsEditCampModalOpen(true);
     setEditingCamp({
@@ -324,29 +330,48 @@ const SuperAdmin = ({ user, onLogout }) => {
 
   const handleSaveEditCamp = async (e) => {
     e.preventDefault();
+    if (isSavingEditCamp) return;
+
     setError("");
     setSuccess("");
+    setEditCampError("");
 
-    if (!editingCamp.name || !editingCamp.adminUsername) {
-      setError("يرجى إدخال اسم المخيم واسم المستخدم على الأقل.");
+    const name = editingCamp.name.trim();
+    const adminUsername = editingCamp.adminUsername.trim();
+    const adminPassword = changeCampPassword ? editingCamp.adminPassword : "";
+
+    if (!name || !adminUsername) {
+      setEditCampError("يرجى إدخال اسم المخيم واسم المستخدم على الأقل.");
       return;
     }
-    if (editingCamp.adminPassword && (editingCamp.adminPassword.length < 10 || !/[A-Za-z]/.test(editingCamp.adminPassword) || !/\d/.test(editingCamp.adminPassword))) {
-      setError("كلمة المرور الجديدة يجب ألا تقل عن 10 أحرف وتحتوي حرفًا ورقمًا على الأقل.");
+    if (changeCampPassword && !adminPassword) {
+      setEditCampError("أدخل كلمة المرور الجديدة أو ألغِ خيار تغيير كلمة المرور.");
+      return;
+    }
+    if (adminPassword && (adminPassword.length < 10 || !/[A-Za-z]/.test(adminPassword) || !/\d/.test(adminPassword))) {
+      setEditCampError("كلمة المرور الجديدة يجب ألا تقل عن 10 أحرف وتحتوي حرفًا ورقمًا على الأقل.");
       return;
     }
 
+    setIsSavingEditCamp(true);
     try {
-      const res = await updateCampFullDetails(editingCamp.id, editingCamp);
+      const res = await updateCampFullDetails(editingCamp.id, {
+        ...editingCamp,
+        name,
+        adminUsername,
+        adminPassword,
+      });
       if (res.success) {
-        setSuccess(`تم تحديث كافة بيانات المخيم "${editingCamp.name}" وحساب المدير بنجاح!`);
         setIsEditCampModalOpen(false);
-        loadData();
+        await loadData();
+        setSuccess(`تم تحديث بيانات المخيم "${name}" وحساب المدير بنجاح.`);
       } else {
-        setError(res.error || "حدث خطأ أثناء حفظ التعديلات.");
+        setEditCampError(res.error || "حدث خطأ أثناء حفظ التعديلات.");
       }
     } catch (err) {
-      setError("حدث خطأ أثناء الاتصال.");
+      setEditCampError(err?.message || "حدث خطأ أثناء الاتصال.");
+    } finally {
+      setIsSavingEditCamp(false);
     }
   };
 
@@ -1451,7 +1476,15 @@ const SuperAdmin = ({ user, onLogout }) => {
                 <FaSpinner className="spinner" /> جاري تحميل بيانات الحساب والمخيم...
               </div>
             ) : (
-              <form onSubmit={handleSaveEditCamp}>
+              <form onSubmit={handleSaveEditCamp} noValidate autoComplete="off">
+                {editCampError && (
+                  <div
+                    role="alert"
+                    style={{ marginBottom: "14px", padding: "11px 14px", borderRadius: "10px", background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c", fontWeight: "700", fontSize: "0.88rem" }}
+                  >
+                    {editCampError}
+                  </div>
+                )}
                 <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                     <div>
@@ -1520,29 +1553,51 @@ const SuperAdmin = ({ user, onLogout }) => {
                           placeholder="اسم المستخدم" 
                           value={editingCamp.adminUsername}
                           onChange={(e) => setEditingCamp({ ...editingCamp, adminUsername: e.target.value })}
+                          name="camp-manager-username"
+                          autoComplete="off"
                           required 
                           style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #cbd5e1", borderRadius: "8px", fontSize: "0.9rem", boxSizing: "border-box", backgroundColor: "white" }}
                         />
                       </div>
-                      <div>
-                        <label style={{ display: "block", fontWeight: "700", fontSize: "0.82rem", color: "#334155", marginBottom: "6px" }}>كلمة مرور جديدة (اختياري)</label>
-                        <input 
-                          type="password"
-                          placeholder="اتركه فارغًا للإبقاء على الحالية"
-                          value={editingCamp.adminPassword}
-                          onChange={(e) => setEditingCamp({ ...editingCamp, adminPassword: e.target.value })}
-                          minLength={10}
-                          autoComplete="new-password"
-                          style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #cbd5e1", borderRadius: "8px", fontSize: "0.9rem", boxSizing: "border-box", backgroundColor: "white" }}
-                        />
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: "700", fontSize: "0.82rem", color: "#334155", cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            checked={changeCampPassword}
+                            onChange={(e) => {
+                              const enabled = e.target.checked;
+                              setChangeCampPassword(enabled);
+                              setEditingCamp((current) => ({ ...current, adminPassword: "" }));
+                              setEditCampError("");
+                            }}
+                          />
+                          تغيير كلمة مرور المدير
+                        </label>
+                        {changeCampPassword ? (
+                          <input
+                            type="password"
+                            name={`camp-manager-new-password-${editingCamp.id}`}
+                            placeholder="10 أحرف على الأقل، بينها حرف ورقم"
+                            value={editingCamp.adminPassword}
+                            onChange={(e) => setEditingCamp({ ...editingCamp, adminPassword: e.target.value })}
+                            minLength={10}
+                            autoComplete="new-password"
+                            aria-label="كلمة مرور المدير الجديدة"
+                            style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #cbd5e1", borderRadius: "8px", fontSize: "0.9rem", boxSizing: "border-box", backgroundColor: "white" }}
+                          />
+                        ) : (
+                          <span style={{ color: "#64748b", fontSize: "0.78rem" }}>ستبقى كلمة المرور الحالية دون تغيير.</span>
+                        )}
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="modal-footer" style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "1.5rem", paddingTop: "1rem", borderTop: "1px solid #e2e8f0" }}>
-                  <button type="button" onClick={() => setIsEditCampModalOpen(false)} style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1", padding: "9px 20px", borderRadius: "10px", fontWeight: "700", cursor: "pointer", fontSize: "0.9rem" }}>إلغاء</button>
-                  <button type="submit" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)", color: "white", border: "none", padding: "9px 24px", borderRadius: "10px", fontWeight: "800", cursor: "pointer", fontSize: "0.9rem", boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)" }}>حفظ التعديلات الان</button>
+                  <button type="button" disabled={isSavingEditCamp} onClick={() => setIsEditCampModalOpen(false)} style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1", padding: "9px 20px", borderRadius: "10px", fontWeight: "700", cursor: isSavingEditCamp ? "not-allowed" : "pointer", fontSize: "0.9rem", opacity: isSavingEditCamp ? 0.65 : 1 }}>إلغاء</button>
+                  <button type="submit" disabled={isSavingEditCamp} aria-busy={isSavingEditCamp} style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)", color: "white", border: "none", padding: "9px 24px", borderRadius: "10px", fontWeight: "800", cursor: isSavingEditCamp ? "wait" : "pointer", fontSize: "0.9rem", boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)", opacity: isSavingEditCamp ? 0.75 : 1 }}>
+                    {isSavingEditCamp ? <><FaSpinner className="spinner" aria-hidden="true" /> جارٍ الحفظ...</> : "حفظ التعديلات الآن"}
+                  </button>
                 </div>
               </form>
             )}
