@@ -20,7 +20,7 @@ const DeveloperModal = ({ onClose }) => {
       <div className="modal-content developer-modal-card" style={{ maxWidth: "650px", borderTop: "6px solid #b89647" }}>
         <div className="modal-header" style={{ borderBottom: "1px solid #e2e8f0" }}>
           <h2 style={{ display: "flex", alignItems: "center", gap: "10px", color: "#0f5132" }}>
-            👨‍💻 حول مطور النظام
+            <FaCode aria-hidden="true" /> حول مطور النظام
           </h2>
           <button onClick={onClose} className="btn-close">
             <FaTimes />
@@ -118,8 +118,8 @@ const DeveloperModal = ({ onClose }) => {
 
           {/* روابط التواصل */}
           <div className="dev-section">
-            <h4 style={{ color: "#0f5132", margin: "0 0 12px 0", fontSize: "1.05rem", textAlign: "center" }}>
-              🌐 تواصل معي ومعرض الأعمال الشخصي
+            <h4 style={{ color: "#0f5132", margin: "0 0 12px 0", fontSize: "1.05rem", textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+              <FaGlobe aria-hidden="true" /> تواصل معي ومعرض الأعمال الشخصي
             </h4>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
               <a href="https://github.com/ibrahimMeqbe1" target="_blank" rel="noopener noreferrer" className="dev-link-btn" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px", padding: "10px", background: "#0f172a", color: "white", textDecoration: "none", borderRadius: "6px", fontSize: "0.85rem", fontWeight: "bold" }}>

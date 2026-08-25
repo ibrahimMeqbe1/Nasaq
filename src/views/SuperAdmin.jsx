@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { 
   FaCampground, 
   FaCoins, 
@@ -20,9 +21,22 @@ import {
   FaClipboardList,
   FaUserCheck,
   FaEdit,
-  FaChartPie
+  FaChartPie,
+  FaTrash,
+  FaCrown,
+  FaUniversity,
+  FaMobileAlt,
+  FaCreditCard,
+  FaKey,
+  FaInfinity
 } from "react-icons/fa";
 import AnimatedNumber, { AnimatedDonut } from "../components/AnimatedNumber";
+import {
+  MIN_PASSWORD_LENGTH,
+  NEW_PASSWORD_REQUIREMENT_MESSAGE,
+  PASSWORD_REQUIREMENT_MESSAGE,
+  isPasswordAllowed
+} from "../lib/passwordPolicy";
 import { 
   getAllCamps, 
   createCamp, 
@@ -38,6 +52,7 @@ import {
   getGlobalSystemMetrics,
   getCampAdminUser,
   updateCampFullDetails,
+  deleteCampPermanently,
   getSuperAdminUsername,
   updateSuperAdminUsername
 } from "../services/campService";
@@ -80,6 +95,10 @@ const SuperAdmin = ({ user, onLogout }) => {
 
   // حالة نموذج إضافة مخيم
   const [isAddCampOpen, setIsAddCampOpen] = useState(false);
+  const [isCreatingCamp, setIsCreatingCamp] = useState(false);
+  const [deleteCandidate, setDeleteCandidate] = useState(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeletingCamp, setIsDeletingCamp] = useState(false);
   const [newCamp, setNewCamp] = useState({
     id: "",
     name: "",
@@ -98,6 +117,9 @@ const SuperAdmin = ({ user, onLogout }) => {
   // حالة نموذج تعديل كافة بيانات المخيم
   const [isEditCampModalOpen, setIsEditCampModalOpen] = useState(false);
   const [loadingEditCamp, setLoadingEditCamp] = useState(false);
+  const [isSavingEditCamp, setIsSavingEditCamp] = useState(false);
+  const [editCampError, setEditCampError] = useState("");
+  const [changeCampPassword, setChangeCampPassword] = useState(false);
   const [editingCamp, setEditingCamp] = useState({
     id: "",
     name: "",
@@ -165,6 +187,7 @@ const SuperAdmin = ({ user, onLogout }) => {
 
   const handleCreateCamp = async (e) => {
     e.preventDefault();
+    if (isCreatingCamp) return;
     setError("");
     setSuccess("");
 
@@ -172,7 +195,12 @@ const SuperAdmin = ({ user, onLogout }) => {
       setError("يرجى تعبئة الحقول الإلزامية.");
       return;
     }
+    if (!isPasswordAllowed(newCamp.adminPassword)) {
+      setError(PASSWORD_REQUIREMENT_MESSAGE);
+      return;
+    }
 
+    setIsCreatingCamp(true);
     try {
       const res = await createCamp({
         id: newCamp.id.trim().toLowerCase(),
@@ -185,7 +213,7 @@ const SuperAdmin = ({ user, onLogout }) => {
       });
 
       if (res.success) {
-        setSuccess("تم إنشاء المخيم وحساب المدير بنجاح!");
+        const successMessage = `تم إنشاء المخيم بنجاح. يمكن الدخول باسم المستخدم: ${newCamp.adminUsername.trim()} أو باسم المخيم: ${newCamp.name.trim()}`;
         setIsAddCampOpen(false);
         setNewCamp({
           id: "",
@@ -196,12 +224,15 @@ const SuperAdmin = ({ user, onLogout }) => {
           adminPassword: "",
           trialPeriod: "1-month"
         });
-        loadData();
+        await loadData();
+        setSuccess(successMessage);
       } else {
         setError(res.error || "حدث خطأ أثناء إنشاء المخيم.");
       }
     } catch (err) {
       setError("حدث خطأ أثناء الاتصال.");
+    } finally {
+      setIsCreatingCamp(false);
     }
   };
 
@@ -270,6 +301,9 @@ const SuperAdmin = ({ user, onLogout }) => {
   const handleOpenEditCampModal = async (camp) => {
     setError("");
     setSuccess("");
+    setEditCampError("");
+    setChangeCampPassword(false);
+    setIsSavingEditCamp(false);
     setLoadingEditCamp(true);
     setIsEditCampModalOpen(true);
     setEditingCamp({
@@ -302,25 +336,76 @@ const SuperAdmin = ({ user, onLogout }) => {
 
   const handleSaveEditCamp = async (e) => {
     e.preventDefault();
+    if (isSavingEditCamp) return;
+
     setError("");
     setSuccess("");
+    setEditCampError("");
 
-    if (!editingCamp.name || !editingCamp.adminUsername) {
-      setError("يرجى إدخال اسم المخيم واسم المستخدم على الأقل.");
+    const name = editingCamp.name.trim();
+    const adminUsername = editingCamp.adminUsername.trim();
+    const adminPassword = changeCampPassword ? editingCamp.adminPassword : "";
+
+    if (!name || !adminUsername) {
+      setEditCampError("يرجى إدخال اسم المخيم واسم المستخدم على الأقل.");
+      return;
+    }
+    if (changeCampPassword && !adminPassword) {
+      setEditCampError("أدخل كلمة المرور الجديدة أو ألغِ خيار تغيير كلمة المرور.");
+      return;
+    }
+    if (adminPassword && !isPasswordAllowed(adminPassword)) {
+      setEditCampError(NEW_PASSWORD_REQUIREMENT_MESSAGE);
       return;
     }
 
+    setIsSavingEditCamp(true);
     try {
-      const res = await updateCampFullDetails(editingCamp.id, editingCamp);
+      const res = await updateCampFullDetails(editingCamp.id, {
+        ...editingCamp,
+        name,
+        adminUsername,
+        adminPassword,
+      });
       if (res.success) {
-        setSuccess(`تم تحديث كافة بيانات المخيم "${editingCamp.name}" وحساب المدير بنجاح!`);
         setIsEditCampModalOpen(false);
-        loadData();
+        await loadData();
+        setSuccess(`تم تحديث بيانات المخيم "${name}" وحساب المدير بنجاح.`);
       } else {
-        setError(res.error || "حدث خطأ أثناء حفظ التعديلات.");
+        setEditCampError(res.error || "حدث خطأ أثناء حفظ التعديلات.");
       }
     } catch (err) {
-      setError("حدث خطأ أثناء الاتصال.");
+      setEditCampError(err?.message || "حدث خطأ أثناء الاتصال.");
+    } finally {
+      setIsSavingEditCamp(false);
+    }
+  };
+
+  const handleDeleteCamp = async (camp) => {
+    setDeleteCandidate(camp);
+    setDeleteConfirmText("");
+    setError("");
+    setSuccess("");
+  };
+
+  const handleConfirmDeleteCamp = async () => {
+    if (!deleteCandidate || deleteConfirmText !== deleteCandidate.id || isDeletingCamp) return;
+    setIsDeletingCamp(true);
+    setError("");
+    setSuccess("");
+    try {
+      const result = await deleteCampPermanently(deleteCandidate.id);
+      if (result.success) {
+        const warningText = result.warnings?.length ? ` ${result.warnings.join(" ")}` : "";
+        setSuccess(`تم حذف المخيم "${deleteCandidate.name}" وجميع بياناته نهائيًا.${warningText}`);
+        setDeleteCandidate(null);
+        setDeleteConfirmText("");
+        await loadData();
+      } else {
+        setError(result.error || "تعذر حذف المخيم.");
+      }
+    } finally {
+      setIsDeletingCamp(false);
     }
   };
 
@@ -477,33 +562,47 @@ const SuperAdmin = ({ user, onLogout }) => {
 
   return (
     <div className="super-admin-layout">
+      <aside className="admin-sidebar">
+        <div className="admin-sidebar-brand">
+          <Image src="/nasaq-logo.png" alt="شعار نَسَق" width={74} height={74} priority />
+          <div><strong>نَسَق</strong><span>إدارة المخيمات</span></div>
+        </div>
+        <nav className="admin-sidebar-nav" aria-label="أقسام لوحة المشرف العام">
+          <button className={activeTab === "camps" ? "active" : ""} aria-pressed={activeTab === "camps"} onClick={() => setActiveTab("camps")}><FaCampground /><span>المخيمات</span></button>
+          <button className={activeTab === "requests" ? "active" : ""} aria-pressed={activeTab === "requests"} onClick={() => setActiveTab("requests")}><FaCoins /><span>طلبات التجديد</span>{stats.pendingRequests > 0 && <b>{stats.pendingRequests}</b>}</button>
+          <button className={activeTab === "announcement" ? "active" : ""} aria-pressed={activeTab === "announcement"} onClick={() => setActiveTab("announcement")}><FaBullhorn /><span>التعميمات</span></button>
+          <button className={activeTab === "settings" ? "active" : ""} aria-pressed={activeTab === "settings"} onClick={() => setActiveTab("settings")}><FaWallet /><span>إعدادات الدفع</span></button>
+        </nav>
+        <div className="admin-sidebar-foot">
+          <span><i></i> النظام متصل</span>
+          <button onClick={onLogout}><FaSignOutAlt /> تسجيل الخروج</button>
+        </div>
+      </aside>
       {/* هيدر المشرف العام الفاخر */}
       <header className="super-admin-header-luxury">
         <div className="super-admin-brand">
           <div className="super-admin-brand-icon">
-            <FaUserShield />
+            <Image src="/nasaq-logo.png" alt="نَسَق" width={46} height={46} priority />
           </div>
           <div className="super-admin-brand-text">
-            <h1>لوحة تحكم المشرف العام والمنظومة الرقمية</h1>
+            <h1>لوحة المشرف العام</h1>
             <span className="sub-title">
-              <span>👨‍💻 م. إبراهيم مقبل - مدير المشرفين</span>
+              <span>ملخص العمليات وإدارة حسابات المخيمات</span>
             </span>
           </div>
         </div>
 
         <div className="super-admin-actions">
           <div className="system-status-pill">
-            <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#10b981", boxShadow: "0 0 8px #10b981" }}></span>
+            <span className="system-status-dot" aria-hidden="true"></span>
             <span>متصل بـ Supabase (المنظومة نشطة)</span>
           </div>
-          <button onClick={onLogout} className="btn-super-logout-luxury">
-            <FaSignOutAlt /> خروج من النظام
-          </button>
+          <button onClick={() => { setError(""); setSuccess(""); setIsAddCampOpen(true); }} className="admin-header-create"><FaPlus /> مخيم جديد</button>
         </div>
       </header>
 
       {/* المحتوى الرئيسي */}
-      <main className="super-admin-content" dir="rtl" style={{ padding: "2rem", maxWidth: "1400px", margin: "0 auto" }}>
+      <main className="super-admin-content" dir="rtl">
         {/* التنبيهات السريعة */}
         {error && <div className="login-error-badge mb-4">{error}</div>}
         {success && (
@@ -512,31 +611,48 @@ const SuperAdmin = ({ user, onLogout }) => {
           </div>
         )}
 
+        <section className="admin-command-hero">
+          <div className="admin-command-copy">
+            <span className="admin-eyebrow"><FaUserShield /> لوحة القيادة التنفيذية</span>
+            <h2>صورة تشغيلية واضحة لكل المخيمات من مكان واحد</h2>
+            <p>تابع حالة الاشتراكات والبيانات وطلبات التجديد، ونفّذ الإجراءات الإدارية الحساسة بوضوح وأمان.</p>
+          </div>
+          <div className="admin-command-actions">
+            <button onClick={() => { setError(""); setSuccess(""); setIsAddCampOpen(true); }} className="admin-primary-action">
+              <FaPlus /> إنشاء مخيم جديد
+            </button>
+            <button onClick={() => setActiveTab("requests")} className="admin-secondary-action">
+              <FaCoins /> مراجعة طلبات التجديد
+              {stats.pendingRequests > 0 && <strong>{stats.pendingRequests}</strong>}
+            </button>
+          </div>
+        </section>
+
         {/* بطاقات الإحصائيات الفاخرة */}
         <div className="super-stats-grid-luxury">
-          <div className="stat-card-luxury" style={{ "--card-accent": "#059669" }}>
+          <div className="stat-card-luxury">
             <div className="stat-card-top">
               <div className="stat-card-info">
                 <span className="stat-label">المخيمات المسجلة بالمنظومة</span>
                 <div className="stat-value"><AnimatedNumber value={stats.totalCamps} /></div>
               </div>
-              <div className="stat-card-icon-wrap" style={{ "--icon-bg": "rgba(5, 150, 105, 0.12)", "--icon-color": "#059669" }}>
+              <div className="stat-card-icon-wrap">
                 <FaCampground />
               </div>
             </div>
             <div className="stat-card-bottom">
-              <span style={{ color: "#059669" }}>🟢 نشط: <AnimatedNumber value={stats.activeCamps} /></span>
-              <span style={{ color: "#ef4444" }}>🔴 منتهي: <AnimatedNumber value={stats.expiredCamps} /></span>
+              <span className="status-positive">نشط: <AnimatedNumber value={stats.activeCamps} /></span>
+              <span className="status-danger">منتهي: <AnimatedNumber value={stats.expiredCamps} /></span>
             </div>
           </div>
 
-          <div className="stat-card-luxury" style={{ "--card-accent": "#d97706" }}>
+          <div className="stat-card-luxury">
             <div className="stat-card-top">
               <div className="stat-card-info">
                 <span className="stat-label">إجمالي العائلات المسجلة</span>
                 <div className="stat-value"><AnimatedNumber value={stats.totalFamilies} /></div>
               </div>
-              <div className="stat-card-icon-wrap" style={{ "--icon-bg": "rgba(217, 119, 6, 0.12)", "--icon-color": "#d97706" }}>
+              <div className="stat-card-icon-wrap">
                 <FaUsers />
               </div>
             </div>
@@ -545,13 +661,13 @@ const SuperAdmin = ({ user, onLogout }) => {
             </div>
           </div>
 
-          <div className="stat-card-luxury" style={{ "--card-accent": "#0d9488" }}>
+          <div className="stat-card-luxury">
             <div className="stat-card-top">
               <div className="stat-card-info">
                 <span className="stat-label">إجمالي الأفراد بالمخيمات</span>
                 <div className="stat-value"><AnimatedNumber value={stats.totalMembers} /></div>
               </div>
-              <div className="stat-card-icon-wrap" style={{ "--icon-bg": "rgba(13, 148, 136, 0.12)", "--icon-color": "#0d9488" }}>
+              <div className="stat-card-icon-wrap">
                 <FaUserFriends />
               </div>
             </div>
@@ -560,13 +676,13 @@ const SuperAdmin = ({ user, onLogout }) => {
             </div>
           </div>
 
-          <div className="stat-card-luxury" style={{ "--card-accent": "#2563eb" }}>
+          <div className="stat-card-luxury">
             <div className="stat-card-top">
               <div className="stat-card-info">
                 <span className="stat-label">إجمالي كشوفات الترشيحات</span>
                 <div className="stat-value"><AnimatedNumber value={stats.totalNominations} /></div>
               </div>
-              <div className="stat-card-icon-wrap" style={{ "--icon-bg": "rgba(37, 99, 235, 0.12)", "--icon-color": "#2563eb" }}>
+              <div className="stat-card-icon-wrap">
                 <FaClipboardList />
               </div>
             </div>
@@ -575,34 +691,34 @@ const SuperAdmin = ({ user, onLogout }) => {
             </div>
           </div>
 
-          <div className="stat-card-luxury" style={{ "--card-accent": "#7c3aed" }}>
+          <div className="stat-card-luxury">
             <div className="stat-card-top">
               <div className="stat-card-info">
                 <span className="stat-label">حسابات المدراء والإشراف</span>
                 <div className="stat-value">{stats.totalUsers}</div>
               </div>
-              <div className="stat-card-icon-wrap" style={{ "--icon-bg": "rgba(124, 58, 237, 0.12)", "--icon-color": "#7c3aed" }}>
+              <div className="stat-card-icon-wrap">
                 <FaUserCheck />
               </div>
             </div>
             <div className="stat-card-bottom">
-              <span style={{ color: "#059669" }}>مدراء نشطين: {stats.activeUsersCount}</span>
+              <span className="status-positive">مدراء نشطون: {stats.activeUsersCount}</span>
             </div>
           </div>
 
-          <div className="stat-card-luxury" style={{ "--card-accent": "#ef4444" }}>
+          <div className={`stat-card-luxury ${stats.pendingRequests > 0 ? "stat-card-luxury--alert" : ""}`}>
             <div className="stat-card-top">
               <div className="stat-card-info">
                 <span className="stat-label">طلبات التجديد المعلقة</span>
-                <div className="stat-value" style={{ color: stats.pendingRequests > 0 ? "#ef4444" : "#0f172a" }}>{stats.pendingRequests}</div>
+                <div className="stat-value">{stats.pendingRequests}</div>
               </div>
-              <div className="stat-card-icon-wrap" style={{ "--icon-bg": "rgba(239, 68, 68, 0.12)", "--icon-color": "#ef4444" }}>
+              <div className="stat-card-icon-wrap">
                 <FaCoins />
               </div>
             </div>
             <div className="stat-card-bottom">
-              <span style={{ color: stats.pendingRequests > 0 ? "#ef4444" : "#64748b" }}>
-                {stats.pendingRequests > 0 ? "⚠️ تحتاج مراجعة فورية" : "لا توجد طلبات جديدة"}
+              <span className={stats.pendingRequests > 0 ? "status-danger" : ""}>
+                {stats.pendingRequests > 0 ? "تحتاج مراجعة فورية" : "لا توجد طلبات جديدة"}
               </span>
             </div>
           </div>
@@ -610,17 +726,15 @@ const SuperAdmin = ({ user, onLogout }) => {
 
         {/* قسم المخططات الدائرية التفاعلية المتحركة لصفحة المشرف العام */}
         {globalMetrics && (
-          <section style={{ background: "#ffffff", padding: "2rem", borderRadius: "24px", border: "1px solid #e2e8f0", margin: "2rem 0", boxShadow: "0 4px 20px rgba(0,0,0,0.03)" }}>
-            <h2 style={{ fontSize: "1.25rem", fontWeight: "900", color: "#1e293b", marginBottom: "1.75rem", textAlign: "right", display: "flex", alignItems: "center", gap: "10px" }}>
-              <FaChartPie style={{ color: "#0d9488" }} /> نسب ومؤشرات التوزيع والإغاثة المنظومية الشاملة (لكافة المخيمات)
+          <section className="global-metrics-panel">
+            <h2 className="global-metrics-title">
+              <FaChartPie /> مؤشرات التوزيع والإغاثة لجميع المخيمات
             </h2>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "2.5rem", justifyItems: "center" }}>
+            <div className="global-metrics-grid">
               {/* مخطط 1: الحالات الخاصة */}
               <AnimatedDonut 
                 percent={globalMetrics.percentSpecial}
-                color="#38bdf8"
-                textColor="#0f172a"
                 label="الحالات الخاصة والحرجة"
                 subText={<><AnimatedNumber value={globalMetrics.familiesWithSpecialCases} /> عائلة من أصل <AnimatedNumber value={globalMetrics.totalNominationsCount} /></>}
               />
@@ -628,8 +742,6 @@ const SuperAdmin = ({ user, onLogout }) => {
               {/* مخطط 2: نسبة الأطفال والطلبة */}
               <AnimatedDonut 
                 percent={globalMetrics.percentChildren}
-                color="#2dd4bf"
-                textColor="#0f172a"
                 label="نسبة الأطفال والطلاب"
                 subText={<><AnimatedNumber value={globalMetrics.totalChildrenCount} /> طفل من أصل <AnimatedNumber value={globalMetrics.grandAgeTotal} /> فرد</>}
               />
@@ -637,8 +749,6 @@ const SuperAdmin = ({ user, onLogout }) => {
               {/* مخطط 3: تغطية الترشيحات */}
               <AnimatedDonut 
                 percent={globalMetrics.percentCoverage}
-                color="#f59e0b"
-                textColor="#ffffff"
                 label="نسبة شمولية الترشيح"
                 subText={<><AnimatedNumber value={globalMetrics.totalNominationsCount} /> مرشحة من أصل <AnimatedNumber value={globalMetrics.totalFamiliesCount} /> عائلة</>}
               />
@@ -646,8 +756,6 @@ const SuperAdmin = ({ user, onLogout }) => {
               {/* مخطط 4: نسبة الشباب والبالغين */}
               <AnimatedDonut 
                 percent={globalMetrics.percentAdults}
-                color="#8b5cf6"
-                textColor="#ffffff"
                 label="نسبة الشباب والبالغين"
                 subText={<><AnimatedNumber value={globalMetrics.totalAdultsCount} /> فرد بالغ من أصل <AnimatedNumber value={globalMetrics.grandAgeTotal} /></>}
               />
@@ -697,7 +805,7 @@ const SuperAdmin = ({ user, onLogout }) => {
               <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
                 <input 
                   type="text"
-                  placeholder="🔍 بحث باسم المخيم، المدير، أو المعرف..."
+                  placeholder="بحث باسم المخيم، المدير، أو المعرّف..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   style={{
@@ -709,7 +817,7 @@ const SuperAdmin = ({ user, onLogout }) => {
                   }}
                 />
 
-                <button onClick={() => setIsAddCampOpen(true)} className="btn btn-primary" style={{ padding: "10px 18px", borderRadius: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
+                <button onClick={() => { setError(""); setSuccess(""); setIsAddCampOpen(true); }} className="btn btn-primary" style={{ padding: "10px 18px", borderRadius: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
                   <FaPlus /> إنشاء مخيم جديد
                 </button>
               </div>
@@ -781,6 +889,14 @@ const SuperAdmin = ({ user, onLogout }) => {
                                 style={{ padding: "6px 12px", fontSize: "0.82rem", borderRadius: "8px", display: "flex", alignItems: "center", gap: "6px", borderColor: "#d97706", color: "#d97706", fontWeight: "700", cursor: "pointer" }}
                               >
                                 <FaClock /> تمديد الاشتراك
+                              </button>
+                              <button
+                                onClick={() => handleDeleteCamp(camp)}
+                                className="btn"
+                                style={{ padding: "6px 12px", fontSize: "0.82rem", borderRadius: "8px", display: "flex", alignItems: "center", gap: "6px", backgroundColor: "#dc2626", border: "1px solid #dc2626", color: "white", fontWeight: "700", cursor: "pointer" }}
+                                aria-label={`حذف المخيم ${camp.name}`}
+                              >
+                                <FaTrash /> حذف نهائي
                               </button>
                             </div>
                           </td>
@@ -887,7 +1003,7 @@ const SuperAdmin = ({ user, onLogout }) => {
                       checked={announcementForm.isActive === true} 
                       onChange={() => setAnnouncementForm(prev => ({ ...prev, isActive: true }))} 
                     />
-                    <span style={{ color: "#16a34a" }}>🟢 تفعيل ونشر الإعلان فوراً لكل المخيمات</span>
+                    <span style={{ color: "#16a34a", display: "inline-flex", alignItems: "center", gap: "8px" }}><FaCheckCircle aria-hidden="true" /> تفعيل ونشر الإعلان فورًا لكل المخيمات</span>
                   </label>
                   <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontWeight: "600" }}>
                     <input 
@@ -896,7 +1012,7 @@ const SuperAdmin = ({ user, onLogout }) => {
                       checked={announcementForm.isActive === false} 
                       onChange={() => setAnnouncementForm(prev => ({ ...prev, isActive: false }))} 
                     />
-                    <span style={{ color: "#dc3545" }}>🔴 إيقاف الإعلان وإخفاؤه حالياً</span>
+                    <span style={{ color: "#dc3545", display: "inline-flex", alignItems: "center", gap: "8px" }}><FaTimesCircle aria-hidden="true" /> إيقاف الإعلان وإخفاؤه حاليًا</span>
                   </label>
                 </div>
               </div>
@@ -908,9 +1024,9 @@ const SuperAdmin = ({ user, onLogout }) => {
                   onChange={(e) => setAnnouncementForm(prev => ({ ...prev, type: e.target.value }))}
                   style={{ width: "100%", padding: "10px 14px", borderRadius: "6px", border: "1.5px solid #cbd5e1", fontWeight: "600", fontSize: "0.95rem", backgroundColor: "white" }}
                 >
-                  <option value="urgent">🔴 خبر عاجل (شريط أحمر بارز)</option>
-                  <option value="warning">🟡 تنبيه هام (شريط ذهبي تنبيهي)</option>
-                  <option value="info">🔵 إعلام رسمي (شريط أزرق رسمي)</option>
+                  <option value="urgent">خبر عاجل — أولوية مرتفعة</option>
+                  <option value="warning">تنبيه مهم — يحتاج متابعة</option>
+                  <option value="info">إعلام رسمي — للمعلومات</option>
                 </select>
               </div>
 
@@ -944,7 +1060,7 @@ const SuperAdmin = ({ user, onLogout }) => {
                   <FaUserShield style={{ fontSize: "1.6rem" }} />
                 </div>
                 <div>
-                  <h2 style={{ margin: 0, fontSize: "1.25rem", fontWeight: "900", color: "#0f172a" }}>👑 تغيير اسم حساب المشرف العام (Developer / SuperAdmin)</h2>
+                  <h2 style={{ margin: 0, fontSize: "1.25rem", fontWeight: "900", color: "#0f172a", display: "flex", alignItems: "center", gap: "8px" }}><FaCrown aria-hidden="true" /> تغيير اسم حساب المشرف العام</h2>
                   <p style={{ margin: "4px 0 0 0", color: "#64748b", fontSize: "0.88rem", fontWeight: "500" }}>
                     تخصيص وتغيير اسم المستخدم الخاص بالمشرف العام للدخول للنظام والتحكم المباشر.
                   </p>
@@ -988,7 +1104,7 @@ const SuperAdmin = ({ user, onLogout }) => {
 
               <form onSubmit={handleUpdateSettings} style={{ display: "flex", flexDirection: "column", gap: "1.4rem" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
-                  <label style={{ fontWeight: "800", color: "#334155", fontSize: "0.92rem" }}>🏦 حساب بنك فلسطين الرسمي (Bank of Palestine):</label>
+                  <label style={{ fontWeight: "800", color: "#334155", fontSize: "0.92rem", display: "flex", alignItems: "center", gap: "8px" }}><FaUniversity aria-hidden="true" /> حساب بنك فلسطين الرسمي:</label>
                   <input 
                     type="text" 
                     value={paymentMethods.bankOfPalestine || ""} 
@@ -999,7 +1115,7 @@ const SuperAdmin = ({ user, onLogout }) => {
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
-                  <label style={{ fontWeight: "800", color: "#334155", fontSize: "0.92rem" }}>📱 تفاصيل حساب جوال باي (Jawwal Pay):</label>
+                  <label style={{ fontWeight: "800", color: "#334155", fontSize: "0.92rem", display: "flex", alignItems: "center", gap: "8px" }}><FaMobileAlt aria-hidden="true" /> تفاصيل حساب جوال باي:</label>
                   <input 
                     type="text" 
                     value={paymentMethods.jawwalPay || ""} 
@@ -1010,7 +1126,7 @@ const SuperAdmin = ({ user, onLogout }) => {
                 </div>
 
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", width: "100%" }}>
-                  <label style={{ fontWeight: "800", color: "#334155", fontSize: "0.92rem" }}>💳 تفاصيل حساب بال باي (PalPay):</label>
+                  <label style={{ fontWeight: "800", color: "#334155", fontSize: "0.92rem", display: "flex", alignItems: "center", gap: "8px" }}><FaCreditCard aria-hidden="true" /> تفاصيل حساب بال باي:</label>
                   <input 
                     type="text" 
                     value={paymentMethods.palPay || ""} 
@@ -1045,6 +1161,23 @@ const SuperAdmin = ({ user, onLogout }) => {
             </div>
             
             <form onSubmit={handleCreateCamp}>
+              {error && (
+                <div
+                  role="alert"
+                  style={{
+                    marginBottom: "14px",
+                    padding: "11px 14px",
+                    borderRadius: "10px",
+                    border: "1px solid #fecaca",
+                    background: "#fef2f2",
+                    color: "#b91c1c",
+                    fontWeight: "700",
+                    fontSize: "0.88rem",
+                  }}
+                >
+                  {error}
+                </div>
+              )}
               <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                   <div>
@@ -1112,7 +1245,7 @@ const SuperAdmin = ({ user, onLogout }) => {
                 </div>
 
                 <div style={{ background: "rgba(5, 150, 105, 0.05)", border: "1px solid rgba(5, 150, 105, 0.2)", borderRadius: "12px", padding: "1rem", marginTop: "4px" }}>
-                  <h4 style={{ fontSize: "0.9rem", color: "#059669", margin: "0 0 10px 0", fontWeight: "800" }}>🔑 بيانات تسجيل دخول مدير المخيم للوحة</h4>
+                  <h4 style={{ fontSize: "0.9rem", color: "#059669", margin: "0 0 10px 0", fontWeight: "800", display: "flex", alignItems: "center", gap: "8px" }}><FaKey aria-hidden="true" /> بيانات تسجيل دخول مدير المخيم للوحة</h4>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                     <div>
                       <label style={{ display: "block", fontWeight: "700", fontSize: "0.82rem", color: "#334155", marginBottom: "6px" }}>اسم المستخدم للوحة *</label>
@@ -1129,9 +1262,11 @@ const SuperAdmin = ({ user, onLogout }) => {
                       <label style={{ display: "block", fontWeight: "700", fontSize: "0.82rem", color: "#334155", marginBottom: "6px" }}>كلمة المرور *</label>
                       <input 
                         type="password" 
-                        placeholder="كلمة مرور الدخول" 
+                        placeholder="6 خانات على الأقل"
                         value={newCamp.adminPassword}
                         onChange={(e) => setNewCamp({ ...newCamp, adminPassword: e.target.value })}
+                        minLength={MIN_PASSWORD_LENGTH}
+                        autoComplete="new-password"
                         required 
                         style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #cbd5e1", borderRadius: "8px", fontSize: "0.9rem", boxSizing: "border-box", backgroundColor: "white" }}
                       />
@@ -1142,7 +1277,32 @@ const SuperAdmin = ({ user, onLogout }) => {
 
               <div className="modal-footer" style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "1.5rem", paddingTop: "1rem", borderTop: "1px solid #e2e8f0" }}>
                 <button type="button" onClick={() => setIsAddCampOpen(false)} style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1", padding: "9px 20px", borderRadius: "10px", fontWeight: "700", cursor: "pointer", fontSize: "0.9rem" }}>إلغاء</button>
-                <button type="submit" style={{ background: "linear-gradient(135deg, #059669 0%, #047857 100%)", color: "white", border: "none", padding: "9px 24px", borderRadius: "10px", fontWeight: "800", cursor: "pointer", fontSize: "0.9rem", boxShadow: "0 4px 12px rgba(5, 150, 105, 0.3)" }}>تأكيد وإنشاء المخيم</button>
+                <button
+                  type="submit"
+                  disabled={isCreatingCamp}
+                  aria-busy={isCreatingCamp}
+                  style={{
+                    background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                    color: "white",
+                    border: "none",
+                    padding: "9px 24px",
+                    borderRadius: "10px",
+                    fontWeight: "800",
+                    cursor: isCreatingCamp ? "wait" : "pointer",
+                    fontSize: "0.9rem",
+                    boxShadow: "0 4px 12px rgba(5, 150, 105, 0.3)",
+                    opacity: isCreatingCamp ? 0.75 : 1,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  {isCreatingCamp ? (
+                    <><FaSpinner className="spinner" /> جارٍ إنشاء المخيم والحساب...</>
+                  ) : (
+                    <>تأكيد وإنشاء المخيم</>
+                  )}
+                </button>
               </div>
             </form>
           </div>
@@ -1245,7 +1405,7 @@ const SuperAdmin = ({ user, onLogout }) => {
                       className="quick-extend-btn"
                       style={{ backgroundColor: "rgba(15, 81, 50, 0.1)", color: "#0f5132", fontWeight: "bold" }}
                     >
-                      ♾️ دائم (مفتوح)
+                      <FaInfinity aria-hidden="true" /> دائم (مفتوح)
                     </button>
                     <button
                       type="button"
@@ -1288,7 +1448,7 @@ const SuperAdmin = ({ user, onLogout }) => {
                   />
                   {subscriptionExpiryInput && (
                     <div style={{ fontSize: "0.82rem", color: "#0f5132", marginTop: "6px", fontWeight: "600" }}>
-                      📅 الموعد المحدد: {new Date(subscriptionExpiryInput).toLocaleString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                      <FaCalendarAlt aria-hidden="true" /> الموعد المحدد: {new Date(subscriptionExpiryInput).toLocaleString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                     </div>
                   )}
                 </div>
@@ -1322,7 +1482,15 @@ const SuperAdmin = ({ user, onLogout }) => {
                 <FaSpinner className="spinner" /> جاري تحميل بيانات الحساب والمخيم...
               </div>
             ) : (
-              <form onSubmit={handleSaveEditCamp}>
+              <form onSubmit={handleSaveEditCamp} noValidate autoComplete="off">
+                {editCampError && (
+                  <div
+                    role="alert"
+                    style={{ marginBottom: "14px", padding: "11px 14px", borderRadius: "10px", background: "#fff1f2", border: "1px solid #fecdd3", color: "#be123c", fontWeight: "700", fontSize: "0.88rem" }}
+                  >
+                    {editCampError}
+                  </div>
+                )}
                 <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                     <div>
@@ -1382,7 +1550,7 @@ const SuperAdmin = ({ user, onLogout }) => {
                   </div>
 
                   <div style={{ background: "rgba(37, 99, 235, 0.05)", border: "1px solid rgba(37, 99, 235, 0.2)", borderRadius: "12px", padding: "1rem", marginTop: "4px" }}>
-                    <h4 style={{ fontSize: "0.9rem", color: "#2563eb", margin: "0 0 10px 0", fontWeight: "800" }}>🔑 تعديل بيانات تسجيل دخول مدير المخيم (حساب اللوحة)</h4>
+                    <h4 style={{ fontSize: "0.9rem", color: "#2563eb", margin: "0 0 10px 0", fontWeight: "800", display: "flex", alignItems: "center", gap: "8px" }}><FaKey aria-hidden="true" /> تعديل بيانات تسجيل دخول مدير المخيم</h4>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
                       <div>
                         <label style={{ display: "block", fontWeight: "700", fontSize: "0.82rem", color: "#334155", marginBottom: "6px" }}>اسم المستخدم للوحة *</label>
@@ -1391,32 +1559,97 @@ const SuperAdmin = ({ user, onLogout }) => {
                           placeholder="اسم المستخدم" 
                           value={editingCamp.adminUsername}
                           onChange={(e) => setEditingCamp({ ...editingCamp, adminUsername: e.target.value })}
+                          name="camp-manager-username"
+                          autoComplete="off"
                           required 
                           style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #cbd5e1", borderRadius: "8px", fontSize: "0.9rem", boxSizing: "border-box", backgroundColor: "white" }}
                         />
                       </div>
-                      <div>
-                        <label style={{ display: "block", fontWeight: "700", fontSize: "0.82rem", color: "#334155", marginBottom: "6px" }}>كلمة المرور الجديدة *</label>
-                        <input 
-                          type="text" 
-                          placeholder="كلمة المرور" 
-                          value={editingCamp.adminPassword}
-                          onChange={(e) => setEditingCamp({ ...editingCamp, adminPassword: e.target.value })}
-                          required 
-                          style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #cbd5e1", borderRadius: "8px", fontSize: "0.9rem", boxSizing: "border-box", backgroundColor: "white" }}
-                        />
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <label style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: "700", fontSize: "0.82rem", color: "#334155", cursor: "pointer" }}>
+                          <input
+                            type="checkbox"
+                            checked={changeCampPassword}
+                            onChange={(e) => {
+                              const enabled = e.target.checked;
+                              setChangeCampPassword(enabled);
+                              setEditingCamp((current) => ({ ...current, adminPassword: "" }));
+                              setEditCampError("");
+                            }}
+                          />
+                          تغيير كلمة مرور المدير
+                        </label>
+                        {changeCampPassword ? (
+                          <input
+                            type="password"
+                            name={`camp-manager-new-password-${editingCamp.id}`}
+                            placeholder="6 خانات على الأقل"
+                            value={editingCamp.adminPassword}
+                            onChange={(e) => setEditingCamp({ ...editingCamp, adminPassword: e.target.value })}
+                            minLength={MIN_PASSWORD_LENGTH}
+                            autoComplete="new-password"
+                            aria-label="كلمة مرور المدير الجديدة"
+                            style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #cbd5e1", borderRadius: "8px", fontSize: "0.9rem", boxSizing: "border-box", backgroundColor: "white" }}
+                          />
+                        ) : (
+                          <span style={{ color: "#64748b", fontSize: "0.78rem" }}>ستبقى كلمة المرور الحالية دون تغيير.</span>
+                        )}
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="modal-footer" style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "1.5rem", paddingTop: "1rem", borderTop: "1px solid #e2e8f0" }}>
-                  <button type="button" onClick={() => setIsEditCampModalOpen(false)} style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1", padding: "9px 20px", borderRadius: "10px", fontWeight: "700", cursor: "pointer", fontSize: "0.9rem" }}>إلغاء</button>
-                  <button type="submit" style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)", color: "white", border: "none", padding: "9px 24px", borderRadius: "10px", fontWeight: "800", cursor: "pointer", fontSize: "0.9rem", boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)" }}>حفظ التعديلات الان</button>
+                  <button type="button" disabled={isSavingEditCamp} onClick={() => setIsEditCampModalOpen(false)} style={{ background: "#f1f5f9", color: "#475569", border: "1px solid #cbd5e1", padding: "9px 20px", borderRadius: "10px", fontWeight: "700", cursor: isSavingEditCamp ? "not-allowed" : "pointer", fontSize: "0.9rem", opacity: isSavingEditCamp ? 0.65 : 1 }}>إلغاء</button>
+                  <button type="submit" disabled={isSavingEditCamp} aria-busy={isSavingEditCamp} style={{ background: "linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)", color: "white", border: "none", padding: "9px 24px", borderRadius: "10px", fontWeight: "800", cursor: isSavingEditCamp ? "wait" : "pointer", fontSize: "0.9rem", boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)", opacity: isSavingEditCamp ? 0.75 : 1 }}>
+                    {isSavingEditCamp ? <><FaSpinner className="spinner" aria-hidden="true" /> جارٍ الحفظ...</> : "حفظ التعديلات الآن"}
+                  </button>
                 </div>
               </form>
             )}
           </div>
+        </div>
+      )}
+
+      {deleteCandidate && (
+        <div className="modal-overlay" role="presentation">
+          <section className="modal-content destructive-confirm" role="dialog" aria-modal="true" aria-labelledby="delete-camp-title">
+            <header className="modal-header">
+              <div>
+                <p className="modal-kicker">إجراء نهائي</p>
+                <h2 id="delete-camp-title"><FaTrash aria-hidden="true" /> حذف {deleteCandidate.name}</h2>
+              </div>
+              <button type="button" className="btn-close" onClick={() => setDeleteCandidate(null)} aria-label="إغلاق نافذة الحذف">
+                <FaTimes aria-hidden="true" />
+              </button>
+            </header>
+
+            <div className="destructive-confirm-body">
+              <p>سيُحذف المخيم وحساب مديره وجميع الأسر والترشيحات وطلبات التجديد المرتبطة به من قاعدة البيانات. لا يمكن التراجع عن هذه العملية.</p>
+              <label htmlFor="delete-camp-confirm">اكتب معرّف المخيم <strong dir="ltr">{deleteCandidate.id}</strong> للتأكيد</label>
+              <input
+                id="delete-camp-confirm"
+                type="text"
+                dir="ltr"
+                autoComplete="off"
+                value={deleteConfirmText}
+                onChange={(event) => setDeleteConfirmText(event.target.value)}
+              />
+            </div>
+
+            <footer className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setDeleteCandidate(null)} disabled={isDeletingCamp}>إلغاء</button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleConfirmDeleteCamp}
+                disabled={deleteConfirmText !== deleteCandidate.id || isDeletingCamp}
+                aria-busy={isDeletingCamp}
+              >
+                {isDeletingCamp ? <><FaSpinner className="spinner" aria-hidden="true" /> جارٍ الحذف…</> : <><FaTrash aria-hidden="true" /> حذف نهائي</>}
+              </button>
+            </footer>
+          </section>
         </div>
       )}
     </div>

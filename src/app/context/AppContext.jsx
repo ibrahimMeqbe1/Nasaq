@@ -20,6 +20,7 @@ export const AppProvider = ({ children }) => {
   const [families, setFamilies] = useState([]);
   const [nominations, setNominations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [dataError, setDataError] = useState("");
   const [showDeveloperModal, setShowDeveloperModal] = useState(false);
 
   const [campProfile, setCampProfile] = useState(null);
@@ -75,18 +76,28 @@ export const AppProvider = ({ children }) => {
 
   // 3. جلب بيانات العائلات والترشيحات والاشتراك الفوري
   useEffect(() => {
-    if (!user) {
+    if (!user || user.role === "superadmin") {
       setFamilies([]);
       setNominations([]);
+      setDataError("");
       return;
     }
 
     const targetCampId = (user.campId && user.campId !== "system") ? user.campId : "kareem";
 
-    const unsubscribeFamilies = subscribeFamilies(targetCampId, (data) => {
+    const unsubscribeFamilies = subscribeFamilies(targetCampId, (data, error) => {
+      if (error) {
+        setDataError("تعذر مزامنة بيانات العائلات مع الخادم. لن تُعرض بيانات تجريبية بدلًا منها.");
+        return;
+      }
       setFamilies(data || []);
+      setDataError("");
     });
-    const unsubscribeNominations = subscribeNominations(targetCampId, (data) => {
+    const unsubscribeNominations = subscribeNominations(targetCampId, (data, error) => {
+      if (error) {
+        setDataError("تعذر مزامنة كشف الترشيحات مع الخادم. تحقق من الاتصال أو أعد تسجيل الدخول.");
+        return;
+      }
       setNominations(data || []);
     });
 
@@ -129,13 +140,17 @@ export const AppProvider = ({ children }) => {
   };
 
   // 4. حماية المسارات والتوجيه التلقائي
+  const protectedRoutes = ["/families", "/nominations", "/settings", "/super-admin"];
+  const isProtectedPath = Boolean(
+    pathname && protectedRoutes.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  );
+
   useEffect(() => {
     if (loading) return;
 
-    const isPublicPath = pathname === "/login" || pathname === "/print";
     const isSuperAdminPath = pathname === "/super-admin";
 
-    if (!user && !isPublicPath) {
+    if (!user && isProtectedPath) {
       router.replace("/login");
     } else if (user && user.role !== "superadmin" && isSuperAdminPath) {
       router.replace("/");
@@ -146,7 +161,7 @@ export const AppProvider = ({ children }) => {
         router.replace("/");
       }
     }
-  }, [user, loading, pathname, router]);
+  }, [user, loading, pathname, router, isProtectedPath]);
 
   const contextValue = {
     user,
@@ -157,11 +172,12 @@ export const AppProvider = ({ children }) => {
     campProfile,
     setCampProfile,
     isSubscriptionExpired,
-    handleLogout
+    dataError,
+    handleLogout,
   };
 
-  // إذا لم يكن المستخدم مسجلاً لدخوله والصفحة غير عامة، نمنع عرض المحتوى ونتوجّه للوجين
-  if (!user && pathname !== "/login" && pathname !== "/print") {
+  // إذا لم يكن المستخدم مسجلاً لدخوله والصفحة محمية حصراً، نمنع عرض المحتوى ونتوجّه للوجين
+  if (!user && isProtectedPath) {
     return (
       <AppContext.Provider value={contextValue}>
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#f8fafc", direction: "rtl" }}>
@@ -169,6 +185,15 @@ export const AppProvider = ({ children }) => {
             <p style={{ color: "#475569", fontWeight: "bold", fontSize: "1.1rem" }}>جاري التوجيه لصفحة تسجيل الدخول...</p>
           </div>
         </div>
+      </AppContext.Provider>
+    );
+  }
+
+  // إذا لم يكن المستخدم مسجلاً لدخوله والصفحة عامة (مثل / أو /about أو /privacy أو /login أو /print)
+  if (!user) {
+    return (
+      <AppContext.Provider value={contextValue}>
+        {children}
       </AppContext.Provider>
     );
   }
@@ -209,6 +234,11 @@ export const AppProvider = ({ children }) => {
     <AppContext.Provider value={contextValue}>
       {user && <Navbar user={user} campProfile={campProfile} onLogout={handleLogout} />}
       {user && <AnnouncementBar />}
+      {dataError && (
+        <div className="system-data-alert" role="alert">
+          {dataError}
+        </div>
+      )}
       <main className="main-content-layout">
         {children}
       </main>

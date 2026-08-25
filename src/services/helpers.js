@@ -1,4 +1,5 @@
 import { encryptData, decryptData } from "../utils/security";
+export { createRecordId } from "../lib/recordIds.mjs";
 
 // ─── localStorage helpers ────────────────────────────────────────────────────
 
@@ -25,6 +26,34 @@ export const localStorageGetJSON = (key, fallback = null) => {
   } catch {
     return fallback;
   }
+};
+
+// ─── Production data helpers ────────────────────────────────────────────────
+
+/**
+ * إنشاء معرّف غير قابل للتصادم للسجلات الجديدة. يبقى المعرّف نصيًا للتوافق
+ * مع المخطط الحالي، بينما تعتمد العشوائية على Web Crypto عند توفره.
+ */
+/**
+ * تحويل أخطاء PostgREST/Supabase إلى رسالة آمنة ومفهومة للمستخدم، دون كشف
+ * تفاصيل قاعدة البيانات أو السماح للعملية بالنجاح محليًا نجاحًا وهميًا.
+ */
+export const assertSupabaseSuccess = (error, actionLabel = "حفظ البيانات") => {
+  if (!error) return;
+
+  console.error(`Supabase ${actionLabel} error:`, error);
+
+  if (error.code === "23505") {
+    throw new Error("السجل موجود مسبقًا. تحقق من رقم الهوية أو المعرّف ثم أعد المحاولة.");
+  }
+  if (error.code === "23503") {
+    throw new Error("تعذر ربط السجل بالمخيم الحالي. حدّث الصفحة ثم أعد المحاولة.");
+  }
+  if (error.code === "42501" || /row-level security|permission/i.test(error.message || "")) {
+    throw new Error("لا تملك الجلسة الحالية صلاحية تنفيذ هذه العملية. سجّل الدخول من جديد.");
+  }
+
+  throw new Error(`تعذر ${actionLabel} في قاعدة البيانات. تحقق من الاتصال ثم أعد المحاولة.`);
 };
 
 // ─── Family mappers ──────────────────────────────────────────────────────────

@@ -1,31 +1,34 @@
 {
-  "name": "kareem-camp",
-  "version": "0.1.0",
+  "name": "nasaq-camp-platform",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "check": "next build",
-    "migrate:passwords": "node scripts/migratePasswords.mjs"
+    "test": "npm run test:contract",
+    "test:contract": "node --test tests/*.test.mjs",
+    "verify": "npm run test:contract && npm run build",
+    "preview:cloudflare": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy:cloudflare": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "upload:cloudflare": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "dependencies": {
+    "@opennextjs/cloudflare": "^1.20.2",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.0",
-    "@testing-library/dom": "^10.4.1",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^13.5.0",
     "bcryptjs": "^3.0.3",
     "crypto-js": "^4.2.0",
     "jose": "^6.2.8",
-    "jspdf": "^4.2.1",
-    "jspdf-autotable": "^5.0.8",
-    "next": "^15.1.6",
+    "next": "16.3.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-icons": "^5.7.0",
-    "web-vitals": "^2.1.4",
-    "xlsx": "^0.18.5"
+    "read-excel-file": "9.3.10"
+  },
+  "devDependencies": {
+    "wrangler": "^4.125.0"
   }
 }

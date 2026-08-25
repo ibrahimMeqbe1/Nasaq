@@ -35,18 +35,18 @@ const AnnouncementBar = () => {
 
   let bgGradient = "linear-gradient(90deg, #7f1d1d, #991b1b)"; // urgent / red
   let labelBg = "#450a0a";
-  let labelText = "📣 تعميم عاجل";
+  let labelText = "تعميم عاجل";
   let Icon = FaBullhorn;
 
   if (announcement.type === "warning") {
     bgGradient = "linear-gradient(90deg, #78350f, #92400e)"; // gold/amber / warning
     labelBg = "#451a03";
-    labelText = "⚠️ تنبيه إداري";
+    labelText = "تنبيه إداري";
     Icon = FaExclamationTriangle;
   } else if (announcement.type === "info") {
     bgGradient = "linear-gradient(90deg, #0f5132, #1e3d59)"; // deep emerald / info
     labelBg = "#062c1b";
-    labelText = "🏛️ بيان رسمي";
+    labelText = "بيان رسمي";
     Icon = FaInfoCircle;
   }
 
@@ -90,7 +90,17 @@ const AnnouncementBar = () => {
           color: #ffffff;
           will-change: transform;
         }
-        .announcement-bar:hover .announcement-ticker-text {
+        .announcement-separator {
+          display: inline-block;
+          width: 1.5rem;
+          height: 1px;
+          margin-inline: 2rem;
+          vertical-align: middle;
+          background: currentColor;
+          opacity: 0.55;
+        }
+        .announcement-bar:hover .announcement-ticker-text,
+        .announcement-bar:focus-within .announcement-ticker-text {
           animation-play-state: paused;
         }
       `}</style>
@@ -122,7 +132,7 @@ const AnnouncementBar = () => {
       {/* المسار المتحرك لشريط الأخبار */}
       <div className="announcement-ticker-container">
         <div className="announcement-ticker-text">
-          {announcement.text} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ✦ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {announcement.text}
+          {announcement.text}<span className="announcement-separator" aria-hidden="true" />{announcement.text}
         </div>
       </div>
     </div>

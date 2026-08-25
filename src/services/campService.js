@@ -1,10 +1,11 @@
-import bcrypt from "bcryptjs";
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
 import { encryptData, decryptData } from "../utils/security";
 import {
   localStorageGet,
   localStorageSet,
   localStorageGetJSON,
+  assertSupabaseSuccess,
+  createRecordId,
   mapCampRow,
   calcTrialExpiry,
   oneYearFromNow,
@@ -92,28 +93,22 @@ export const updateSuperAdminUsername = async (newUsername) => {
   const clean = (newUsername || "").trim();
   if (!clean) throw new Error("يرجى إدخال اسم مستخدم صالح للمشرف العام");
 
-  if (typeof window !== "undefined") {
-    localStorage.setItem(SUPERADMIN_USERNAME_KEY, clean);
-    // تحديث الجلسة الحالية إن كان المستخدم الحالي superadmin
-    const saved =
-      sessionStorage.getItem("kareem_camp_logged_in") ||
-      localStorage.getItem("kareem_camp_logged_in");
-    if (saved) {
-      try {
-        const u = JSON.parse(saved);
-        if (u.role === "superadmin") {
-          u.username = clean;
-          sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(u));
-        }
-      } catch {}
-    }
+  if (isSupabaseConfigured) {
+    const { error } = await supabase.from("users").update({ username: clean }).eq("role", "superadmin");
+    assertSupabaseSuccess(error, "تحديث اسم المشرف العام");
   }
 
-  if (isSupabaseConfigured) {
-    try {
-      await supabase.from("users").update({ username: clean }).eq("role", "superadmin");
-    } catch (e) {
-      console.warn("Supabase updateSuperAdminUsername error:", e);
+  if (typeof window !== "undefined") {
+    localStorage.setItem(SUPERADMIN_USERNAME_KEY, clean);
+    const saved = sessionStorage.getItem("kareem_camp_logged_in");
+    if (saved) {
+      try {
+        const currentUser = JSON.parse(saved);
+        if (currentUser.role === "superadmin") {
+          currentUser.username = clean;
+          sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(currentUser));
+        }
+      } catch {}
     }
   }
 
@@ -130,7 +125,6 @@ export const authenticateUser = async (username, password) => {
     return { success: false, error: "يرجى إدخال اسم المستخدم وكلمة المرور." };
   }
 
-  // 1. المحاولة عبر Next.js API Route للمصادقة الآمنة على الخادم
   try {
     const res = await fetch("/api/auth/login", {
       method: "POST",
@@ -138,84 +132,36 @@ export const authenticateUser = async (username, password) => {
       body: JSON.stringify({ username: trimmedUser, password: trimmedPass }),
     });
 
-    if (res.ok) {
-      const data = await res.json();
-      if (data.success) {
-        // لازم نربط الجلسة الحقيقية بعميل Supabase بالمتصفح، وإلا رح تُحسب
-        // كل الاستعلامات القادمة (families/nominations/...) كـ "anon" وتُرفض
-        // بسبب سياسات RLS رغم إن تسجيل الدخول نجح.
-        if (isSupabaseConfigured && data.access_token && data.refresh_token) {
-          try {
-            await supabase.auth.setSession({
-              access_token: data.access_token,
-              refresh_token: data.refresh_token,
-            });
-          } catch (sessionErr) {
-            console.error("setSession error:", sessionErr);
-          }
-        }
-        return data;
-      }
-    } else {
-      const data = await res.json().catch(() => null);
-      if (data && data.error) {
-        return { success: false, error: data.error };
-      }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      return { success: false, error: data.error || "تعذر تسجيل الدخول." };
     }
-  } catch (apiErr) {
-    console.warn("API login route not reachable, falling back to Supabase client auth:", apiErr);
-  }
-
-  // 2. المحاولة المباشرة عبر Supabase Client إن تعذر الوصول للـ API
-  if (isSupabaseConfigured) {
-    try {
-      const email = trimmedUser.includes("@") ? trimmedUser : `${trimmedUser.toLowerCase()}@camp.com`;
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password: trimmedPass,
+    if (isSupabaseConfigured && data.access_token && data.refresh_token) {
+      const { error } = await supabase.auth.setSession({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
       });
-
-      if (!authError && authData?.user) {
-        const { data: profile } = await supabase
-          .from("users")
-          .select("*")
-          .eq("id", authData.user.id)
-          .maybeSingle();
-
-        return {
-          success: true,
-          user: {
-            username: profile?.username || trimmedUser,
-            role: profile?.role || authData.user.user_metadata?.role || "admin",
-            campId: profile?.camp_id || authData.user.user_metadata?.campId || "kareem",
-            email,
-            name: profile?.name || authData.user.user_metadata?.name || trimmedUser,
-            uid: authData.user.id,
-          },
-        };
-      }
-    } catch (err) {
-      console.error("Supabase direct auth error:", err);
+      if (error) return { success: false, error: "تعذر إنشاء جلسة قاعدة البيانات." };
     }
+    return data;
+  } catch (apiErr) {
+    console.error("Authentication API unavailable:", apiErr);
+    return { success: false, error: "تعذر الوصول إلى خادم المصادقة. حاول مرة أخرى." };
   }
-
-  return { success: false, error: "اسم المستخدم أو كلمة المرور غير صحيحة." };
 };
 
 // ─── Camp profile ─────────────────────────────────────────────────────────────
 
 export const getCampProfile = async (campId) => {
   if (isSupabaseConfigured) {
-    try {
-      const { data } = await supabase
-        .from("camps")
-        .select("*")
-        .eq("id", campId)
-        .single();
-      if (data) return mapCampRow(data);
-    } catch (err) {
-      console.error("Supabase fetch camp profile error:", err);
-    }
+    const { data, error } = await supabase
+      .from("camps")
+      .select("*")
+      .eq("id", campId)
+      .maybeSingle();
+    assertSupabaseSuccess(error, "تحميل بيانات المخيم");
+    if (!data) throw new Error("لم يتم العثور على المخيم المرتبط بهذا الحساب.");
+    return mapCampRow(data);
   }
 
   initCampLocalStorage();
@@ -233,8 +179,7 @@ export const getCampProfile = async (campId) => {
 
 export const updateCampProfile = async (campId, updatedFields) => {
   if (isSupabaseConfigured) {
-    try {
-      const payload = {};
+    const payload = {};
       if (updatedFields.name !== undefined)               payload.name = updatedFields.name;
       if (updatedFields.managerName !== undefined)        payload.manager_name = updatedFields.managerName;
       if (updatedFields.managerPhone !== undefined)       payload.phone = updatedFields.managerPhone;
@@ -243,13 +188,12 @@ export const updateCampProfile = async (campId, updatedFields) => {
       if (updatedFields.isActive !== undefined)           payload.is_active = updatedFields.isActive;
       if (updatedFields.logoUrl !== undefined)            payload.logo_url = updatedFields.logoUrl;
 
-      if (Object.keys(payload).length > 0) {
-        const { error } = await supabase.from("camps").update(payload).eq("id", campId);
-        if (error) console.error("Supabase update camp profile error:", error);
-      }
-    } catch (err) {
-      console.error("Supabase update camp profile catch error:", err);
+    if (Object.keys(payload).length > 0) {
+      const { data, error } = await supabase.from("camps").update(payload).eq("id", campId).select("id");
+      assertSupabaseSuccess(error, "تحديث بيانات المخيم");
+      if (!data?.length) throw new Error("لم يتم العثور على المخيم أو لا تملك صلاحية تعديله.");
     }
+    return { success: true };
   }
 
   initCampLocalStorage();
@@ -270,9 +214,14 @@ export const getAllCamps = async () => {
         .from("camps")
         .select("*")
         .order("created_at", { ascending: true });
-      if (!error && data?.length) return data.map(mapCampRow);
+      if (error) throw error;
+
+      // An empty array is a valid production result. Falling back to the local
+      // demo records here made deleted camps reappear after a page refresh.
+      return (data || []).map(mapCampRow);
     } catch (err) {
       console.error("Supabase get all camps error:", err);
+      throw new Error("تعذر تحميل المخيمات من قاعدة البيانات. حاول مرة أخرى.");
     }
   }
 
@@ -291,24 +240,29 @@ export const createCamp = async (campData) => {
       // الإنشاء لازم يصير عبر مسار سيرفر محمي (service role)، مش إدراج مباشر
       // من المتصفح، عشان: 1) الباسورد يتشفر صح، 2) يتربط حساب Supabase Auth
       // حقيقي للمدير الجديد، 3) RLS ما يمنع العملية أصلاً.
-      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch("/api/admin/create-camp", {
         method: "POST",
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token || ""}`,
         },
         body: JSON.stringify({
           id, name, managerName, managerPhone, adminUsername, adminPassword,
           expiryDate: expiryDate.toISOString(),
         }),
+        signal: AbortSignal.timeout(35000),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!data.success) throw new Error(data.error || "فشل إنشاء المخيم");
-      return { success: true };
+      return data;
     } catch (err) {
       console.error("Supabase create camp error:", err);
-      return { success: false, error: err.message };
+      return {
+        success: false,
+        error: err?.name === "AbortError" || err?.name === "TimeoutError"
+          ? "استغرق إنشاء المخيم وقتًا طويلًا. تحقق من الاتصال وحاول مرة أخرى."
+          : err.message,
+      };
     }
   }
 
@@ -334,14 +288,14 @@ export const deleteCampPermanently = async (campId) => {
 
   if (isSupabaseConfigured) {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch("/api/admin/delete-camp", {
         method: "POST",
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token || ""}`,
         },
         body: JSON.stringify({ campId, confirmation: campId }),
+        signal: AbortSignal.timeout(35000),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result.success) {
@@ -365,10 +319,28 @@ export const deleteCampPermanently = async (campId) => {
 // ─── Payment methods ──────────────────────────────────────────────────────────
 
 export const getPaymentMethods = async () => {
+  if (isSupabaseConfigured) {
+    const { data, error } = await supabase
+      .from("system_settings")
+      .select("value")
+      .eq("key", "payment_methods")
+      .maybeSingle();
+    assertSupabaseSuccess(error, "تحميل طرق الدفع");
+    return data?.value || DEFAULT_PAYMENT_METHODS;
+  }
   return localStorageGetJSON(PAYMENT_METHODS_KEY) || DEFAULT_PAYMENT_METHODS;
 };
 
 export const updatePaymentMethods = async (methods) => {
+  if (isSupabaseConfigured) {
+    const { error } = await supabase.from("system_settings").upsert([{
+      key: "payment_methods",
+      value: methods,
+      updated_at: new Date().toISOString(),
+    }]);
+    assertSupabaseSuccess(error, "حفظ طرق الدفع");
+    return { success: true };
+  }
   if (typeof window !== "undefined") {
     localStorage.setItem(PAYMENT_METHODS_KEY, JSON.stringify(methods));
   }
@@ -380,7 +352,7 @@ export const updatePaymentMethods = async (methods) => {
 export const submitRenewalRequest = async (requestData) => {
   const { campId, campName, requestedMonths, notes } = requestData;
   const newRequest = {
-    id: "req-" + Date.now(),
+    id: createRecordId("request"),
     camp_id: campId,
     camp_name: campName,
     requested_months: parseInt(requestedMonths) || 1,
@@ -390,13 +362,9 @@ export const submitRenewalRequest = async (requestData) => {
   };
 
   if (isSupabaseConfigured) {
-    try {
-      const { error } = await supabase.from("renewal_requests").insert([newRequest]);
-      if (error) throw error;
-      return { success: true };
-    } catch (err) {
-      console.error("Supabase submit renewal request error:", err);
-    }
+    const { error } = await supabase.from("renewal_requests").insert([newRequest]);
+    assertSupabaseSuccess(error, "إرسال طلب التجديد");
+    return { success: true };
   }
 
   initCampLocalStorage();
@@ -406,28 +374,23 @@ export const submitRenewalRequest = async (requestData) => {
     requestedMonths: newRequest.requested_months,
     notes: newRequest.notes, status: "pending", createdAt: newRequest.request_date,
   });
-  localStorageSetJSON(PAYMENT_REQUESTS_KEY, requests);
+  localStorage.setItem(PAYMENT_REQUESTS_KEY, JSON.stringify(requests));
   return { success: true };
 };
 
 export const getAllRenewalRequests = async () => {
   if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase
-        .from("renewal_requests")
-        .select("*")
-        .order("request_date", { ascending: false });
-      if (!error && data) {
-        return data.map((row) => ({
+    const { data, error } = await supabase
+      .from("renewal_requests")
+      .select("*")
+      .order("request_date", { ascending: false });
+    assertSupabaseSuccess(error, "تحميل طلبات التجديد");
+    return (data || []).map((row) => ({
           id: row.id, campId: row.camp_id, campName: row.camp_name,
           requestedMonths: row.requested_months || 1,
           status: row.status || "pending", notes: row.notes || "",
           createdAt: row.request_date,
-        }));
-      }
-    } catch (err) {
-      console.error("Supabase get all renewal requests error:", err);
-    }
+    }));
   }
 
   return localStorageGetJSON(PAYMENT_REQUESTS_KEY, []);
@@ -435,23 +398,13 @@ export const getAllRenewalRequests = async () => {
 
 export const approveRenewalRequest = async (requestId, campId, monthsCount = 1) => {
   if (isSupabaseConfigured) {
-    try {
-      await supabase.from("renewal_requests").update({ status: "approved" }).eq("id", requestId);
-
-      const { data: campData } = await supabase
-        .from("camps").select("subscription_expiry").eq("id", campId).single();
-      const currentExpiry = campData?.subscription_expiry ? new Date(campData.subscription_expiry) : new Date();
-      const baseDate = currentExpiry > new Date() ? currentExpiry : new Date();
-      baseDate.setMonth(baseDate.getMonth() + (monthsCount || 1));
-
-      await supabase.from("camps").update({
-        subscription_expiry: baseDate.toISOString(), is_active: true,
-      }).eq("id", campId);
-
-      return { success: true };
-    } catch (err) {
-      console.error("Supabase approve renewal error:", err);
-    }
+    const { error } = await supabase.rpc("approve_renewal_request", {
+      target_request_id: requestId,
+      target_camp_id: campId,
+      months_to_add: Math.max(1, parseInt(monthsCount) || 1),
+    });
+    assertSupabaseSuccess(error, "اعتماد طلب التجديد");
+    return { success: true };
   }
 
   initCampLocalStorage();
@@ -479,12 +432,14 @@ export const approveRenewalRequest = async (requestId, campId, monthsCount = 1) 
 
 export const declineRenewalRequest = async (requestId) => {
   if (isSupabaseConfigured) {
-    try {
-      await supabase.from("renewal_requests").update({ status: "declined" }).eq("id", requestId);
-      return { success: true };
-    } catch (err) {
-      console.error("Supabase decline renewal error:", err);
-    }
+    const { data, error } = await supabase
+      .from("renewal_requests")
+      .update({ status: "declined" })
+      .eq("id", requestId)
+      .select("id");
+    assertSupabaseSuccess(error, "رفض طلب التجديد");
+    if (!data?.length) throw new Error("طلب التجديد غير موجود أو لا تملك صلاحية تعديله.");
+    return { success: true };
   }
 
   const requests = localStorageGetJSON(PAYMENT_REQUESTS_KEY, []);
@@ -501,19 +456,15 @@ export const declineRenewalRequest = async (requestId) => {
 
 export const getAnnouncement = async () => {
   if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase.from("announcements").select("*").limit(1).single();
-      if (!error && data) {
-        return {
-          text: data.content,
-          title: data.title || "إعلان عاجل",
-          isActive: data.is_active !== undefined ? data.is_active : true,
-          type: data.type || "urgent",
-        };
-      }
-    } catch (err) {
-      console.warn("Supabase get announcement warning:", err);
-    }
+    const { data, error } = await supabase.from("announcements").select("*").limit(1).maybeSingle();
+    assertSupabaseSuccess(error, "تحميل الإعلان العام");
+    if (!data) return DEFAULT_ANNOUNCEMENT;
+    return {
+      text: data.content,
+      title: data.title || "إعلان عاجل",
+      isActive: data.is_active !== undefined ? data.is_active : true,
+      type: data.type || "urgent",
+    };
   }
 
   return localStorageGetJSON(ANNOUNCEMENT_KEY) || DEFAULT_ANNOUNCEMENT;
@@ -527,14 +478,13 @@ export const updateAnnouncement = async (announcementData) => {
   };
 
   if (isSupabaseConfigured) {
-    try {
-      await supabase.from("announcements").upsert([{
-        id: "global-announcement", title: "إعلان جديد",
-        content: payload.text, is_active: payload.isActive, type: payload.type,
-      }]);
-    } catch (err) {
-      console.warn("Supabase update announcement warning:", err);
-    }
+    const { error } = await supabase.from("announcements").upsert([{
+      id: "global-announcement", title: "إعلان عام",
+      content: payload.text, is_active: payload.isActive, type: payload.type,
+    }]);
+    assertSupabaseSuccess(error, "حفظ الإعلان العام");
+    if (typeof window !== "undefined") window.dispatchEvent(new Event("announcementUpdated"));
+    return { success: true };
   }
 
   if (typeof window !== "undefined") {
@@ -598,8 +548,9 @@ export const getAdminSystemStats = async () => {
     }
   }
 
-  // Fallback to localStorage if Supabase data is empty
-  if (totalFamilies === 0 && typeof window !== "undefined") {
+  // Demo data is only valid when Supabase is not configured. A valid empty
+  // production database must stay empty after camps are deleted.
+  if (!isSupabaseConfigured && totalFamilies === 0 && typeof window !== "undefined") {
     if (localStorage.getItem("kareem_camp_families_cleared") !== "true") {
       try {
         const raw = localStorage.getItem("kareem_camp_families_v5");
@@ -614,7 +565,7 @@ export const getAdminSystemStats = async () => {
     }
   }
 
-  if (totalNominations === 0 && typeof window !== "undefined") {
+  if (!isSupabaseConfigured && totalNominations === 0 && typeof window !== "undefined") {
     if (localStorage.getItem("kareem_camp_nominations_cleared") !== "true") {
       try {
         const raw = localStorage.getItem("kareem_camp_nominations_v3");
@@ -651,14 +602,14 @@ export const getGlobalSystemMetrics = async () => {
     }
   }
 
-  if (families.length === 0 && typeof window !== "undefined") {
+  if (!isSupabaseConfigured && families.length === 0 && typeof window !== "undefined") {
     try {
       const raw = localStorage.getItem("kareem_camp_families_v5");
       if (raw) families = decryptData(raw) || [];
     } catch {}
   }
 
-  if (nominations.length === 0 && typeof window !== "undefined") {
+  if (!isSupabaseConfigured && nominations.length === 0 && typeof window !== "undefined") {
     try {
       const raw = localStorage.getItem("kareem_camp_nominations_v3");
       if (raw) nominations = decryptData(raw) || [];
@@ -706,7 +657,8 @@ export const getGlobalSystemMetrics = async () => {
     });
   }
 
-  const grandAgeTotal = age_0_2 + age_3_5 + age_6_18 + age_19_60 + age_over_60 || totalNominationMembers || 1;
+  const grandAgeTotal =
+    age_0_2 + age_3_5 + age_6_18 + age_19_60 + age_over_60 || totalNominationMembers;
   const totalChildrenCount = age_0_2 + age_3_5 + age_6_18;
   const totalAdultsCount = age_19_60 + age_over_60;
 
@@ -719,7 +671,9 @@ export const getGlobalSystemMetrics = async () => {
     grandAgeTotal,
     percentSpecial: nominations.length ? Math.min(100, Math.round((familiesWithSpecialCases / nominations.length) * 100)) : 0,
     percentChildren: grandAgeTotal ? Math.round((totalChildrenCount / grandAgeTotal) * 100) : 0,
-    percentCoverage: families.length ? Math.min(100, Math.round((nominations.length / families.length) * 100)) : 100,
+    percentCoverage: families.length
+      ? Math.min(100, Math.round((nominations.length / families.length) * 100))
+      : 0,
     percentAdults: grandAgeTotal ? Math.round((totalAdultsCount / grandAgeTotal) * 100) : 0,
   };
 };
@@ -728,13 +682,11 @@ export const getGlobalSystemMetrics = async () => {
 
 export const getCampAdminUser = async (campId) => {
   if (isSupabaseConfigured) {
-    try {
-      const { data, error } = await supabase
-        .from("users").select("*").eq("camp_id", campId).limit(1).single();
-      if (!error && data) return { username: data.username || "", password: "" };
-    } catch (err) {
-      console.warn("Supabase fetch camp user error:", err);
-    }
+    const { data, error } = await supabase
+      .from("users").select("username").eq("camp_id", campId).eq("role", "admin").limit(1).maybeSingle();
+    assertSupabaseSuccess(error, "تحميل حساب مدير المخيم");
+    if (!data) throw new Error("لا يوجد حساب مدير مرتبط بهذا المخيم.");
+    return { username: data.username || "", password: "" };
   }
 
   initCampLocalStorage();
@@ -749,17 +701,18 @@ export const updateCampFullDetails = async (campId, campDetails) => {
 
   if (isSupabaseConfigured) {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch("/api/admin/update-camp", {
         method: "POST",
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${session?.access_token || ""}`,
         },
         body: JSON.stringify({ campId, name, managerName, managerPhone, address, adminUsername, adminPassword }),
+        signal: AbortSignal.timeout(35000),
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || !result.success) throw new Error(result.error || "فشل تحديث حساب المخيم");
+      return result;
     } catch (err) {
       console.error("Supabase updateCampFullDetails error:", err);
       return { success: false, error: err.message };

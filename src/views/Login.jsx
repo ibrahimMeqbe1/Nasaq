@@ -1,23 +1,16 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { 
-  FaLock, 
-  FaUser, 
-  FaSignInAlt, 
-  FaShieldAlt, 
-  FaCampground, 
-  FaKey, 
-  FaUsers, 
-  FaHandsHelping, 
-  FaCheckCircle, 
-  FaEye, 
+import {
+  FaCheckCircle,
+  FaEye,
   FaEyeSlash,
-  FaCrown,
-  FaSparkles,
-  FaGlobe,
-  FaBuilding
+  FaLock,
+  FaShieldAlt,
+  FaSignInAlt,
+  FaUser,
 } from "react-icons/fa";
 import { loginAndRedirect } from "../lib/authHelpers";
 
@@ -29,17 +22,17 @@ const Login = ({ setUser }) => {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const handleLogin = async (event) => {
+    event.preventDefault();
     setError("");
 
     if (!username.trim()) {
-      setError("يرجى إدخال اسم المستخدم.");
+      setError("أدخل اسم المستخدم للمتابعة.");
       return;
     }
 
     if (!password) {
-      setError("يرجى إدخال كلمة المرور.");
+      setError("أدخل كلمة المرور للمتابعة.");
       return;
     }
 
@@ -47,207 +40,145 @@ const Login = ({ setUser }) => {
 
     try {
       const result = await loginAndRedirect(username, password);
-      
-      if (result.success) {
-        sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(result.user));
-        if (result.session) {
-          sessionStorage.setItem("kareem_camp_supabase_session", JSON.stringify(result.session));
-          localStorage.setItem("kareem_camp_supabase_session", JSON.stringify(result.session));
-        }
-        localStorage.removeItem("kareem_camp_logged_in");
-        setUser(result.user);
+
+      if (!result.success) {
+        setError(result.error || "بيانات الدخول غير صحيحة. تحقق من اسم المستخدم وكلمة المرور ثم أعد المحاولة.");
         setLoading(false);
-        
-        router.push(result.redirectPath || (result.user.role === "superadmin" ? "/super-admin" : "/"));
-      } else {
-        setError(result.error || "اسم المستخدم أو كلمة المرور غير صحيحة.");
-        setLoading(false);
+        return;
       }
-    } catch (err) {
-      setError("حدث خطأ أثناء محاولة تسجيل الدخول. يرجى المحاولة لاحقاً.");
+
+      sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(result.user));
+      localStorage.removeItem("kareem_camp_logged_in");
+      setUser(result.user);
+      router.push(result.redirectPath || (result.user.role === "superadmin" ? "/super-admin" : "/"));
+    } catch {
+      setError("تعذر الاتصال بالخادم. تحقق من الشبكة ثم أعد المحاولة.");
       setLoading(false);
     }
   };
 
-  const handleQuickFill = (userVal, passVal = "") => {
-    setUsername(userVal);
-    setPassword(passVal);
-    setError("");
-  };
-
   return (
-    <div className="login-page-wrapper-luxury">
-      {/* 3D Floating Interactive Background Elements */}
-      <div className="bg-floating-shapes">
-        <div className="shape shape-1"></div>
-        <div className="shape shape-2"></div>
-        <div className="shape shape-3"></div>
-        <div className="shape shape-4"></div>
-      </div>
-
-      <div className="login-container-split-3d">
-        {/* قسم البانر الجانبي البصري الرسمى 3D */}
-        <div className="login-side-showcase-3d">
-          <div className="showcase-glow-backdrop"></div>
-          <div className="showcase-content-3d">
-            {/* الشعار المضيء 3D */}
-            <div className="official-seal-badge-3d">
-              <div className="seal-icon-glow">
-                <FaCampground className="brand-svg-lg-3d" />
-              </div>
-              <div className="seal-text-info">
-                <span className="seal-tag">المنظومة الرقمية الرسمية الموحدة</span>
-                <span className="seal-title">نظام إدارة المخيمات الإغاثية</span>
-              </div>
+    <main className="login-page" dir="rtl">
+      <section className="login-shell" aria-label="تسجيل الدخول إلى نَسَق">
+        <div className="login-intro">
+          <div className="login-brand-lockup">
+            <Image
+              src="/nasaq-logo.png"
+              alt="شعار نَسَق"
+              width={72}
+              height={72}
+              priority
+              className="login-brand-logo"
+            />
+            <div>
+              <strong>نَسَق</strong>
+              <span>منصة إدارة المخيمات</span>
             </div>
+          </div>
 
-            <h2>المنصة الذكية المتكاملة لإدارة شؤون المخيمات وتوزيع المساعدات</h2>
+          <div className="login-intro-copy">
+            <p className="login-kicker">بيانات دقيقة. قرار أسرع.</p>
+            <h2>إدارة المخيم من شاشة واحدة واضحة.</h2>
             <p>
-              نظام إلكتروني متطور فائق الأمان والسرعة لتسجيل وحصر بيانات الأسر النازحة، تنظيم الترشيحات والشفافية في تقديم المساعدات بحرفية عالية.
+              سجّل العائلات، راجع الترشيحات، وصدّر الكشوفات الرسمية دون تشتيت أو خطوات زائدة.
             </p>
+          </div>
 
-            {/* شريط الحالة والشبكة */}
-            <div className="network-live-status-pill">
-              <span className="pulse-dot"></span>
-              <span>🟢 الربط السحابي الحقيقي متصل مع Supabase & Local DB</span>
-            </div>
-            
-            {/* المميزات الرسمية */}
-            <div className="showcase-features-list-3d">
-              <div className="feature-item-3d">
-                <div className="feat-icon-wrap">
-                  <FaCheckCircle />
-                </div>
-                <span>إدارة وحصر دقيق لبيانات العائلات والأسر المتضررة</span>
-              </div>
-              <div className="feature-item-3d">
-                <div className="feat-icon-wrap">
-                  <FaCheckCircle />
-                </div>
-                <span>متابعة فورية وتصنيف الكشوفات وحالات الترشيح</span>
-              </div>
-              <div className="feature-item-3d">
-                <div className="feat-icon-wrap">
-                  <FaCheckCircle />
-                </div>
-                <span>إحصائيات ولوحات قياس حية وخرائط بيانات ذكية</span>
-              </div>
-              <div className="feature-item-3d">
-                <div className="feat-icon-wrap">
-                  <FaCheckCircle />
-                </div>
-                <span>تصدير رسمي بصيغ PDF و Excel بكفاءة عالية</span>
-              </div>
-            </div>
+          <ul className="login-benefits" aria-label="وظائف المنصة الأساسية">
+            <li><FaCheckCircle aria-hidden="true" /><span>سجل موحّد للعائلات والأفراد</span></li>
+            <li><FaCheckCircle aria-hidden="true" /><span>ترشيحات وتقارير قابلة للطباعة</span></li>
+            <li><FaCheckCircle aria-hidden="true" /><span>صلاحيات مستقلة لكل مخيم</span></li>
+          </ul>
 
-            {/* الإحصائيات Bar 3D */}
-            <div className="showcase-stats-pills-3d">
-              <div className="stat-pill-3d">
-                <div className="stat-pill-icon primary">
-                  <FaUsers />
-                </div>
-                <div>
-                  <strong>+10,000</strong>
-                  <small>عائلة مسجلة</small>
-                </div>
-              </div>
-              <div className="stat-pill-3d">
-                <div className="stat-pill-icon gold">
-                  <FaHandsHelping />
-                </div>
-                <div>
-                  <strong>+25,000</strong>
-                  <small>ترشيح معتمد</small>
-                </div>
-              </div>
-            </div>
+          <div className="login-security-note">
+            <FaShieldAlt aria-hidden="true" />
+            <span>الاتصال بقاعدة البيانات محمي، ولا تظهر بيانات مخيم لغير حسابه.</span>
           </div>
         </div>
 
-        {/* قسم نموذج الدخول الفاخر 3D Glassmorphism */}
-        <div className="login-form-side-3d">
-          <div className="login-glass-card-3d">
-            <div className="login-header-3d">
-              <div className="login-brand-icon-3d">
-                <FaCampground className="brand-svg-3d" />
-              </div>
-              <h1>تسجيل الدخول</h1>
-              <p className="login-subtitle-3d">أدخل بيانات حسابك للمتابعة إلى اللوحة الرقمية</p>
-            </div>
-
-            {error && (
-              <div className="login-error-badge-luxury-3d">
-                <FaShieldAlt /> {error}
-              </div>
-            )}
-
-            <form onSubmit={handleLogin} className="login-form-3d">
-              <div className="login-input-group-3d">
-                <label htmlFor="username" className="login-input-label">
-                  <FaUser className="login-field-icon" /> اسم المستخدم
-                </label>
-                <div className="input-with-icon-3d">
-                  <input
-                    type="text"
-                    id="username"
-                    placeholder="أدخل اسم المستخدم (مثال: Ibrahim)"
-                    value={username}
-                    onChange={(e) => {
-                      setUsername(e.target.value);
-                      setError("");
-                    }}
-                    required
-                    autoComplete="username"
-                  />
-                </div>
-              </div>
-
-              <div className="login-input-group-3d">
-                <label htmlFor="password" className="login-input-label">
-                  <FaLock className="login-field-icon" /> كلمة المرور
-                </label>
-                <div className="input-with-icon-3d">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    id="password"
-                    placeholder="أدخل كلمة المرور"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    autoComplete="current-password"
-                  />
-                  <button
-                    type="button"
-                    className="password-toggle-btn"
-                    onClick={() => setShowPassword(!showPassword)}
-                    tabIndex="-1"
-                    title={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
-                  >
-                    {showPassword ? <FaEyeSlash /> : <FaEye />}
-                  </button>
-                </div>
-              </div>
-
-              <button type="submit" className="btn-login-submit-luxury-3d" disabled={loading}>
-                {loading ? (
-                  <span className="spinner-text-3d">جاري التحقق وتأمين التوصيل...</span>
-                ) : (
-                  <>
-                    <FaSignInAlt /> تسجيل الدخول للوحة التحكم
-                  </>
-                )}
-              </button>
-            </form>
-
-            <div className="login-card-footer-3d">
-              <p>
-                © 2026 المنظومة الرقمية للمخيمات | تطوير وتنفيذ <strong>م. إبراهيم مقبل</strong>
-              </p>
-            </div>
+        <div className="login-form-panel">
+          <div className="login-mobile-brand" aria-hidden="true">
+            <Image src="/nasaq-logo.png" alt="" width={56} height={56} priority />
+            <strong>نَسَق</strong>
           </div>
+
+          <header className="login-form-heading">
+            <h1>تسجيل الدخول</h1>
+            <p>استخدم حساب المخيم أو حساب المشرف العام.</p>
+          </header>
+
+          {error && (
+            <div id="login-error" className="login-alert" role="alert" aria-live="assertive">
+              <FaShieldAlt aria-hidden="true" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleLogin} className="login-form" noValidate>
+            <div className="field-group">
+              <label htmlFor="username"><FaUser aria-hidden="true" /> اسم المستخدم</label>
+              <input
+                type="text"
+                id="username"
+                placeholder="مثال: camp-admin"
+                value={username}
+                onChange={(event) => {
+                  setUsername(event.target.value);
+                  setError("");
+                }}
+                required
+                aria-required="true"
+                aria-invalid={Boolean(error)}
+                aria-describedby={error ? "login-error" : undefined}
+                autoComplete="username"
+                inputMode="text"
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="password"><FaLock aria-hidden="true" /> كلمة المرور</label>
+              <div className="password-field">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  id="password"
+                  placeholder="أدخل كلمة المرور"
+                  value={password}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    setError("");
+                  }}
+                  required
+                  aria-required="true"
+                  aria-invalid={Boolean(error)}
+                  aria-describedby={error ? "login-error" : undefined}
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                  aria-pressed={showPassword}
+                >
+                  {showPassword ? <FaEyeSlash aria-hidden="true" /> : <FaEye aria-hidden="true" />}
+                </button>
+              </div>
+            </div>
+
+            <button type="submit" className="login-submit" disabled={loading} aria-busy={loading}>
+              {loading ? (
+                <><span className="button-spinner" aria-hidden="true" /> جارٍ التحقق…</>
+              ) : (
+                <><FaSignInAlt aria-hidden="true" /> دخول إلى اللوحة</>
+              )}
+            </button>
+          </form>
+
+          <p className="login-support-copy">إذا تعذر الدخول، تواصل مع مشرف النظام لتأكيد بيانات الحساب.</p>
+          <p className="login-copyright">© 2026 نَسَق لإدارة المخيمات</p>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 };
 

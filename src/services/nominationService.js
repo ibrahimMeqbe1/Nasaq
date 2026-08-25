@@ -1,10 +1,12 @@
-import { supabase, isSupabaseConfigured, isDemoMode } from "../lib/supabase";
-import defaultNominations from "./nominationsDefault.json";
+import { supabase, isSupabaseConfigured } from "../lib/supabase";
 import { encryptData, decryptData } from "../utils/security";
+import { assertSupabaseSuccess, createRecordId } from "./helpers";
+
+const loadDefaultNominations = async () => (await import("./nominationsDefault.json")).default;
 
 const initLocalStorage = () => {
   if (!localStorage.getItem("kareem_camp_nominations_v3") && !localStorage.getItem("kareem_camp_nominations_cleared")) {
-    localStorage.setItem("kareem_camp_nominations_v3", encryptData(defaultNominations));
+    localStorage.setItem("kareem_camp_nominations_v3", encryptData([]));
   }
 };
 
@@ -81,18 +83,12 @@ export const subscribeNominations = (campId, callback) => {
         const { data, error } = await supabase
           .from("nominations")
           .select("*")
+          .eq("camp_id", campId)
           .order("created_at", { ascending: true });
-
-        if (!error && data) {
-          const target = campId || "kareem";
-          const filtered = data.filter(n => (n.camp_id || "kareem") === target);
-          callback(filtered.map(mapSupabaseNominationToJS));
-          return;
-        }
-
-        callback(getDemoNominations(campId));
-      } catch (e) {
-        callback(getDemoNominations(campId));
+        assertSupabaseSuccess(error, "تحميل كشف الترشيحات");
+        callback((data || []).map(mapSupabaseNominationToJS), null);
+      } catch (error) {
+        callback(null, error);
       }
     };
 
@@ -145,40 +141,65 @@ const getNum = (val) => {
   return isNaN(parsed) ? 0 : parsed;
 };
 
+const mapNominationToSupabase = (campId, nomData, id) => ({
+  ...(id !== undefined && { id }),
+  ...(campId !== undefined && campId !== null && { camp_id: campId }),
+  serial_no: getNum(nomData.serialNo),
+  name: (nomData.name || "").trim(),
+  id_number: (nomData.idNumber || "").trim(),
+  gender: nomData.gender || "ذكر",
+  status: nomData.status || "متزوج",
+  phone: cleanPhone(nomData.phone),
+  phone_alt: cleanPhone(nomData.phoneAlt),
+  wife_name: (nomData.wifeName || "").trim(),
+  wife_id: (nomData.wifeId || "").trim(),
+  wife_2_name: (nomData.wife2Name || "").trim(),
+  wife_2_id: (nomData.wife2Id || "").trim(),
+  members_count: getNum(nomData.membersCount) || 1,
+  age_0_2_male: getNum(nomData.age_0_2_male ?? nomData.age02Male),
+  age_0_2_female: getNum(nomData.age_0_2_female ?? nomData.age02Female),
+  age_3_5_male: getNum(nomData.age_3_5_male ?? nomData.age35Male),
+  age_3_5_female: getNum(nomData.age_3_5_female ?? nomData.age35Female),
+  age_6_18_male: getNum(nomData.age_6_18_male ?? nomData.age618Male),
+  age_6_18_female: getNum(nomData.age_6_18_female ?? nomData.age618Female),
+  age_19_60_male: getNum(nomData.age_19_60_male ?? nomData.age1960Male),
+  age_19_60_female: getNum(nomData.age_19_60_female ?? nomData.age1960Female),
+  age_over_60_male: getNum(nomData.age_over_60_male ?? nomData.ageOver60Male),
+  age_over_60_female: getNum(nomData.age_over_60_female ?? nomData.ageOver60Female),
+  has_disabled: nomData.hasDisabled ? 1 : 0,
+  has_chronic_disease: nomData.hasChronicDisease ? 1 : 0,
+  is_lactating_or_pregnant: nomData.isLactatingOrPregnant ? 1 : 0,
+  is_female_headed: nomData.isFemaleHeaded ? 1 : 0,
+  location: (nomData.currentAddress || nomData.location || "").trim(),
+  current_address: (nomData.currentAddress || nomData.location || "").trim(),
+  original_address: (nomData.originalAddress || "").trim(),
+  governorate: nomData.governorate || "شمال غزة",
+  camp_name: (nomData.campName || "").trim(),
+  shelter_manager: (nomData.shelterManager || "").trim(),
+  shelter_phone: cleanPhone(nomData.shelterPhone),
+  shelter_phone_alt: cleanPhone(nomData.shelterPhoneAlt),
+  shelter_address: (nomData.shelterAddress || "").trim(),
+  shelter_gps: (nomData.shelterGps || "").trim(),
+  dob: (nomData.dob || "").trim(),
+  wife_dob: (nomData.wifeDob || "").trim(),
+  notes: (nomData.notes || "").trim(),
+  ...(nomData.createdAt && { created_at: nomData.createdAt }),
+});
+
 /**
  * إضافة ترشيح جديد
  * @param {string} campId - معرّف المخيم
  * @param {Object} nomData - بيانات الترشيح
  */
 export const addNomination = async (campId, nomData) => {
-  const customId = nomData.id || "nom_" + Date.now();
+  const customId = nomData.id || createRecordId("nom");
   
   if (isSupabaseConfigured) {
-    try {
-      const payload = {
-        id: customId,
-        camp_id: campId,
-        name: nomData.name.trim(),
-        id_number: nomData.idNumber.trim(),
-        phone: cleanPhone(nomData.phone),
-        members_count: getNum(nomData.membersCount) || 1,
-        location: nomData.currentAddress ? nomData.currentAddress.trim() : (nomData.location || ""),
-        status: nomData.status || "متزوج",
-        has_disabled: nomData.hasDisabled ? 1 : 0,
-        has_chronic_disease: nomData.hasChronicDisease ? 1 : 0,
-        is_lactating_or_pregnant: nomData.isLactatingOrPregnant ? 1 : 0,
-        is_female_headed: nomData.isFemaleHeaded ? 1 : 0,
-        dob: nomData.dob ? nomData.dob.trim() : "",
-        wife_name: nomData.wifeName ? nomData.wifeName.trim() : "",
-        wife_id: nomData.wifeId ? nomData.wifeId.trim() : "",
-        wife_dob: nomData.wifeDob ? nomData.wifeDob.trim() : "",
-        notes: nomData.notes ? nomData.notes.trim() : "",
-        created_at: new Date().toISOString()
-      };
-      await supabase.from("nominations").insert([payload]);
-    } catch (e) {
-      console.warn("Supabase addNomination warning:", e);
-    }
+    const { error } = await supabase
+      .from("nominations")
+      .insert([{ ...mapNominationToSupabase(campId, nomData, customId), created_at: new Date().toISOString() }]);
+    assertSupabaseSuccess(error, "حفظ الترشيح");
+    return customId;
   }
 
   const newNomination = {
@@ -255,28 +276,14 @@ export const updateNomination = async (id, nomData) => {
   };
 
   if (isSupabaseConfigured) {
-    try {
-      const payload = {
-        name: updatedNom.name,
-        id_number: updatedNom.idNumber,
-        phone: updatedNom.phone,
-        members_count: updatedNom.membersCount,
-        location: updatedNom.currentAddress,
-        status: updatedNom.status,
-        has_disabled: updatedNom.hasDisabled,
-        has_chronic_disease: updatedNom.hasChronicDisease,
-        is_lactating_or_pregnant: updatedNom.isLactatingOrPregnant,
-        is_female_headed: updatedNom.isFemaleHeaded,
-        dob: nomData.dob ? nomData.dob.trim() : "",
-        wife_name: updatedNom.wifeName,
-        wife_id: updatedNom.wifeId,
-        wife_dob: nomData.wifeDob ? nomData.wifeDob.trim() : "",
-        notes: nomData.notes ? nomData.notes.trim() : ""
-      };
-      await supabase.from("nominations").update(payload).eq("id", id);
-    } catch (e) {
-      console.warn("Supabase updateNomination warning:", e);
-    }
+    const { data, error } = await supabase
+      .from("nominations")
+      .update(mapNominationToSupabase(null, nomData))
+      .eq("id", id)
+      .select("id");
+    assertSupabaseSuccess(error, "تحديث الترشيح");
+    if (!data?.length) throw new Error("لم يتم العثور على الترشيح أو لا تملك صلاحية تعديله.");
+    return true;
   }
 
   initLocalStorage();
@@ -295,11 +302,10 @@ export const updateNomination = async (id, nomData) => {
  */
 export const deleteNomination = async (id) => {
   if (isSupabaseConfigured) {
-    try {
-      await supabase.from("nominations").delete().eq("id", id);
-    } catch (e) {
-      console.warn("Supabase deleteNomination warning:", e);
-    }
+    const { data, error } = await supabase.from("nominations").delete().eq("id", id).select("id");
+    assertSupabaseSuccess(error, "حذف الترشيح");
+    if (!data?.length) throw new Error("لم يتم العثور على الترشيح أو لا تملك صلاحية حذفه.");
+    return true;
   }
 
   initLocalStorage();
@@ -316,6 +322,7 @@ export const deleteNomination = async (id) => {
 export const importDefaultNominationsToFirestore = async (campId) => {
   if (isSupabaseConfigured) {
     try {
+      const defaultNominations = await loadDefaultNominations();
       const rows = defaultNominations.map((n, i) => ({
         id: n.id || `nom-csv-${i}-${Date.now()}`,
         camp_id: campId,
@@ -355,38 +362,16 @@ export const batchAddNominations = async (campId, nomList) => {
   if (!nomList || nomList.length === 0) return true;
 
   if (isSupabaseConfigured) {
-    try {
-      const rows = nomList.map((nom, i) => ({
-        id: nom.id || `nom_${Date.now()}_${i}_${Math.random().toString(36).substr(2, 4)}`,
-        camp_id: campId,
-        name: (nom.name || "").trim(),
-        id_number: (nom.idNumber || "").trim(),
-        phone: (nom.phone || "").trim(),
-        members_count: parseInt(nom.membersCount) || 1,
-        location: nom.currentAddress ? nom.currentAddress.trim() : (nom.location || ""),
-        status: nom.status || "متزوج",
-        has_disabled: nom.hasDisabled ? 1 : 0,
-        has_chronic_disease: nom.hasChronicDisease ? 1 : 0,
-        is_lactating_or_pregnant: nom.isLactatingOrPregnant ? 1 : 0,
-        is_female_headed: nom.isFemaleHeaded ? 1 : 0,
-        dob: (nom.dob || "").trim(),
-        wife_name: (nom.wifeName || "").trim(),
-        wife_id: (nom.wifeId || "").trim(),
-        wife_dob: (nom.wifeDob || "").trim(),
-        notes: (nom.notes || "").trim(),
-        created_at: nom.createdAt || new Date().toISOString()
-      }));
-      const chunkSize = 100;
-      for (let i = 0; i < rows.length; i += chunkSize) {
-        const chunk = rows.slice(i, i + chunkSize);
-        const { error } = await supabase.from("nominations").upsert(chunk);
-        if (error) {
-          console.error("Error upserting nominations chunk:", error);
-        }
-      }
-    } catch (err) {
-      console.warn("Supabase batchAddNominations error, falling back to local:", err);
+    const rows = nomList.map((nom) => ({
+      ...mapNominationToSupabase(campId, nom, nom.id || createRecordId("nom")),
+      created_at: nom.createdAt || new Date().toISOString(),
+    }));
+    const chunkSize = 100;
+    for (let i = 0; i < rows.length; i += chunkSize) {
+      const { error } = await supabase.from("nominations").upsert(rows.slice(i, i + chunkSize));
+      assertSupabaseSuccess(error, "استيراد كشف الترشيحات");
     }
+    return true;
   }
 
   localStorage.removeItem("kareem_camp_nominations_cleared");
@@ -424,11 +409,9 @@ export const batchAddNominations = async (campId, nomList) => {
  */
 export const deleteAllNominations = async (campId) => {
   if (isSupabaseConfigured) {
-    try {
-      await supabase.from("nominations").delete().eq("camp_id", campId);
-    } catch (e) {
-      console.warn("Supabase deleteAllNominations error:", e);
-    }
+    const { error } = await supabase.from("nominations").delete().eq("camp_id", campId);
+    assertSupabaseSuccess(error, "مسح كشف الترشيحات");
+    return true;
   }
 
   localStorage.setItem("kareem_camp_nominations_v3", encryptData([]));

@@ -47,7 +47,7 @@ export const AnimatedNumber = ({ value, duration = 1200, decimals = 0, formatter
   return <span>{formattedVal}</span>;
 };
 
-export const AnimatedDonut = ({ percent, color, label, subText, textColor = "#ffffff" }) => {
+export const AnimatedDonut = ({ percent, label, subText }) => {
   const [animatedPercent, setAnimatedPercent] = useState(0);
   const target = Math.min(100, Math.max(0, parseFloat(percent) || 0));
 
@@ -73,56 +73,14 @@ export const AnimatedDonut = ({ percent, color, label, subText, textColor = "#ff
   }, [target]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "1rem", width: "100%", maxWidth: "220px" }}>
-      <div 
-        style={{
-          width: "140px",
-          height: "140px",
-          borderRadius: "50%",
-          background: `conic-gradient(${color} 0% ${animatedPercent.toFixed(1)}%, #1e293b ${animatedPercent.toFixed(1)}% 100%)`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: `0 8px 20px ${color}33`,
-          transition: "transform 0.3s ease"
-        }}
-      >
-        <div 
-          style={{
-            width: "92px",
-            height: "92px",
-            borderRadius: "50%",
-            backgroundColor: "#ffffff",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "1.5rem",
-            fontWeight: "900",
-            color: "#0f172a",
-            fontFamily: "sans-serif"
-          }}
-        >
+    <div className="data-donut">
+      <div className="data-donut-ring" style={{ "--donut-value": `${animatedPercent.toFixed(1)}%` }}>
+        <div className="data-donut-value">
           <AnimatedNumber value={percent} decimals={0} />%
         </div>
       </div>
-      <div 
-        style={{
-          width: "100%",
-          backgroundColor: color,
-          color: textColor,
-          padding: "10px 16px",
-          borderRadius: "14px",
-          fontWeight: "800",
-          fontSize: "0.92rem",
-          textAlign: "center",
-          boxShadow: `0 4px 10px ${color}40`
-        }}
-      >
-        {label}
-      </div>
-      <span style={{ fontSize: "0.82rem", fontWeight: "700", color: "#64748b", background: "#ffffff", padding: "4px 12px", borderRadius: "20px", border: "1px solid #cbd5e1" }}>
-        {subText}
-      </span>
+      <strong className="data-donut-label">{label}</strong>
+      <span className="data-donut-detail">{subText}</span>
     </div>
   );
 };

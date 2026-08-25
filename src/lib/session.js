@@ -1,5 +1,4 @@
-import { SignJWT } from "jose/jwt/sign";
-import { jwtVerify } from "jose/jwt/verify";
+import { SignJWT, jwtVerify } from "jose";
 
 function getSecretKey() {
   const secret = process.env.JWT_SECRET;

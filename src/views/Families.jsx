@@ -1,13 +1,15 @@
 "use client";
 
 import React, { useState } from "react";
+import dynamic from "next/dynamic";
 import FamilyTable from "../components/FamilyTable";
 import FamilyForm from "../components/FamilyForm";
-import ExcelImportModal from "../components/ExcelImportModal";
 import { addFamily, updateFamily, deleteFamily, deleteAllFamilies, batchAddFamilies } from "../services/familyService";
-import { exportToExcel } from "../utils/exportExcel";
+import { exportToExcel, downloadFamiliesTemplate } from "../utils/exportExcel";
 import { exportToPDF } from "../utils/exportPDF";
-import { FaPlus, FaFileExcel, FaFilePdf, FaExclamationTriangle, FaTimes, FaUpload, FaTrash, FaUsers, FaUserFriends, FaHome, FaHeart } from "react-icons/fa";
+import { FaPlus, FaFileExcel, FaFilePdf, FaExclamationTriangle, FaTimes, FaUpload, FaDownload, FaTrash, FaUsers, FaUserFriends, FaHome, FaHeart } from "react-icons/fa";
+
+const ExcelImportModal = dynamic(() => import("../components/ExcelImportModal"), { ssr: false });
 
 const Families = ({ families = [], user, campProfile }) => {
   // حساب الإحصائيات السريعة
@@ -49,7 +51,7 @@ const Families = ({ families = [], user, campProfile }) => {
       setIsClearAllModalOpen(false);
     } catch (error) {
       console.error("Error clearing families:", error);
-      showNotification("حدث خطأ أثناء محاولة مسح الكشف.", "error");
+      showNotification(error.message || "تعذر مسح الكشف من قاعدة البيانات.", "error");
     }
   };
 
@@ -86,7 +88,7 @@ const Families = ({ families = [], user, campProfile }) => {
       setIsFormOpen(false);
     } catch (error) {
       console.error("Error saving family:", error);
-      showNotification("حدث خطأ غير متوقع أثناء الحفظ. يرجى المحاولة لاحقاً.", "error");
+      showNotification(error.message || "تعذر حفظ العائلة في قاعدة البيانات.", "error");
     }
   };
 
@@ -140,7 +142,7 @@ const Families = ({ families = [], user, campProfile }) => {
       setIsDeleteModalOpen(false);
     } catch (error) {
       console.error("Error deleting family:", error);
-      showNotification("حدث خطأ أثناء محاولة حذف السجل.", "error");
+      showNotification(error.message || "تعذر حذف سجل العائلة من قاعدة البيانات.", "error");
     }
   };
 
@@ -148,7 +150,7 @@ const Families = ({ families = [], user, campProfile }) => {
     <div className="families-page-container">
       {/* التنبيهات النصية السريعة */}
       {notification && (
-        <div className={`notification-toast ${notification.type}`}>
+        <div className={`notification-toast ${notification.type}`} role={notification.type === "error" ? "alert" : "status"} aria-live="polite">
           {notification.message}
         </div>
       )}
@@ -166,10 +168,12 @@ const Families = ({ families = [], user, campProfile }) => {
           <button onClick={() => setIsImportOpen(true)} className="btn btn-secondary" title="استيراد من Excel">
             <FaUpload /> استيراد Excel
           </button>
+          <button onClick={downloadFamiliesTemplate} className="btn btn-secondary" title="تحميل قالب فارغ جاهز للتعبئة">
+            <FaDownload /> قالب الأسر الفارغ
+          </button>
           <button 
             onClick={handleOpenClearAll} 
-            className="btn btn-pdf"
-            style={{ backgroundColor: "#dc3545", borderColor: "#dc3545", color: "white" }}
+            className="btn btn-danger"
             title="مسح الكشف بالكامل"
             disabled={families.length === 0}
           >

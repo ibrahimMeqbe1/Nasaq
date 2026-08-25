@@ -10,12 +10,18 @@ export async function loginUser(username, password) {
     return { success: false, error: "يرجى إدخال اسم المستخدم وكلمة المرور." };
   }
 
+  const controller = new AbortController();
+  // Supabase Auth and the protected profile lookup may each incur a cold-start
+  // delay. Keep the browser timeout above the server-side request budget so a
+  // successful response is never discarded at the last millisecond.
+  const timeout = setTimeout(() => controller.abort(), 30000);
   try {
     const response = await fetch("/api/auth/login", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: cleanUser, password: cleanPass }),
+      signal: controller.signal,
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.success) {
@@ -29,8 +35,13 @@ export async function loginUser(username, password) {
       if (error) return { success: false, error: "تعذر إنشاء جلسة آمنة" };
     }
     return data;
-  } catch {
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      return { success: false, error: "استغرق الاتصال وقتًا طويلًا. تحقق من الإنترنت وحاول مجددًا." };
+    }
     return { success: false, error: "تعذر الاتصال بالخادم. حاول مرة أخرى." };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

@@ -154,8 +154,11 @@ const CampSettings = ({ user, campProfile, setCampProfile }) => {
             borderColor: isSubscriptionActive ? "#10b981" : "#ef4444",
             color: isSubscriptionActive ? "#a7f3d0" : "#fca5a5"
           }}>
-            <span>{isSubscriptionActive ? "🟢 اشتراك نشط" : "🔴 اشتراك منتهي"}</span>
-            <span>•</span>
+            <span className={`subscription-status-label ${isSubscriptionActive ? "is-active" : "is-expired"}`}>
+              {isSubscriptionActive ? <FaCheckCircle aria-hidden="true" /> : <FaExclamationTriangle aria-hidden="true" />}
+              {isSubscriptionActive ? "اشتراك نشط" : "اشتراك منتهي"}
+            </span>
+            <span aria-hidden="true">—</span>
             <span>انتهاء الاشتراك: {formattedExpiryDate}</span>
           </div>
         )}

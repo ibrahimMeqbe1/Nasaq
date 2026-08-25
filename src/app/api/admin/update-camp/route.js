@@ -1,16 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, isAdminConfigured } from "../../../../lib/supabaseAdmin";
-import { hashPassword } from "../../../../lib/auth";
-
-async function requireSuperAdmin(request) {
-  const header = request.headers.get("authorization") || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-  if (!token || !supabaseAdmin) return null;
-  const { data } = await supabaseAdmin.auth.getUser(token);
-  if (!data?.user) return null;
-  const { data: profile } = await supabaseAdmin.from("users").select("role").eq("id", data.user.id).maybeSingle();
-  return profile?.role === "superadmin" ? data.user : null;
-}
+import { requireSuperAdmin } from "../../../../lib/adminAuth";
+import { NEW_PASSWORD_REQUIREMENT_MESSAGE, isPasswordAllowed } from "../../../../lib/passwordPolicy";
 
 export async function POST(request) {
   try {
@@ -28,23 +19,38 @@ export async function POST(request) {
     if (!campId || !adminUsername) {
       return NextResponse.json({ success: false, error: "معرف المخيم واسم المستخدم مطلوبان" }, { status: 400 });
     }
-    if (adminPassword && adminPassword.length < 6) {
-      return NextResponse.json({ success: false, error: "كلمة المرور الجديدة يجب ألا تقل عن 6 أحرف" }, { status: 400 });
+    const campName = String(body.name || "").trim();
+    if (!campName) {
+      return NextResponse.json({ success: false, error: "اسم المخيم مطلوب" }, { status: 400 });
     }
-
-    const campPayload = {};
-    if (body.name !== undefined) campPayload.name = String(body.name).trim();
-    if (body.managerName !== undefined) campPayload.manager_name = String(body.managerName).trim();
-    if (body.managerPhone !== undefined) campPayload.phone = String(body.managerPhone).trim();
-    if (body.address !== undefined) campPayload.location = String(body.address).trim();
-    if (Object.keys(campPayload).length) {
-      const { error } = await supabaseAdmin.from("camps").update(campPayload).eq("id", campId);
-      if (error) throw error;
+    if (!/^[a-zA-Z0-9._-]{3,64}$/.test(adminUsername)) {
+      return NextResponse.json({ success: false, error: "اسم المستخدم يجب أن يكون من 3 إلى 64 حرفًا إنجليزيًا أو رقمًا" }, { status: 400 });
+    }
+    if (adminPassword && !isPasswordAllowed(adminPassword)) {
+      return NextResponse.json({ success: false, error: NEW_PASSWORD_REQUIREMENT_MESSAGE }, { status: 400 });
     }
 
     const { data: profile, error: profileError } = await supabaseAdmin
       .from("users").select("id").eq("camp_id", campId).eq("role", "admin").limit(1).maybeSingle();
-    if (profileError || !profile) throw new Error("لا يوجد حساب مدير مرتبط بهذا المخيم");
+    if (profileError) throw profileError;
+    if (!profile) {
+      return NextResponse.json({ success: false, error: "لا يوجد حساب مدير مرتبط بهذا المخيم" }, { status: 404 });
+    }
+
+    const campPayload = { name: campName };
+    if (body.managerName !== undefined) campPayload.manager_name = String(body.managerName).trim();
+    if (body.managerPhone !== undefined) campPayload.phone = String(body.managerPhone).trim();
+    if (body.address !== undefined) campPayload.location = String(body.address).trim();
+    const { data: updatedCamp, error: campError } = await supabaseAdmin
+      .from("camps")
+      .update(campPayload)
+      .eq("id", campId)
+      .select("id")
+      .maybeSingle();
+    if (campError) throw campError;
+    if (!updatedCamp) {
+      return NextResponse.json({ success: false, error: "المخيم المطلوب غير موجود" }, { status: 404 });
+    }
 
     const email = adminUsername.includes("@") ? adminUsername.toLowerCase() : `${adminUsername.toLowerCase()}@camp.com`;
     const authPayload = { email, email_confirm: true, app_metadata: { role: "admin", campId } };
@@ -52,10 +58,15 @@ export async function POST(request) {
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(profile.id, authPayload);
     if (authError) throw authError;
 
-    const userPayload = { username: adminUsername, name: body.name || campId };
-    if (adminPassword) userPayload.password = hashPassword(adminPassword);
-    const { error: userError } = await supabaseAdmin.from("users").update(userPayload).eq("id", profile.id);
+    const userPayload = { username: adminUsername, name: campName };
+    const { data: updatedUser, error: userError } = await supabaseAdmin
+      .from("users")
+      .update(userPayload)
+      .eq("id", profile.id)
+      .select("id")
+      .maybeSingle();
     if (userError) throw userError;
+    if (!updatedUser) throw new Error("تعذر تحديث حساب مدير المخيم");
 
     return NextResponse.json({ success: true, username: adminUsername });
   } catch (error) {
