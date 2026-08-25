@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, isAdminConfigured } from "../../../../lib/supabaseAdmin";
 import { requireSuperAdmin } from "../../../../lib/adminAuth";
+import { PASSWORD_REQUIREMENT_MESSAGE, isPasswordAllowed } from "../../../../lib/passwordPolicy";
 
 export async function POST(request) {
   try {
@@ -45,9 +46,9 @@ export async function POST(request) {
         { status: 400 }
       );
     }
-    if (adminPassword.length < 10 || !/[A-Za-z]/.test(adminPassword) || !/\d/.test(adminPassword)) {
+    if (!isPasswordAllowed(adminPassword)) {
       return NextResponse.json(
-        { success: false, error: "كلمة المرور يجب ألا تقل عن 10 أحرف وتحتوي حرفًا ورقمًا على الأقل." },
+        { success: false, error: PASSWORD_REQUIREMENT_MESSAGE },
         { status: 400 }
       );
     }

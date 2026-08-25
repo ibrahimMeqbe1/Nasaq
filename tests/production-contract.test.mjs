@@ -112,6 +112,22 @@ test("camp editing exposes validation errors and makes password changes opt-in",
   assert.match(updateRoute, /المخيم المطلوب غير موجود/);
 });
 
+test("camp manager passwords use the shared six-character policy", async () => {
+  const [policy, superAdmin, createRoute, updateRoute] = await Promise.all([
+    read("src/lib/passwordPolicy.js"),
+    read("src/views/SuperAdmin.jsx"),
+    read("src/app/api/admin/create-camp/route.js"),
+    read("src/app/api/admin/update-camp/route.js"),
+  ]);
+
+  assert.match(policy, /MIN_PASSWORD_LENGTH\s*=\s*6/);
+  assert.match(policy, /password\.length\s*>=\s*MIN_PASSWORD_LENGTH/);
+  assert.match(superAdmin, /minLength=\{MIN_PASSWORD_LENGTH\}/);
+  assert.match(createRoute, /isPasswordAllowed\(adminPassword\)/);
+  assert.match(updateRoute, /isPasswordAllowed\(adminPassword\)/);
+  assert.doesNotMatch(`${policy}\n${superAdmin}\n${createRoute}\n${updateRoute}`, /password\.length\s*<\s*10/);
+});
+
 test("login does not discard successful cold-start responses", async () => {
   const [authHelpers, loginRoute] = await Promise.all([
     read("src/lib/authHelpers.js"),

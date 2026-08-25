@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, isAdminConfigured } from "../../../../lib/supabaseAdmin";
 import { requireSuperAdmin } from "../../../../lib/adminAuth";
+import { NEW_PASSWORD_REQUIREMENT_MESSAGE, isPasswordAllowed } from "../../../../lib/passwordPolicy";
 
 export async function POST(request) {
   try {
@@ -25,8 +26,8 @@ export async function POST(request) {
     if (!/^[a-zA-Z0-9._-]{3,64}$/.test(adminUsername)) {
       return NextResponse.json({ success: false, error: "اسم المستخدم يجب أن يكون من 3 إلى 64 حرفًا إنجليزيًا أو رقمًا" }, { status: 400 });
     }
-    if (adminPassword && (adminPassword.length < 10 || !/[A-Za-z]/.test(adminPassword) || !/\d/.test(adminPassword))) {
-      return NextResponse.json({ success: false, error: "كلمة المرور الجديدة يجب ألا تقل عن 10 أحرف وتحتوي حرفًا ورقمًا" }, { status: 400 });
+    if (adminPassword && !isPasswordAllowed(adminPassword)) {
+      return NextResponse.json({ success: false, error: NEW_PASSWORD_REQUIREMENT_MESSAGE }, { status: 400 });
     }
 
     const { data: profile, error: profileError } = await supabaseAdmin

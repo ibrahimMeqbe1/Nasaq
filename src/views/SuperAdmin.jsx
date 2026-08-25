@@ -31,6 +31,12 @@ import {
   FaInfinity
 } from "react-icons/fa";
 import AnimatedNumber, { AnimatedDonut } from "../components/AnimatedNumber";
+import {
+  MIN_PASSWORD_LENGTH,
+  NEW_PASSWORD_REQUIREMENT_MESSAGE,
+  PASSWORD_REQUIREMENT_MESSAGE,
+  isPasswordAllowed
+} from "../lib/passwordPolicy";
 import { 
   getAllCamps, 
   createCamp, 
@@ -189,8 +195,8 @@ const SuperAdmin = ({ user, onLogout }) => {
       setError("يرجى تعبئة الحقول الإلزامية.");
       return;
     }
-    if (newCamp.adminPassword.length < 10 || !/[A-Za-z]/.test(newCamp.adminPassword) || !/\d/.test(newCamp.adminPassword)) {
-      setError("كلمة المرور يجب ألا تقل عن 10 أحرف وتحتوي حرفًا ورقمًا على الأقل.");
+    if (!isPasswordAllowed(newCamp.adminPassword)) {
+      setError(PASSWORD_REQUIREMENT_MESSAGE);
       return;
     }
 
@@ -348,8 +354,8 @@ const SuperAdmin = ({ user, onLogout }) => {
       setEditCampError("أدخل كلمة المرور الجديدة أو ألغِ خيار تغيير كلمة المرور.");
       return;
     }
-    if (adminPassword && (adminPassword.length < 10 || !/[A-Za-z]/.test(adminPassword) || !/\d/.test(adminPassword))) {
-      setEditCampError("كلمة المرور الجديدة يجب ألا تقل عن 10 أحرف وتحتوي حرفًا ورقمًا على الأقل.");
+    if (adminPassword && !isPasswordAllowed(adminPassword)) {
+      setEditCampError(NEW_PASSWORD_REQUIREMENT_MESSAGE);
       return;
     }
 
@@ -1256,10 +1262,10 @@ const SuperAdmin = ({ user, onLogout }) => {
                       <label style={{ display: "block", fontWeight: "700", fontSize: "0.82rem", color: "#334155", marginBottom: "6px" }}>كلمة المرور *</label>
                       <input 
                         type="password" 
-                        placeholder="10 أحرف مع حرف ورقم"
+                        placeholder="6 خانات على الأقل"
                         value={newCamp.adminPassword}
                         onChange={(e) => setNewCamp({ ...newCamp, adminPassword: e.target.value })}
-                        minLength={10}
+                        minLength={MIN_PASSWORD_LENGTH}
                         autoComplete="new-password"
                         required 
                         style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #cbd5e1", borderRadius: "8px", fontSize: "0.9rem", boxSizing: "border-box", backgroundColor: "white" }}
@@ -1577,10 +1583,10 @@ const SuperAdmin = ({ user, onLogout }) => {
                           <input
                             type="password"
                             name={`camp-manager-new-password-${editingCamp.id}`}
-                            placeholder="10 أحرف على الأقل، بينها حرف ورقم"
+                            placeholder="6 خانات على الأقل"
                             value={editingCamp.adminPassword}
                             onChange={(e) => setEditingCamp({ ...editingCamp, adminPassword: e.target.value })}
-                            minLength={10}
+                            minLength={MIN_PASSWORD_LENGTH}
                             autoComplete="new-password"
                             aria-label="كلمة مرور المدير الجديدة"
                             style={{ width: "100%", padding: "9px 12px", border: "1.5px solid #cbd5e1", borderRadius: "8px", fontSize: "0.9rem", boxSizing: "border-box", backgroundColor: "white" }}
