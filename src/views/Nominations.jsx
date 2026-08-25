@@ -1,13 +1,15 @@
 "use client";
 
 import React, { useState } from "react";
+import dynamic from "next/dynamic";
 import NominationTable from "../components/NominationTable";
 import NominationForm from "../components/NominationForm";
-import ExcelImportModal from "../components/ExcelImportModal";
 import { addNomination, updateNomination, deleteNomination, deleteAllNominations, batchAddNominations } from "../services/nominationService";
-import { exportNominationsToExcel } from "../utils/exportExcel";
+import { exportNominationsToExcel, downloadNominationsTemplate } from "../utils/exportExcel";
 import { exportToPDF } from "../utils/exportPDF";
-import { FaPlus, FaFileExcel, FaFilePdf, FaExclamationTriangle, FaTimes, FaUpload, FaTrash } from "react-icons/fa";
+import { FaPlus, FaFileExcel, FaFilePdf, FaExclamationTriangle, FaTimes, FaUpload, FaDownload, FaTrash, FaClipboardList } from "react-icons/fa";
+
+const ExcelImportModal = dynamic(() => import("../components/ExcelImportModal"), { ssr: false });
 
 const Nominations = ({ nominations = [], user, campProfile }) => {
   // حالات النوافذ المنبثقة
@@ -44,7 +46,7 @@ const Nominations = ({ nominations = [], user, campProfile }) => {
       setIsClearAllModalOpen(false);
     } catch (error) {
       console.error("Error clearing nominations:", error);
-      showNotification("حدث خطأ أثناء محاولة مسح الكشف.", "error");
+      showNotification(error.message || "تعذر مسح كشف الترشيحات من قاعدة البيانات.", "error");
     }
   };
 
@@ -81,7 +83,7 @@ const Nominations = ({ nominations = [], user, campProfile }) => {
       setIsFormOpen(false);
     } catch (error) {
       console.error("Error saving nomination:", error);
-      showNotification("حدث خطأ غير متوقع أثناء الحفظ. يرجى المحاولة لاحقاً.", "error");
+      showNotification(error.message || "تعذر حفظ الترشيح في قاعدة البيانات.", "error");
     }
   };
 
@@ -135,7 +137,7 @@ const Nominations = ({ nominations = [], user, campProfile }) => {
       setIsDeleteModalOpen(false);
     } catch (error) {
       console.error("Error deleting nomination:", error);
-      showNotification("حدث خطأ أثناء محاولة حذف السجل.", "error");
+      showNotification(error.message || "تعذر حذف الترشيح من قاعدة البيانات.", "error");
     }
   };
 
@@ -143,7 +145,7 @@ const Nominations = ({ nominations = [], user, campProfile }) => {
     <div className="families-page-container">
       {/* التنبيهات النصية السريعة */}
       {notification && (
-        <div className={`notification-toast ${notification.type}`}>
+        <div className={`notification-toast ${notification.type}`} role={notification.type === "error" ? "alert" : "status"} aria-live="polite">
           {notification.message}
         </div>
       )}
@@ -151,7 +153,7 @@ const Nominations = ({ nominations = [], user, campProfile }) => {
       {/* ترويسة صفحة الترشيحات */}
       <header className="page-header">
         <div className="page-header-info">
-          <h1>✏️ إدارة كشف الترشيحات المفصل</h1>
+          <h1><FaClipboardList aria-hidden="true" /> إدارة كشف الترشيحات المفصل</h1>
           <p>قائمة كاملة بالعائلات المرشحة للمساعدات في {campProfile?.name || "المخيم"} مع فلترة الحالات الصحية الخاصة والمحافظات وخيارات تصدير التقارير.</p>
         </div>
         <div className="page-header-actions">
@@ -161,10 +163,12 @@ const Nominations = ({ nominations = [], user, campProfile }) => {
           <button onClick={() => setIsImportOpen(true)} className="btn btn-secondary" title="استيراد من Excel">
             <FaUpload /> استيراد Excel
           </button>
+          <button onClick={downloadNominationsTemplate} className="btn btn-secondary" title="تحميل قالب فارغ جاهز للتعبئة">
+            <FaDownload /> قالب الترشيحات الفارغ
+          </button>
           <button 
             onClick={handleOpenClearAll} 
-            className="btn btn-pdf"
-            style={{ backgroundColor: "#dc3545", borderColor: "#dc3545", color: "white" }}
+            className="btn btn-danger"
             title="مسح الكشف بالكامل"
             disabled={nominations.length === 0}
           >
@@ -174,7 +178,6 @@ const Nominations = ({ nominations = [], user, campProfile }) => {
             onClick={() => exportNominationsToExcel(nominations, campProfile)} 
             className="btn btn-excel"
             title="تصدير Excel"
-            style={{ borderColor: "#b89647", color: "#b89647" }}
             disabled={nominations.length === 0}
           >
             <FaFileExcel /> تصدير Excel
@@ -183,7 +186,6 @@ const Nominations = ({ nominations = [], user, campProfile }) => {
             onClick={() => exportToPDF(nominations, "nominations", campProfile)} 
             className="btn btn-pdf"
             title="تصدير PDF"
-            style={{ borderColor: "#b89647", color: "#b89647" }}
             disabled={nominations.length === 0}
           >
             <FaFilePdf /> تصدير PDF / طباعة

@@ -4,7 +4,8 @@ import React, { useState, useEffect } from "react";
 import { 
   FaEdit, FaTrashAlt, FaSearch, FaUserFriends, FaMapMarkerAlt, 
   FaPhoneAlt, FaIdCard, FaEye, FaWheelchair, FaHeartbeat, 
-  FaBaby, FaFemale, FaTimes, FaMapMarkedAlt 
+  FaBaby, FaFemale, FaTimes, FaMapMarkedAlt, FaUser, FaHome,
+  FaFileAlt, FaChild, FaGraduationCap, FaCheckCircle, FaMinusCircle
 } from "react-icons/fa";
 
 const NominationTable = ({ nominations, onEdit, onDelete }) => {
@@ -330,7 +331,7 @@ const NominationTable = ({ nominations, onEdit, onDelete }) => {
                       <div style={{ fontWeight: "600" }}>{nom.governorate || "شمال غزة"}</div>
                       {nom.shelterManager && nom.shelterManager.trim() !== "" && !nom.shelterManager.includes("ربيع جمال") && (
                         <div style={{ fontSize: "0.75rem", color: "var(--primary-color)", marginTop: "2px" }}>
-                          👤 {nom.shelterManager}
+                          <FaUser aria-hidden="true" /> {nom.shelterManager}
                           {nom.shelterPhone && <span className="ltr-span" style={{ fontSize: "0.7rem", color: "#64748b", marginRight: "3px" }}>({nom.shelterPhone})</span>}
                         </div>
                       )}
@@ -339,12 +340,12 @@ const NominationTable = ({ nominations, onEdit, onDelete }) => {
                       <div>{nom.currentAddress}</div>
                       {nom.originalAddress && (
                         <div style={{ fontSize: "0.75rem", color: "var(--secondary-color)", fontWeight: "600", marginTop: "2px" }}>
-                          🏡 الأصلي: {nom.originalAddress}
+                          <FaHome aria-hidden="true" /> الأصلي: {nom.originalAddress}
                         </div>
                       )}
                       {(nom.shelterAddress || nom.shelterGps) && (
                         <div style={{ fontSize: "0.7rem", color: "#64748b", marginTop: "2px" }}>
-                          📍 {nom.shelterAddress || "مركز الإيواء"}
+                          <FaMapMarkerAlt aria-hidden="true" /> {nom.shelterAddress || "مركز الإيواء"}
                           {nom.shelterGps && (
                             <a href={nom.shelterGps} target="_blank" rel="noopener noreferrer" style={{ marginRight: "4px", textDecoration: "underline", color: "var(--primary-color)" }}>
                               (خريطة)
@@ -386,7 +387,7 @@ const NominationTable = ({ nominations, onEdit, onDelete }) => {
           </table>
         ) : (
           <div className="empty-state">
-            <div className="empty-state-icon">🔍</div>
+            <div className="empty-state-icon"><FaSearch aria-hidden="true" /></div>
             <h3>لم يتم العثور على أي ترشيحات تطابق فلاتر البحث</h3>
             <p>حاول تعديل فلاتر التصفية أو أضف ترشيحاً جديداً للنظام.</p>
           </div>
@@ -509,11 +510,11 @@ const NominationTable = ({ nominations, onEdit, onDelete }) => {
                   <div className="card-detail">
                     <span className="detail-label">تصنيفات صحية:</span>
                     <span className="detail-val">
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        {nom.hasDisabled === 1 && <span style={{ color: "#a04000", fontWeight: "bold" }}>♿ إعاقة</span>}
-                        {nom.hasChronicDisease === 1 && <span style={{ color: "#842029", fontWeight: "bold" }}>🩺 مزمن</span>}
-                        {nom.isLactatingOrPregnant === 1 && <span style={{ color: "#0f5132", fontWeight: "bold" }}>👶 حامل/مرضعة</span>}
-                        {nom.isFemaleHeaded === 1 && <span style={{ color: "#4a148c", fontWeight: "bold" }}>👩 معيل</span>}
+                      <div className="condition-tags">
+                        {nom.hasDisabled === 1 && <span><FaWheelchair aria-hidden="true" /> إعاقة</span>}
+                        {nom.hasChronicDisease === 1 && <span><FaHeartbeat aria-hidden="true" /> مزمن</span>}
+                        {nom.isLactatingOrPregnant === 1 && <span><FaBaby aria-hidden="true" /> حامل/مرضعة</span>}
+                        {nom.isFemaleHeaded === 1 && <span><FaFemale aria-hidden="true" /> معيل</span>}
                         {nom.hasDisabled !== 1 && nom.hasChronicDisease !== 1 && nom.isLactatingOrPregnant !== 1 && nom.isFemaleHeaded !== 1 && "طبيعي"}
                       </div>
                     </span>
@@ -535,7 +536,7 @@ const NominationTable = ({ nominations, onEdit, onDelete }) => {
           })
         ) : (
           <div className="empty-state">
-            <div className="empty-state-icon">🔍</div>
+            <div className="empty-state-icon"><FaSearch aria-hidden="true" /></div>
             <h3>لا توجد نتائج بحث مطابقة</h3>
           </div>
         )}
@@ -546,7 +547,7 @@ const NominationTable = ({ nominations, onEdit, onDelete }) => {
         <div className="modal-overlay">
           <div className="modal-content" style={{ maxWidth: "700px", width: "95%" }}>
             <div className="modal-header" style={{ borderBottom: "2px solid var(--primary-color)" }}>
-              <h2 style={{ color: "var(--primary-dark)" }}>📄 بطاقة تفاصيل الترشيح الكاملة</h2>
+              <h2 className="modal-title-with-icon" style={{ color: "var(--primary-dark)" }}><FaFileAlt aria-hidden="true" /> بطاقة تفاصيل الترشيح الكاملة</h2>
               <button onClick={() => setDetailNomination(null)} className="btn-close">
                 <FaTimes />
               </button>
@@ -569,7 +570,7 @@ const NominationTable = ({ nominations, onEdit, onDelete }) => {
 
                 {/* 2. الزوجات والأفراد */}
                 <div style={{ border: "1px solid #e2e8f0", padding: "15px", borderRadius: "8px" }}>
-                  <h3 style={{ margin: "0 0 10px 0", fontSize: "1rem", color: "var(--primary-dark)" }}>👩‍👩‍👦 الزوجات وأفراد الأسرة</h3>
+                  <h3 className="detail-section-title" style={{ margin: "0 0 10px 0", fontSize: "1rem", color: "var(--primary-dark)" }}><FaUserFriends aria-hidden="true" /> الزوجات وأفراد الأسرة</h3>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "12px", fontSize: "0.88rem" }}>
                     {detailNomination.wifeName && (
                       <div style={{ background: "#f8fafc", padding: "8px", borderRadius: "6px" }}>
@@ -589,23 +590,23 @@ const NominationTable = ({ nominations, onEdit, onDelete }) => {
                     <strong>إجمالي عدد أفراد الأسرة:</strong> <span className="badge-members" style={{ fontSize: "0.9rem" }}>{detailNomination.membersCount} أفراد</span>
                     <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "8px", fontSize: "0.85rem" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", background: "#f8fafc", padding: "6px 12px", borderRadius: "4px" }}>
-                        <span>👶 <strong>أطفال (0-2):</strong></span>
+                        <span className="detail-line-label"><FaBaby aria-hidden="true" /> <strong>أطفال (0-2):</strong></span>
                         <span>ذكور: {detailNomination.age_0_2_male || 0} | إناث: {detailNomination.age_0_2_female || 0}</span>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", background: "#f8fafc", padding: "6px 12px", borderRadius: "4px" }}>
-                        <span>🧒 <strong>أطفال (3-5):</strong></span>
+                        <span className="detail-line-label"><FaChild aria-hidden="true" /> <strong>أطفال (3-5):</strong></span>
                         <span>ذكور: {detailNomination.age_3_5_male || 0} | إناث: {detailNomination.age_3_5_female || 0}</span>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", background: "#f8fafc", padding: "6px 12px", borderRadius: "4px" }}>
-                        <span>🎒 <strong>أطفال (6-18):</strong></span>
+                        <span className="detail-line-label"><FaGraduationCap aria-hidden="true" /> <strong>أطفال (6-18):</strong></span>
                         <span>ذكور: {detailNomination.age_6_18_male || 0} | إناث: {detailNomination.age_6_18_female || 0}</span>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", background: "#f8fafc", padding: "6px 12px", borderRadius: "4px" }}>
-                        <span>🧑 <strong>بالغين (19-60):</strong></span>
+                        <span className="detail-line-label"><FaUser aria-hidden="true" /> <strong>بالغون (19-60):</strong></span>
                         <span>ذكور: {detailNomination.age_19_60_male || 0} | إناث: {detailNomination.age_19_60_female || 0}</span>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", background: "#f8fafc", padding: "6px 12px", borderRadius: "4px" }}>
-                        <span>🧓 <strong>مسنين (60+):</strong></span>
+                        <span className="detail-line-label"><FaUserFriends aria-hidden="true" /> <strong>كبار السن (60+):</strong></span>
                         <span>ذكور: {detailNomination.age_over_60_male || 0} | إناث: {detailNomination.age_over_60_female || 0}</span>
                       </div>
                     </div>
@@ -614,26 +615,26 @@ const NominationTable = ({ nominations, onEdit, onDelete }) => {
 
                 {/* 3. الحالات الصحية */}
                 <div style={{ border: "1px solid #e2e8f0", padding: "15px", borderRadius: "8px" }}>
-                  <h3 style={{ margin: "0 0 10px 0", fontSize: "1rem", color: "var(--primary-dark)" }}>♿ الحالات والمحددات الخاصة</h3>
+                  <h3 className="detail-section-title" style={{ margin: "0 0 10px 0", fontSize: "1rem", color: "var(--primary-dark)" }}><FaWheelchair aria-hidden="true" /> الحالات والمحددات الخاصة</h3>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "10px", fontSize: "0.9rem" }}>
                     <div style={{ color: detailNomination.hasDisabled ? "#a04000" : "#94a3b8", fontWeight: detailNomination.hasDisabled ? "bold" : "normal" }}>
-                      {detailNomination.hasDisabled ? "✔ ذوي إعاقة" : "✘ لا يوجد إعاقة"}
+                      {detailNomination.hasDisabled ? <><FaCheckCircle aria-hidden="true" /> ذوو إعاقة</> : <><FaMinusCircle aria-hidden="true" /> لا توجد إعاقة</>}
                     </div>
                     <div style={{ color: detailNomination.hasChronicDisease ? "#842029" : "#94a3b8", fontWeight: detailNomination.hasChronicDisease ? "bold" : "normal" }}>
-                      {detailNomination.hasChronicDisease ? "✔ أمراض مزمنة" : "✘ لا يوجد أمراض مزمنة"}
+                      {detailNomination.hasChronicDisease ? <><FaCheckCircle aria-hidden="true" /> أمراض مزمنة</> : <><FaMinusCircle aria-hidden="true" /> لا توجد أمراض مزمنة</>}
                     </div>
                     <div style={{ color: detailNomination.isLactatingOrPregnant ? "#0f5132" : "#94a3b8", fontWeight: detailNomination.isLactatingOrPregnant ? "bold" : "normal" }}>
-                      {detailNomination.isLactatingOrPregnant ? "✔ امرأة حامل أو مرضعة" : "✘ لا يوجد مرضعة/حامل"}
+                      {detailNomination.isLactatingOrPregnant ? <><FaCheckCircle aria-hidden="true" /> امرأة حامل أو مرضعة</> : <><FaMinusCircle aria-hidden="true" /> لا توجد حالة حمل أو رضاعة</>}
                     </div>
                     <div style={{ color: detailNomination.isFemaleHeaded ? "#4a148c" : "#94a3b8", fontWeight: detailNomination.isFemaleHeaded ? "bold" : "normal" }}>
-                      {detailNomination.isFemaleHeaded ? "✔ الأسرة تعيلها امرأة" : "✘ لا تعيلها امرأة"}
+                      {detailNomination.isFemaleHeaded ? <><FaCheckCircle aria-hidden="true" /> الأسرة تعيلها امرأة</> : <><FaMinusCircle aria-hidden="true" /> الأسرة لا تعيلها امرأة</>}
                     </div>
                   </div>
                 </div>
 
                 {/* 4. السكن والنزوح */}
                 <div style={{ border: "1px solid #e2e8f0", padding: "15px", borderRadius: "8px" }}>
-                  <h3 style={{ margin: "0 0 10px 0", fontSize: "1rem", color: "var(--primary-dark)" }}>📍 السكن والنزوح ومراكز الإيواء</h3>
+                  <h3 className="detail-section-title" style={{ margin: "0 0 10px 0", fontSize: "1rem", color: "var(--primary-dark)" }}><FaMapMarkerAlt aria-hidden="true" /> السكن والنزوح ومراكز الإيواء</h3>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "10px", fontSize: "0.88rem" }}>
                     <div><strong>السكن الحالي بالتفصيل:</strong> {detailNomination.currentAddress}</div>
                     <div><strong>السكن الأصلي:</strong> {detailNomination.originalAddress || "غير محدد"}</div>

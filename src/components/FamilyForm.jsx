@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { FaTimes, FaSave, FaUser, FaIdCard, FaPhone, FaUsers, FaMapMarkerAlt } from "react-icons/fa";
+import { FaTimes, FaSave, FaUser, FaIdCard, FaPhone, FaUsers, FaMapMarkerAlt, FaEdit, FaPlus } from "react-icons/fa";
 
 const FamilyForm = ({ isOpen, onClose, onSave, family }) => {
   const [formData, setFormData] = useState({
@@ -116,7 +116,10 @@ const FamilyForm = ({ isOpen, onClose, onSave, family }) => {
     <div className="modal-overlay">
       <div className="modal-content" style={{ maxWidth: "650px" }}>
         <div className="modal-header">
-          <h2>{family ? "✏️ تعديل بيانات العائلة" : "➕ إضافة عائلة جديدة"}</h2>
+          <h2 className="modal-title-with-icon">
+            {family ? <FaEdit aria-hidden="true" /> : <FaPlus aria-hidden="true" />}
+            {family ? "تعديل بيانات العائلة" : "إضافة عائلة جديدة"}
+          </h2>
           <button onClick={onClose} className="btn-close" title="إغلاق">
             <FaTimes />
           </button>

@@ -1,16 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { isDemoMode } from "../lib/supabase";
-import { FaUsers, FaChartPie, FaSignOutAlt, FaDatabase, FaClipboardList, FaCog, FaCampground, FaBars, FaTimes, FaUserCircle } from "react-icons/fa";
+import { FaUsers, FaChartPie, FaSignOutAlt, FaDatabase, FaClipboardList, FaCog, FaCampground } from "react-icons/fa";
 import SubscriptionCountdown from "./SubscriptionCountdown";
 
 const Navbar = ({ user, campProfile, onLogout }) => {
   const pathname = usePathname();
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
   const handleLogout = () => {
     if (onLogout) {
       onLogout();
@@ -51,37 +49,37 @@ const Navbar = ({ user, campProfile, onLogout }) => {
 
         {/* روابط التنقل الرئيسية */}
         {user && (
-          <nav className={`navbar-links ${mobileMenuOpen ? "open" : ""}`}>
+          <nav className="navbar-links" aria-label="التنقل الرئيسي">
             <Link 
               href="/" 
               className={`navbar-link ${isActive("/") ? "active" : ""}`}
-              onClick={() => setMobileMenuOpen(false)}
+              aria-current={isActive("/") ? "page" : undefined}
             >
-              <FaChartPie className="nav-icon" />
+              <FaChartPie className="nav-icon" aria-hidden="true" />
               <span>الرئيسية</span>
             </Link>
             <Link 
               href="/families" 
               className={`navbar-link ${isActive("/families") ? "active" : ""}`}
-              onClick={() => setMobileMenuOpen(false)}
+              aria-current={isActive("/families") ? "page" : undefined}
             >
-              <FaUsers className="nav-icon" />
+              <FaUsers className="nav-icon" aria-hidden="true" />
               <span>إدارة العائلات</span>
             </Link>
             <Link 
               href="/nominations" 
               className={`navbar-link ${isActive("/nominations") ? "active" : ""}`}
-              onClick={() => setMobileMenuOpen(false)}
+              aria-current={isActive("/nominations") ? "page" : undefined}
             >
-              <FaClipboardList className="nav-icon" />
+              <FaClipboardList className="nav-icon" aria-hidden="true" />
               <span>كشف الترشيحات</span>
             </Link>
             <Link 
               href="/settings" 
               className={`navbar-link ${isActive("/settings") ? "active" : ""}`}
-              onClick={() => setMobileMenuOpen(false)}
+              aria-current={isActive("/settings") ? "page" : undefined}
             >
-              <FaCog className="nav-icon" />
+              <FaCog className="nav-icon" aria-hidden="true" />
               <span>إدارة المخيم</span>
             </Link>
           </nav>
@@ -95,7 +93,7 @@ const Navbar = ({ user, campProfile, onLogout }) => {
 
           {isDemoMode && (
             <div className="demo-badge" title="بيانات توضيحية محلياً">
-              <FaDatabase className="demo-badge-icon" />
+              <FaDatabase className="demo-badge-icon" aria-hidden="true" />
               <span>وضع تجريبي</span>
             </div>
           )}
@@ -111,7 +109,7 @@ const Navbar = ({ user, campProfile, onLogout }) => {
                 className="btn-logout-icon" 
                 title="تسجيل الخروج"
               >
-                <FaSignOutAlt />
+                <FaSignOutAlt aria-hidden="true" />
                 <span>خروج</span>
               </button>
             </div>
@@ -121,32 +119,32 @@ const Navbar = ({ user, campProfile, onLogout }) => {
 
       {/* شريط التنقل السفلي الفاخر للهواتف المحمولة */}
       {user && (
-        <nav className="mobile-bottom-nav">
-          <Link href="/" className={`mobile-bottom-link ${isActive("/") ? "active" : ""}`}>
-            <FaChartPie className="mobile-nav-icon" />
+        <nav className="mobile-bottom-nav" aria-label="التنقل على الهاتف">
+          <Link href="/" className={`mobile-bottom-link ${isActive("/") ? "active" : ""}`} aria-current={isActive("/") ? "page" : undefined}>
+            <FaChartPie className="mobile-nav-icon" aria-hidden="true" />
             <span>الرئيسية</span>
           </Link>
-          <Link href="/families" className={`mobile-bottom-link ${isActive("/families") ? "active" : ""}`}>
-            <FaUsers className="mobile-nav-icon" />
+          <Link href="/families" className={`mobile-bottom-link ${isActive("/families") ? "active" : ""}`} aria-current={isActive("/families") ? "page" : undefined}>
+            <FaUsers className="mobile-nav-icon" aria-hidden="true" />
             <span>العائلات</span>
           </Link>
-          <Link href="/nominations" className={`mobile-bottom-link ${isActive("/nominations") ? "active" : ""}`}>
-            <FaClipboardList className="mobile-nav-icon" />
+          <Link href="/nominations" className={`mobile-bottom-link ${isActive("/nominations") ? "active" : ""}`} aria-current={isActive("/nominations") ? "page" : undefined}>
+            <FaClipboardList className="mobile-nav-icon" aria-hidden="true" />
             <span>الترشيحات</span>
           </Link>
           {user.role === "superadmin" ? (
-            <Link href="/super-admin" className={`mobile-bottom-link ${isActive("/super-admin") ? "active" : ""}`}>
-              <FaCampground className="mobile-nav-icon" />
+            <Link href="/super-admin" className={`mobile-bottom-link ${isActive("/super-admin") ? "active" : ""}`} aria-current={isActive("/super-admin") ? "page" : undefined}>
+              <FaCampground className="mobile-nav-icon" aria-hidden="true" />
               <span>المشرف</span>
             </Link>
           ) : (
-            <Link href="/settings" className={`mobile-bottom-link ${isActive("/settings") ? "active" : ""}`}>
-              <FaCog className="mobile-nav-icon" />
+            <Link href="/settings" className={`mobile-bottom-link ${isActive("/settings") ? "active" : ""}`} aria-current={isActive("/settings") ? "page" : undefined}>
+              <FaCog className="mobile-nav-icon" aria-hidden="true" />
               <span>المخيم</span>
             </Link>
           )}
           <button onClick={handleLogout} className="mobile-bottom-link logout-mobile-btn" title="تسجيل الخروج">
-            <FaSignOutAlt className="mobile-nav-icon logout-icon-danger" />
+            <FaSignOutAlt className="mobile-nav-icon logout-icon-danger" aria-hidden="true" />
             <span>خروج</span>
           </button>
         </nav>

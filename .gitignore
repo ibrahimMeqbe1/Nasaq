@@ -31,3 +31,9 @@ yarn-error.log*
 .next/
 scratch/
 session-fix-patch/
+
+# local design/QA artifacts
+.hallmark/
+outputs/_qa_srs/
+outputs/_qa_srs_a11y.json
+outputs/Nasaq_SRS_AR_v1.0.docx

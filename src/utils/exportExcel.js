@@ -1,5 +1,3 @@
-import * as XLSX from "xlsx";
-
 /**
  * دالة تحويل وتنسيق تواريخ الميلاد بدقة (تحويل أرقام إكسل المتسلسلة 24427 و 37046 أو ISO إلى تواريخ YYYY-MM-DD)
  */
@@ -86,7 +84,17 @@ export const cleanWifeDetails = (rawWifeName, rawWifeId) => {
  * توليد وتنزيل كشف Excel بتنسيق وتلوين مطابق 100% لتصميم الـ PDF الرسمي
  * مع ألوان الغابات الزمردية (#0f5132)، الترويسات الكحلية، وحدود الجدول، وتنسيق النص المحمي
  */
+const escapeHtml = (value) => String(value ?? "-")
+  .replaceAll("&", "&amp;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;")
+  .replaceAll('"', "&quot;")
+  .replaceAll("'", "&#039;");
+
 const downloadPdfStyledExcel = (filename, title, metaDetails, headers, rows) => {
+  const resolvedLogoUrl = metaDetails.logoUrl?.startsWith("/")
+    ? `${window.location.origin}${metaDetails.logoUrl}`
+    : metaDetails.logoUrl;
   const html = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
     <head>
@@ -170,20 +178,26 @@ const downloadPdfStyledExcel = (filename, title, metaDetails, headers, rows) => 
         .td-right { text-align: right; }
         .row-even { background-color: #ffffff; }
         .row-odd { background-color: #f8fafc; }
+        .brand-cell { width: 110px; text-align: center; vertical-align: middle; border: 2px solid #0f5132; }
+        .brand-logo { width: 76px; height: 76px; object-fit: contain; }
+        .signature { height: 90px; vertical-align: bottom; text-align: center; font-weight: 700; color: #0f5132; }
       </style>
     </head>
     <body dir="rtl">
       <table>
         <!-- 1. ترويسة اسم المنظومة والمخيم باللون الأخضر الزمردي #0f5132 -->
         <tr>
-          <td colspan="${headers.length}" class="main-header-banner">${metaDetails.campName || "نظام إدارة المخيمات"}</td>
+          <td colspan="2" rowspan="3" class="brand-cell">
+            ${resolvedLogoUrl ? `<img class="brand-logo" src="${escapeHtml(resolvedLogoUrl)}" alt="شعار المخيم" />` : "شعار المخيم"}
+          </td>
+          <td colspan="${Math.max(headers.length - 2, 1)}" class="main-header-banner">${escapeHtml(metaDetails.campName || "نظام إدارة المخيمات")}</td>
         </tr>
         <tr>
-          <td colspan="${headers.length}" class="subtitle-banner">منصة متكاملة لإدارة المخيمات بسهولة وكفاءة</td>
+          <td colspan="${Math.max(headers.length - 2, 1)}" class="subtitle-banner">كشف رسمي صادر عن إدارة المخيم</td>
         </tr>
         <tr>
-          <td colspan="${headers.length}" class="meta-row">
-            مسؤول المخيم: ${metaDetails.managerName} | جوال للتواصل: ${metaDetails.managerPhone} | التاريخ: ${metaDetails.dateStr} | إجمالي السجلات: ${metaDetails.totalCount}
+          <td colspan="${Math.max(headers.length - 2, 1)}" class="meta-row">
+            مسؤول المخيم: ${escapeHtml(metaDetails.managerName)} | جوال التواصل: ${escapeHtml(metaDetails.managerPhone)} | التاريخ: ${escapeHtml(metaDetails.dateStr)} | إجمالي السجلات: ${escapeHtml(metaDetails.totalCount)}
           </td>
         </tr>
 
@@ -193,7 +207,7 @@ const downloadPdfStyledExcel = (filename, title, metaDetails, headers, rows) => 
         <!-- 2. عنوان الكشف الرئيسي -->
         <tr>
           <td colspan="${headers.length}" style="background-color:#f4f6f4; color:#0f5132; font-size:13pt; font-weight:800; text-align:center; height:40px; border:1.5px solid #0f5132;">
-            ${title}
+            ${escapeHtml(title)}
           </td>
         </tr>
 
@@ -203,7 +217,7 @@ const downloadPdfStyledExcel = (filename, title, metaDetails, headers, rows) => 
         <!-- 3. ترويسات الجدول بنفس لون ترويسة PDF (#0f5132 مع حدود كحلية #0f172a) -->
         <thead>
           <tr>
-            ${headers.map(h => `<th class="th-pdf-style">${h}</th>`).join("")}
+            ${headers.map(h => `<th class="th-pdf-style">${escapeHtml(h)}</th>`).join("")}
           </tr>
         </thead>
 
@@ -214,11 +228,18 @@ const downloadPdfStyledExcel = (filename, title, metaDetails, headers, rows) => 
               ${row.map(cell => {
                 const alignClass = cell.isText ? "td-text-explicit" : cell.align === "center" ? "td-center" : "td-right";
                 const displayVal = cell.value !== null && cell.value !== undefined && cell.value !== "" ? String(cell.value) : "-";
-                return `<td class="td-pdf-style ${alignClass}">${displayVal}</td>`;
+                return `<td class="td-pdf-style ${alignClass}">${escapeHtml(displayVal)}</td>`;
               }).join("")}
             </tr>
           `).join("")}
         </tbody>
+        <tfoot>
+          <tr><td colspan="${headers.length}" style="height:18px;border:none"></td></tr>
+          <tr>
+            <td colspan="${Math.ceil(headers.length / 2)}" class="signature">توقيع مسؤول المخيم: ${escapeHtml(metaDetails.managerName)}<br/><br/>________________________</td>
+            <td colspan="${Math.floor(headers.length / 2)}" class="signature">الختم الرسمي<br/><br/>________________________</td>
+          </tr>
+        </tfoot>
       </table>
     </body>
     </html>
@@ -240,8 +261,8 @@ const downloadPdfStyledExcel = (filename, title, metaDetails, headers, rows) => 
  */
 export const exportToExcel = (families, campProfile = null) => {
   const campName = campProfile?.name || "نظام إدارة المخيمات";
-  const managerName = campProfile?.managerName || "ربيع جمال جودة جودة";
-  const managerPhone = campProfile?.managerPhone || "0599099693";
+  const managerName = campProfile?.managerName || "غير محدد";
+  const managerPhone = campProfile?.managerPhone || "غير محدد";
 
   const today = new Date();
   const dateStr = today.toLocaleDateString("ar-EG", {
@@ -292,6 +313,7 @@ export const exportToExcel = (families, campProfile = null) => {
     managerPhone,
     dateStr,
     totalCount: `${(families || []).length} عائلة`
+    ,logoUrl: campProfile?.logoUrl || "/nasaq-logo.png"
   };
 
   downloadPdfStyledExcel(`كشف عائلات ${campName}.xls`, title, metaDetails, headers, rows);
@@ -302,8 +324,8 @@ export const exportToExcel = (families, campProfile = null) => {
  */
 export const exportNominationsToExcel = (nominations, campProfile = null) => {
   const campName = campProfile?.name || "نظام إدارة المخيمات";
-  const managerName = campProfile?.managerName || "ربيع جمال جوده جودة";
-  const managerPhone = campProfile?.managerPhone || "0599099693";
+  const managerName = campProfile?.managerName || "غير محدد";
+  const managerPhone = campProfile?.managerPhone || "غير محدد";
 
   const today = new Date();
   const dateStr = today.toLocaleDateString("ar-EG", {
@@ -405,7 +427,23 @@ export const exportNominationsToExcel = (nominations, campProfile = null) => {
     managerPhone,
     dateStr,
     totalCount: `${(nominations || []).length} عائلة مرشحة`
+    ,logoUrl: campProfile?.logoUrl || "/nasaq-logo.png"
   };
 
   downloadPdfStyledExcel(`كشف ترشيحات ${campName}.xls`, title, metaDetails, headers, rows);
 };
+
+const downloadStaticTemplate = (url, filename) => {
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};
+
+export const downloadFamiliesTemplate = () =>
+  downloadStaticTemplate("/templates/families-template.xlsx", "قالب كشف الأسر الفارغ.xlsx");
+
+export const downloadNominationsTemplate = () =>
+  downloadStaticTemplate("/templates/nominations-template.xlsx", "قالب كشف الترشيحات الفارغ.xlsx");

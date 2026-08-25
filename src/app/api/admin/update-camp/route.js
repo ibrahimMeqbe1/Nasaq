@@ -1,16 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin, isAdminConfigured } from "../../../../lib/supabaseAdmin";
-import { hashPassword } from "../../../../lib/auth";
-
-async function requireSuperAdmin(request) {
-  const header = request.headers.get("authorization") || "";
-  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-  if (!token || !supabaseAdmin) return null;
-  const { data } = await supabaseAdmin.auth.getUser(token);
-  if (!data?.user) return null;
-  const { data: profile } = await supabaseAdmin.from("users").select("role").eq("id", data.user.id).maybeSingle();
-  return profile?.role === "superadmin" ? data.user : null;
-}
+import { requireSuperAdmin } from "../../../../lib/adminAuth";
 
 export async function POST(request) {
   try {
@@ -28,8 +18,11 @@ export async function POST(request) {
     if (!campId || !adminUsername) {
       return NextResponse.json({ success: false, error: "معرف المخيم واسم المستخدم مطلوبان" }, { status: 400 });
     }
-    if (adminPassword && adminPassword.length < 6) {
-      return NextResponse.json({ success: false, error: "كلمة المرور الجديدة يجب ألا تقل عن 6 أحرف" }, { status: 400 });
+    if (!/^[a-zA-Z0-9._-]{3,64}$/.test(adminUsername)) {
+      return NextResponse.json({ success: false, error: "اسم المستخدم يجب أن يكون من 3 إلى 64 حرفًا إنجليزيًا أو رقمًا" }, { status: 400 });
+    }
+    if (adminPassword && (adminPassword.length < 10 || !/[A-Za-z]/.test(adminPassword) || !/\d/.test(adminPassword))) {
+      return NextResponse.json({ success: false, error: "كلمة المرور الجديدة يجب ألا تقل عن 10 أحرف وتحتوي حرفًا ورقمًا" }, { status: 400 });
     }
 
     const campPayload = {};
@@ -53,7 +46,6 @@ export async function POST(request) {
     if (authError) throw authError;
 
     const userPayload = { username: adminUsername, name: body.name || campId };
-    if (adminPassword) userPayload.password = hashPassword(adminPassword);
     const { error: userError } = await supabaseAdmin.from("users").update(userPayload).eq("id", profile.id);
     if (userError) throw userError;
 

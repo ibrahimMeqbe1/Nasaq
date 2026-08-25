@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Tajawal:wght@300;400;500;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Tajawal:wght@300;400;500;700;800;900&display=swap');
 
 /* ========================================================
    نظام التصميم العصري الفاخر (Modern Luxury Design System)
@@ -111,7 +111,7 @@ body {
   gap: 12px;
   text-decoration: none;
   color: white;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .navbar-brand:hover {
@@ -181,7 +181,7 @@ body {
   display: flex;
   align-items: center;
   gap: 7px;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .navbar-link:hover {
@@ -316,7 +316,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .btn-logout-icon:hover {
@@ -912,7 +912,7 @@ select.form-control {
   font-weight: 500 !important;
   color: #0f172a !important;
   background-color: #f8fafc !important;
-  transition: all 0.2s ease !important;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease!important;
   display: block !important;
 }
 
@@ -1061,7 +1061,7 @@ select.form-control {
   color: white;
   font-family: inherit;
   font-size: 0.95rem;
-  transition: all 0.25s ease;
+  transition: color 0.25s ease, background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease, opacity 0.25s ease;
 }
 
 .input-with-icon input::placeholder {
@@ -1108,7 +1108,7 @@ select.form-control {
   padding: 6px 12px;
   border-radius: 20px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .preset-btn:hover {
@@ -1133,7 +1133,7 @@ select.form-control {
   justify-content: center;
   gap: 10px;
   box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.4);
-  transition: all 0.25s ease;
+  transition: color 0.25s ease, background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease, opacity 0.25s ease;
   margin-top: 0.5rem;
 }
 
@@ -1921,7 +1921,7 @@ select.form-control {
   text-align: center;
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   cursor: pointer;
-  transition: all 0.25s ease;
+  transition: color 0.25s ease, background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease, opacity 0.25s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2117,7 +2117,7 @@ select.form-control {
   display: inline-flex !important;
   align-items: center !important;
   gap: 6px !important;
-  transition: all 0.25s ease !important;
+  transition: color 0.25s ease, background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease, opacity 0.25s ease!important;
   box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3) !important;
   margin: 0 4px !important;
 }
@@ -2181,12 +2181,42 @@ select.form-control {
    ======================================================== */
 .super-admin-layout {
   min-height: 100vh;
+  display: grid;
+  grid-template-columns: 268px minmax(0, 1fr);
   background-color: #f8fafc;
   font-family: inherit;
   color: #1e293b;
 }
+.admin-sidebar {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-start: 0;
+  z-index: 60;
+  width: 268px;
+  display: flex;
+  flex-direction: column;
+  padding: 25px 18px 18px;
+  color: #fff;
+  background: linear-gradient(180deg, #0a3421 0%, #0d472d 58%, #092b1c 100%);
+  box-shadow: 14px 0 40px rgba(12,48,30,.12);
+}
+.admin-sidebar-brand { display: flex; align-items: center; gap: 13px; padding: 0 8px 24px; border-bottom: 1px solid rgba(255,255,255,.1); }
+.admin-sidebar-brand img { width: 58px; height: 58px; object-fit: contain; border-radius: 16px; background: #fff; padding: 3px; }
+.admin-sidebar-brand div { display: grid; gap: 2px; }
+.admin-sidebar-brand strong { font-size: 1.42rem; color: #f2cf7d; letter-spacing: .03em; }
+.admin-sidebar-brand span { font-size: .76rem; color: rgba(255,255,255,.62); }
+.admin-sidebar-nav { display: grid; gap: 7px; margin-top: 25px; }
+.admin-sidebar-nav button { position: relative; width: 100%; min-height: 49px; display: grid; grid-template-columns: 24px 1fr auto; align-items: center; gap: 10px; padding: 10px 13px; border: 0; border-radius: 13px; color: rgba(255,255,255,.68); background: transparent; font: 700 .88rem/1.3 inherit; text-align: right; cursor: pointer; transition: .18s ease; }
+.admin-sidebar-nav button:hover { color: #fff; background: rgba(255,255,255,.07); }
+.admin-sidebar-nav button.active { color: #173821; background: #f2cf7d; box-shadow: 0 10px 24px rgba(0,0,0,.16); }
+.admin-sidebar-nav button b { min-width: 23px; padding: 3px 6px; border-radius: 9px; color: #fff; background: #d83b3b; font-size: .7rem; text-align: center; }
+.admin-sidebar-foot { margin-top: auto; display: grid; gap: 10px; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.1); }
+.admin-sidebar-foot > span { display: flex; align-items: center; gap: 8px; padding: 0 10px; color: rgba(255,255,255,.7); font-size: .76rem; }
+.admin-sidebar-foot i { width: 8px; height: 8px; border-radius: 50%; background: #48d88a; box-shadow: 0 0 0 5px rgba(72,216,138,.1); }
+.admin-sidebar-foot button { min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid rgba(255,255,255,.12); border-radius: 12px; color: #fff; background: rgba(255,255,255,.06); font-family: inherit; font-weight: 700; cursor: pointer; }
 
 .super-admin-header-luxury {
+  grid-column: 2;
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
   border-bottom: 3px solid #d97706;
   padding: 1.25rem 2rem;
@@ -2198,6 +2228,7 @@ select.form-control {
   flex-wrap: wrap;
   gap: 1rem;
 }
+.admin-header-create { min-height: 42px; display: flex; align-items: center; gap: 8px; padding: 9px 15px; border: 0; border-radius: 11px; color: #fff; background: #0f5132; font-family: inherit; font-weight: 800; cursor: pointer; box-shadow: 0 7px 18px rgba(15,81,50,.2); }
 
 .super-admin-brand {
   display: flex;
@@ -2268,7 +2299,7 @@ select.form-control {
   display: flex;
   align-items: center;
   gap: 8px;
-  transition: all 0.25s ease;
+  transition: color 0.25s ease, background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease, opacity 0.25s ease;
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
@@ -2296,7 +2327,7 @@ select.form-control {
   justify-content: space-between;
   position: relative;
   overflow: hidden;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1), transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .stat-card-luxury:hover {
@@ -2385,7 +2416,7 @@ select.form-control {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
   white-space: nowrap;
 }
 
@@ -2563,7 +2594,7 @@ select.form-control {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  transition: all 0.25s ease;
+  transition: color 0.25s ease, background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease, opacity 0.25s ease;
   box-shadow: 0 4px 16px rgba(16, 185, 129, 0.35);
   margin-top: 1rem;
   font-family: inherit;
@@ -2598,7 +2629,7 @@ select.form-control {
   font-weight: 700;
   font-size: 0.88rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .btn-expired-logout-luxury:hover {
@@ -2624,6 +2655,144 @@ select.form-control {
   position: relative;
   overflow: hidden;
   direction: rtl;
+}
+
+.brand-image-3d {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 22%;
+}
+
+/* Nasaq executive control center */
+.super-admin-layout {
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at 85% 0%, rgba(15, 81, 50, .1), transparent 30rem),
+    linear-gradient(180deg, #f8faf9 0%, #f3f6f4 100%);
+  color: #17211c;
+}
+
+.super-admin-header-luxury {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  min-height: 76px;
+  padding: 12px clamp(18px, 4vw, 56px) !important;
+  background: rgba(255,255,255,.94) !important;
+  border-bottom: 1px solid rgba(15,81,50,.12) !important;
+  box-shadow: 0 8px 28px rgba(18,49,35,.06) !important;
+  backdrop-filter: blur(18px);
+}
+
+.super-admin-brand { gap: 13px !important; }
+.super-admin-brand-icon {
+  width: 50px !important;
+  height: 50px !important;
+  padding: 3px !important;
+  border-radius: 15px !important;
+  background: #fff !important;
+  box-shadow: 0 5px 18px rgba(15,81,50,.16) !important;
+}
+.super-admin-brand-icon img { width: 100%; height: 100%; object-fit: contain; border-radius: 12px; }
+.super-admin-brand-text h1 { color: #123123 !important; font-size: 1.08rem !important; letter-spacing: -.02em; }
+.super-admin-brand-text h1 span { color: #ad7d24; font-weight: 700; margin-inline-start: 6px; }
+.super-admin-brand-text .sub-title { color: #6b7b72 !important; font-size: .76rem !important; }
+.system-status-pill { background: #eef8f2 !important; border: 1px solid #cce9d7 !important; color: #17613e !important; }
+
+.super-admin-content {
+  grid-column: 2;
+  width: min(1540px, 100%);
+  max-width: 1540px !important;
+  padding: 30px clamp(16px, 3vw, 44px) 60px !important;
+}
+
+.admin-command-hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  margin-bottom: 22px;
+  padding: clamp(24px, 4vw, 42px);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 28px;
+  color: #fff;
+  background: linear-gradient(125deg, #0b3d27 0%, #0f5b39 60%, #16724a 100%);
+  box-shadow: 0 22px 52px rgba(15,81,50,.2);
+}
+.admin-command-hero::after {
+  content: "";
+  position: absolute;
+  width: 330px; height: 330px;
+  inset-inline-end: -100px; top: -190px;
+  border-radius: 50%;
+  border: 70px solid rgba(198,154,69,.13);
+}
+.admin-command-copy, .admin-command-actions { position: relative; z-index: 1; }
+.admin-command-copy { max-width: 720px; }
+.admin-eyebrow { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 13px; color: #f4d894; font-size: .82rem; font-weight: 800; }
+.admin-command-copy h2 { margin: 0; font-size: clamp(1.45rem, 3vw, 2.25rem); line-height: 1.35; font-weight: 900; letter-spacing: -.035em; }
+.admin-command-copy p { margin: 12px 0 0; color: rgba(255,255,255,.76); line-height: 1.9; font-size: .94rem; }
+.admin-command-actions { display: flex; flex-direction: column; min-width: 235px; gap: 10px; }
+.admin-command-actions button { min-height: 48px; padding: 11px 17px; border-radius: 13px; display: flex; align-items: center; justify-content: center; gap: 9px; font-family: inherit; font-weight: 800; cursor: pointer; transition: .2s ease; }
+.admin-command-actions button:hover { transform: translateY(-2px); }
+.admin-primary-action { border: 0; color: #153620; background: #f2ce79; box-shadow: 0 8px 20px rgba(0,0,0,.14); }
+.admin-secondary-action { border: 1px solid rgba(255,255,255,.2); color: #fff; background: rgba(255,255,255,.09); }
+.admin-secondary-action strong { min-width: 22px; padding: 2px 6px; border-radius: 10px; background: #dc3939; }
+
+.super-stats-grid-luxury { grid-template-columns: repeat(5, minmax(0, 1fr)) !important; gap: 14px !important; margin-bottom: 22px !important; }
+.super-stats-grid-luxury > .stat-card-luxury:nth-child(5) { display: none !important; }
+.super-stats-grid-luxury .stat-card-luxury {
+  min-height: 158px;
+  padding: 18px !important;
+  border: 1px solid #e3ebe6 !important;
+  border-radius: 18px !important;
+  box-shadow: 0 8px 25px rgba(25,56,42,.055) !important;
+}
+.super-stats-grid-luxury .stat-card-luxury:hover { transform: translateY(-3px) !important; box-shadow: 0 16px 34px rgba(25,56,42,.1) !important; }
+.super-stats-grid-luxury .stat-value { font-size: clamp(1.75rem, 2.5vw, 2.35rem) !important; color: #14291f !important; }
+.super-stats-grid-luxury .stat-label { color: #708078 !important; font-size: .76rem !important; line-height: 1.55; }
+
+.super-tabs-pill-bar {
+  display: none !important;
+}
+.super-tab-pill-btn { min-height: 46px; border-radius: 11px !important; color: #627269 !important; }
+.super-tab-pill-btn.active { color: #fff !important; background: #0f5132 !important; box-shadow: 0 7px 17px rgba(15,81,50,.2) !important; }
+.super-content-card-luxury, .super-card {
+  border: 1px solid #e0e9e3 !important;
+  border-radius: 22px !important;
+  box-shadow: 0 12px 34px rgba(25,56,42,.06) !important;
+}
+.super-admin-layout .family-table { border-radius: 14px; overflow: hidden; }
+.super-admin-layout .family-table thead th { background: #153e2a !important; color: #fff !important; border-color: #285a40 !important; font-size: .78rem !important; }
+.super-admin-layout .family-table tbody tr:hover { background: #f1f8f4 !important; }
+
+@media (max-width: 1200px) {
+  .super-stats-grid-luxury { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+@media (max-width: 760px) {
+  .super-admin-layout { display: block; }
+  .admin-sidebar { position: relative; width: auto; inset: auto; padding: 14px; }
+  .admin-sidebar-brand { padding-bottom: 12px; }
+  .admin-sidebar-brand img { width: 46px; height: 46px; }
+  .admin-sidebar-nav { display: flex; overflow-x: auto; margin-top: 12px; padding-bottom: 4px; }
+  .admin-sidebar-nav button { flex: 0 0 auto; width: auto; grid-template-columns: 20px auto auto; min-height: 43px; white-space: nowrap; }
+  .admin-sidebar-foot { display: none; }
+  .super-admin-header-luxury, .admin-command-hero { align-items: stretch !important; }
+  .super-admin-header-luxury { position: relative; flex-direction: column; }
+  .super-admin-actions { width: 100%; justify-content: space-between; }
+  .admin-command-hero { flex-direction: column; border-radius: 20px; }
+  .admin-command-actions { min-width: 0; width: 100%; }
+  .super-stats-grid-luxury { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .super-tabs-pill-bar { position: static; overflow-x: auto; flex-wrap: nowrap !important; justify-content: flex-start !important; }
+  .super-tab-pill-btn { flex: 0 0 auto !important; white-space: nowrap; }
+}
+@media (max-width: 480px) {
+  .super-stats-grid-luxury { grid-template-columns: 1fr !important; }
+  .system-status-pill { display: none !important; }
 }
 
 /* الأشكال الهندسية والجسيمات المتحركة 3D */
@@ -2859,7 +3028,7 @@ select.form-control {
   padding: 10px 14px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  transition: all 0.25s ease;
+  transition: color 0.25s ease, background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease, opacity 0.25s ease;
 }
 
 .feature-item-3d:hover {
@@ -3049,7 +3218,7 @@ select.form-control {
   font-size: 0.95rem;
   font-weight: 600;
   box-sizing: border-box;
-  transition: all 0.25s ease;
+  transition: color 0.25s ease, background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease, opacity 0.25s ease;
   outline: none;
 }
 
@@ -3132,7 +3301,7 @@ select.form-control {
   display: flex;
   align-items: center;
   gap: 8px;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: color 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   text-align: right;
 }
 
@@ -3179,7 +3348,7 @@ select.form-control {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  transition: all 0.25s ease;
+  transition: color 0.25s ease, background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease, opacity 0.25s ease;
   box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4);
   margin-top: 8px;
 }
@@ -3346,7 +3515,7 @@ select.form-control {
     font-weight: 700;
     flex: 1;
     height: 100%;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
     background: transparent;
     border: none;
     cursor: pointer;
@@ -3394,7 +3563,7 @@ select.form-control {
   /* ترويسات لوحة التحكم للهواتف */
   .dashboard-header,
   .page-header {
-    flex-direction: column !alignment;
+    flex-direction: column !important;
     text-align: center !important;
     align-items: center !important;
     gap: 1rem !important;
@@ -3725,7 +3894,7 @@ select.form-control {
   font-weight: 700;
   font-size: 0.88rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
 }
 
 .btn-upload-label:hover {
@@ -3807,7 +3976,7 @@ select.form-control {
   align-items: center;
   gap: 10px;
   box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35);
-  transition: all 0.2s ease;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
   font-family: inherit;
 }
 

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin, isAdminConfigured } from "../../../../lib/supabaseAdmin";
 import { createSessionToken, setSessionCookie } from "../../../../lib/session";
 
@@ -8,9 +9,19 @@ const invalidCredentials = () =>
     { status: 401 }
   );
 
+const fetchWithTimeout = async (url, options = {}) => {
+  const timeoutSignal = AbortSignal.timeout(12000);
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, timeoutSignal])
+    : timeoutSignal;
+  return fetch(url, { ...options, signal });
+};
+
 export async function POST(request) {
   try {
-    if (!isAdminConfigured || !supabaseAdmin) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    if (!supabaseUrl || !publishableKey) {
       return NextResponse.json(
         { success: false, error: "الخادم غير مهيأ للمصادقة" },
         { status: 503 }
@@ -25,59 +36,87 @@ export async function POST(request) {
       return invalidCredentials();
     }
 
-    // Accept the account username, camp ID, or exact camp name. The lookup runs
-    // only on the server and never exposes the users table to anonymous clients.
+    const authClient = createClient(supabaseUrl, publishableKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: { fetch: fetchWithTimeout },
+    });
+
+    // Try the normal username/email path first. This avoids multiple privileged
+    // database round-trips for the common case and keeps login responsive.
     let resolvedProfile = null;
-    const { data: usernameProfile } = await supabaseAdmin
-      .from("users")
-      .select("id, username, role, camp_id, name")
-      .ilike("username", username)
-      .maybeSingle();
-    resolvedProfile = usernameProfile;
-
-    if (!resolvedProfile) {
-      let { data: camp } = await supabaseAdmin
-        .from("camps")
-        .select("id")
-        .eq("id", username)
-        .maybeSingle();
-      if (!camp) {
-        const result = await supabaseAdmin
-          .from("camps")
-          .select("id")
-          .ilike("name", username)
-          .limit(1)
-          .maybeSingle();
-        camp = result.data;
-      }
-      if (camp?.id) {
-        const { data: campProfile } = await supabaseAdmin
-          .from("users")
-          .select("id, username, role, camp_id, name")
-          .eq("camp_id", camp.id)
-          .eq("role", "admin")
-          .limit(1)
-          .maybeSingle();
-        resolvedProfile = campProfile;
-      }
-    }
-
-    if (!resolvedProfile) return invalidCredentials();
-
-    const { data: authUserData } = await supabaseAdmin.auth.admin.getUserById(resolvedProfile.id);
-    const email = authUserData?.user?.email || `${resolvedProfile.username.toLowerCase()}@camp.com`;
-    const { data: authData, error: authError } = await supabaseAdmin.auth.signInWithPassword({
+    let email = username.includes("@") ? username : `${username}@camp.com`;
+    let { data: authData, error: authError } = await authClient.auth.signInWithPassword({
       email,
       password,
     });
 
+    // Camp ID/name login needs server-side resolution, so use it only as a
+    // fallback when direct username authentication did not succeed.
+    if ((authError || !authData?.session) && isAdminConfigured && supabaseAdmin) {
+      const { data: usernameProfile } = await supabaseAdmin
+        .from("users")
+        .select("id, username, role, camp_id, name")
+        .ilike("username", username)
+        .maybeSingle();
+      resolvedProfile = usernameProfile;
+
+      if (!resolvedProfile) {
+        let { data: camp } = await supabaseAdmin
+          .from("camps")
+          .select("id")
+          .eq("id", username)
+          .maybeSingle();
+        if (!camp) {
+          const result = await supabaseAdmin
+            .from("camps")
+            .select("id")
+            .ilike("name", username)
+            .limit(1)
+            .maybeSingle();
+          camp = result.data;
+        }
+        if (camp?.id) {
+          const { data: campProfile } = await supabaseAdmin
+            .from("users")
+            .select("id, username, role, camp_id, name")
+            .eq("camp_id", camp.id)
+            .eq("role", "admin")
+            .limit(1)
+            .maybeSingle();
+          resolvedProfile = campProfile;
+        }
+      }
+      if (!resolvedProfile) return invalidCredentials();
+      email = `${resolvedProfile.username.toLowerCase()}@camp.com`;
+      ({ data: authData, error: authError } = await authClient.auth.signInWithPassword({
+        email,
+        password,
+      }));
+    }
+
     if (authError || !authData?.user || !authData?.session) return invalidCredentials();
 
+    if (!resolvedProfile) {
+      const userClient = createClient(supabaseUrl, publishableKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+        global: {
+          fetch: fetchWithTimeout,
+          headers: { Authorization: `Bearer ${authData.session.access_token}` },
+        },
+      });
+      const { data: ownProfile } = await userClient
+        .from("users")
+        .select("id, username, role, camp_id, name")
+        .eq("id", authData.user.id)
+        .maybeSingle();
+      resolvedProfile = ownProfile;
+    }
+
     // Authorization data must come from the protected profile table, never user_metadata.
-    const profile = resolvedProfile.id === authData.user.id ? resolvedProfile : null;
+    const profile = resolvedProfile?.id === authData.user.id ? resolvedProfile : null;
 
     if (!profile || !["admin", "superadmin"].includes(profile.role)) {
-      await supabaseAdmin.auth.signOut({ scope: "local" }).catch(() => {});
+      await authClient.auth.signOut({ scope: "local" }).catch(() => {});
       return invalidCredentials();
     }
 
@@ -108,6 +147,12 @@ export async function POST(request) {
     return response;
   } catch (error) {
     console.error("Auth API login error:", error);
+    if (error?.name === "TimeoutError" || error?.name === "AbortError") {
+      return NextResponse.json(
+        { success: false, error: "تعذر الوصول إلى خدمة المصادقة خلال الوقت المحدد" },
+        { status: 504 }
+      );
+    }
     return NextResponse.json(
       { success: false, error: "تعذر تسجيل الدخول الآن" },
       { status: 500 }

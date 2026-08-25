@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { 
   FaTimes, FaSave, FaUser, FaIdCard, FaPhone, FaUsers, 
-  FaMapMarkerAlt, FaHeartbeat, FaWheelchair, FaBaby, FaFemale 
+  FaMapMarkerAlt, FaHeartbeat, FaWheelchair, FaBaby, FaFemale,
+  FaEdit, FaPlus, FaHome
 } from "react-icons/fa";
 
 const NominationForm = ({ isOpen, onClose, onSave, nomination }) => {
@@ -192,7 +193,10 @@ const NominationForm = ({ isOpen, onClose, onSave, nomination }) => {
     <div className="modal-overlay">
       <div className="modal-content" style={{ maxWidth: "750px", width: "95%" }}>
         <div className="modal-header">
-          <h2>{nomination ? "✏️ تعديل بيانات الترشيح" : "➕ إضافة ترشيح جديد"}</h2>
+          <h2 className="modal-title-with-icon">
+            {nomination ? <FaEdit aria-hidden="true" /> : <FaPlus aria-hidden="true" />}
+            {nomination ? "تعديل بيانات الترشيح" : "إضافة ترشيح جديد"}
+          </h2>
           <button onClick={onClose} className="btn-close" title="إغلاق">
             <FaTimes />
           </button>
@@ -214,7 +218,7 @@ const NominationForm = ({ isOpen, onClose, onSave, nomination }) => {
               cursor: "pointer"
             }}
           >
-            👤 بيانات رب الأسرة
+            <FaUser aria-hidden="true" /> بيانات رب الأسرة
           </button>
           <button 
             type="button" 
@@ -230,7 +234,7 @@ const NominationForm = ({ isOpen, onClose, onSave, nomination }) => {
               cursor: "pointer"
             }}
           >
-            👩‍👩‍👦 الزوجات والأفراد
+            <FaUsers aria-hidden="true" /> الزوجات والأفراد
           </button>
           <button 
             type="button" 
@@ -246,7 +250,7 @@ const NominationForm = ({ isOpen, onClose, onSave, nomination }) => {
               cursor: "pointer"
             }}
           >
-            ♿ الحالات الخاصة
+            <FaWheelchair aria-hidden="true" /> الحالات الخاصة
           </button>
           <button 
             type="button" 
@@ -262,7 +266,7 @@ const NominationForm = ({ isOpen, onClose, onSave, nomination }) => {
               cursor: "pointer"
             }}
           >
-            📍 السكن والإيواء
+            <FaHome aria-hidden="true" /> السكن والإيواء
           </button>
         </div>
 

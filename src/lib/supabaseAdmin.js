@@ -11,6 +11,14 @@ const serviceRoleKey =
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
   "";
 
+const fetchWithTimeout = async (url, options = {}) => {
+  const timeoutSignal = AbortSignal.timeout(12000);
+  const signal = options.signal
+    ? AbortSignal.any([options.signal, timeoutSignal])
+    : timeoutSignal;
+  return fetch(url, { ...options, signal });
+};
+
 export const isAdminConfigured = Boolean(supabaseUrl && serviceRoleKey);
 
 export const supabaseAdmin = isAdminConfigured
@@ -19,5 +27,6 @@ export const supabaseAdmin = isAdminConfigured
         autoRefreshToken: false,
         persistSession: false,
       },
+      global: { fetch: fetchWithTimeout },
     })
   : null;

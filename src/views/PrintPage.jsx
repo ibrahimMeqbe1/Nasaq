@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { FaLightbulb, FaPrint } from "react-icons/fa";
 
 const PrintPage = () => {
   const [data, setData] = useState([]);
@@ -9,9 +10,9 @@ const PrintPage = () => {
 
   useEffect(() => {
     // جلب البيانات المخزنة للطباعة
-    const printData = localStorage.getItem("kareem_camp_print_data");
-    const printType = localStorage.getItem("kareem_camp_print_type") || "families";
-    const printProfile = localStorage.getItem("kareem_camp_print_profile");
+    const printData = sessionStorage.getItem("kareem_camp_print_data");
+    const printType = sessionStorage.getItem("kareem_camp_print_type") || "families";
+    const printProfile = sessionStorage.getItem("kareem_camp_print_profile");
     
     let activeProfile = null;
     if (printProfile) {
@@ -30,6 +31,9 @@ const PrintPage = () => {
       setData(JSON.parse(printData));
     }
     setType(printType);
+    sessionStorage.removeItem("kareem_camp_print_data");
+    sessionStorage.removeItem("kareem_camp_print_type");
+    sessionStorage.removeItem("kareem_camp_print_profile");
     
     // تشغيل نافذة الطباعة تلقائياً بعد رندر بيانات الصفحة بالكامل للجوال والكمبيوتر
     const timer = setTimeout(() => {
@@ -48,6 +52,7 @@ const PrintPage = () => {
 
   const totalCount = data.length;
   const totalMembers = data.reduce((sum, item) => sum + (parseInt(item.membersCount) || 0), 0);
+  const reportReference = `${campProfile?.id || "CAMP"}-${type === "nominations" ? "NOM" : "FAM"}-${today.toISOString().slice(0, 10).replaceAll("-", "")}`;
 
   // إحصائيات الترشيحات الخاصة بالطباعة
   const isPos = (v) => v === 1 || v === "1" || v === true || v === "true" || v === "نعم";
@@ -196,6 +201,16 @@ const PrintPage = () => {
             page-break-inside: avoid !important;
             page-break-after: auto;
           }
+          table.print-table thead {
+            display: table-header-group !important;
+          }
+          table.print-table tfoot {
+            display: table-footer-group !important;
+          }
+          .header, .report-title-bar, .stats-summary, .footer {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
           table.print-table th, table.print-table td {
             line-height: 1.45 !important;
             word-wrap: break-word !important;
@@ -255,8 +270,9 @@ const PrintPage = () => {
         gap: "10px",
         boxShadow: "0 4px 15px rgba(15, 81, 50, 0.25)"
       }}>
-        <div style={{ fontSize: "0.88rem", fontWeight: "700" }}>
-          💡 <span style={{ color: "#fef08a" }}>تلميح للطباعة من الجوال:</span> يرجى التأكد من تفعيل وضع <strong>"أفقي (Landscape)"</strong> في خيارات حفظ الـ PDF من هاتفك للحصول على أفضل قراءة احترافية لكافة الأعمدة.
+        <div style={{ fontSize: "0.88rem", fontWeight: "700", display: "flex", alignItems: "flex-start", gap: "8px" }}>
+          <FaLightbulb aria-hidden="true" style={{ marginTop: "4px", flexShrink: 0 }} />
+          <span><span style={{ color: "#fef08a" }}>تلميح للطباعة من الجوال:</span> يرجى التأكد من تفعيل وضع <strong>"أفقي (Landscape)"</strong> في خيارات حفظ الـ PDF من هاتفك للحصول على أفضل قراءة احترافية لكافة الأعمدة.</span>
         </div>
         <button 
           onClick={() => window.print()}
@@ -272,14 +288,14 @@ const PrintPage = () => {
             boxShadow: "0 4px 10px rgba(0,0,0,0.2)"
           }}
         >
-          🖨️ بدء الطباعة / حفظ PDF
+          <FaPrint aria-hidden="true" style={{ marginLeft: "8px" }} /> بدء الطباعة / حفظ PDF
         </button>
       </div>
 
       {/* الترويسة الرئيسية */}
       <div className="header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "3px double #0f5132", paddingBottom: "15px", marginBottom: "25px" }}>
         <div className="logo-section" style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-          <img className="logo" src={campProfile?.logoUrl || "/logo.jpg"} alt="شعار المخيم" style={{ width: "75px", height: "75px", objectFit: "contain", borderRadius: "50%", border: "2px solid #b89647" }} onError={(e) => e.target.style.display = 'none'} />
+          <img className="logo" src={campProfile?.logoUrl || "/nasaq-logo.png"} alt={`شعار ${campProfile?.name || "المخيم"}`} style={{ width: "82px", height: "82px", objectFit: "contain", borderRadius: "18px", border: "2px solid #b89647", padding: "3px", background: "#fff" }} onError={(e) => { e.currentTarget.src = "/nasaq-logo.png"; }} />
           <div className="camp-title">
             <h1 style={{ fontSize: "18pt", color: "#0f5132", margin: 0, fontWeight: 700 }}>{campProfile?.name || "نظام إدارة المخيمات"}</h1>
             <p style={{ fontSize: "10pt", color: "#b89647", margin: "5px 0 0 0", fontWeight: 600 }}>منصة متكاملة لإدارة المخيمات بسهولة وكفاءة</p>
@@ -290,6 +306,7 @@ const PrintPage = () => {
           <p><span style={{ fontWeight: "bold", color: "#0f5132" }}>رقم الجوال:</span> {campProfile?.managerPhone || "غير محدد"}</p>
           <p><span style={{ fontWeight: "bold", color: "#0f5132" }}>التاريخ:</span> {dateStr}</p>
           <p><span style={{ fontWeight: "bold", color: "#0f5132" }}>الموقع:</span> {campProfile?.address || "غير محدد"}</p>
+          <p><span style={{ fontWeight: "bold", color: "#0f5132" }}>مرجع الكشف:</span> <span dir="ltr">{reportReference}</span></p>
         </div>
       </div>
 
@@ -432,20 +449,20 @@ const PrintPage = () => {
                   <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt", backgroundColor: "rgba(255, 140, 0, 0.02)" }}>{ages.aOver60m}</td>
                   <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt", backgroundColor: "rgba(255, 140, 0, 0.02)" }}>{ages.aOver60f}</td>
                   
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt" }}>{hasDis ? "✔" : "-"}</td>
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt" }}>{hasChr ? "✔" : "-"}</td>
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt" }}>{hasPreg ? "✔" : "-"}</td>
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt" }}>{hasFem ? "✔" : "-"}</td>
+                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt" }}>{hasDis ? "نعم" : "-"}</td>
+                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt" }}>{hasChr ? "نعم" : "-"}</td>
+                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt" }}>{hasPreg ? "نعم" : "-"}</td>
+                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt" }}>{hasFem ? "نعم" : "-"}</td>
 
                   {/* المحافظة / المندوب */}
                   <td style={{ padding: "4px 3px", border: "1px solid #cbd5e1", fontSize: "7.5pt", lineHeight: "1.35", wordBreak: "break-word" }}>
                     <div style={{ fontWeight: "bold", color: "#0f5132", marginBottom: "2px" }}>{nom.governorate || "شمال غزة"}</div>
                     {nom.shelterManager && (
                       <div style={{ fontSize: "6.8pt", color: "#334155" }}>
-                        <div style={{ fontWeight: "600", color: "#0f5132" }}>👤 {nom.shelterManager}</div>
+                        <div style={{ fontWeight: "600", color: "#0f5132" }}>المندوب: {nom.shelterManager}</div>
                         {nom.shelterPhone && (
                           <div style={{ fontSize: "6.5pt", color: "#64748b", marginTop: "1px" }}>
-                            📱 <span style={{ direction: "ltr", display: "inline-block" }}>{nom.shelterPhone}</span>
+                            هاتف: <span style={{ direction: "ltr", display: "inline-block" }}>{nom.shelterPhone}</span>
                           </div>
                         )}
                         {nom.shelterPhoneAlt && (
@@ -463,7 +480,7 @@ const PrintPage = () => {
                     {nom.originalAddress && <div style={{ fontSize: "6.8pt", color: "#b89647", fontWeight: "600", marginBottom: "2px" }}>الأصلي: {nom.originalAddress}</div>}
                     {(nom.shelterAddress || nom.shelterGps) && (
                       <div style={{ fontSize: "6.5pt", color: "#64748b", marginTop: "1px" }}>
-                        📍 {nom.shelterAddress || "مركز الإيواء"} {nom.shelterGps && `(خريطة)`}
+                        مركز الإيواء: {nom.shelterAddress || "غير محدد"} {nom.shelterGps && `(خريطة)`}
                       </div>
                     )}
                   </td>
@@ -522,7 +539,7 @@ const PrintPage = () => {
         </div>
         <div>
           <div className="signature-box" style={{ borderTop: "1px dashed #94a3b8", width: "200px", textAlign: "center", paddingTop: "10px", marginTop: "40px" }}>
-            توقيع وختم إدارة المخيم
+            توقيع مسؤول المخيم: {campProfile?.managerName || "غير محدد"}
           </div>
         </div>
       </div>
@@ -537,7 +554,7 @@ const PrintPage = () => {
         color: "#64748b",
         fontWeight: "600"
       }}>
-        تم تطوير هذا النظام بواسطة Eng: Ibrahim Meqbel &nbsp;&nbsp;|&nbsp;&nbsp; للتواصل: <span style={{ direction: "ltr", display: "inline-block" }}>+970597163242</span>
+        نَسَق | منصة إدارة المخيمات والاستجابة الإنسانية &nbsp;&nbsp;•&nbsp;&nbsp; كشف صادر إلكترونيًا بتاريخ {dateStr}
       </div>
     </div>
   );

@@ -185,7 +185,7 @@ const FamilyTable = ({ families, onEdit, onDelete }) => {
           </table>
         ) : (
           <div className="empty-state">
-            <div className="empty-state-icon">🔍</div>
+            <div className="empty-state-icon"><FaSearch aria-hidden="true" /></div>
             <h3>لم يتم العثور على أي عائلات تطابق بحثك</h3>
             <p>حاول إدخال تفاصيل أخرى أو أضف عائلة جديدة للنظام.</p>
           </div>
@@ -337,7 +337,7 @@ const FamilyTable = ({ families, onEdit, onDelete }) => {
           })
         ) : (
           <div className="empty-state">
-            <div className="empty-state-icon">🔍</div>
+            <div className="empty-state-icon"><FaSearch aria-hidden="true" /></div>
             <h3>لا توجد نتائج بحث مطابقة</h3>
           </div>
         )}

@@ -20,6 +20,7 @@ export const AppProvider = ({ children }) => {
   const [families, setFamilies] = useState([]);
   const [nominations, setNominations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [dataError, setDataError] = useState("");
   const [showDeveloperModal, setShowDeveloperModal] = useState(false);
 
   const [campProfile, setCampProfile] = useState(null);
@@ -75,18 +76,28 @@ export const AppProvider = ({ children }) => {
 
   // 3. جلب بيانات العائلات والترشيحات والاشتراك الفوري
   useEffect(() => {
-    if (!user) {
+    if (!user || user.role === "superadmin") {
       setFamilies([]);
       setNominations([]);
+      setDataError("");
       return;
     }
 
     const targetCampId = (user.campId && user.campId !== "system") ? user.campId : "kareem";
 
-    const unsubscribeFamilies = subscribeFamilies(targetCampId, (data) => {
+    const unsubscribeFamilies = subscribeFamilies(targetCampId, (data, error) => {
+      if (error) {
+        setDataError("تعذر مزامنة بيانات العائلات مع الخادم. لن تُعرض بيانات تجريبية بدلًا منها.");
+        return;
+      }
       setFamilies(data || []);
+      setDataError("");
     });
-    const unsubscribeNominations = subscribeNominations(targetCampId, (data) => {
+    const unsubscribeNominations = subscribeNominations(targetCampId, (data, error) => {
+      if (error) {
+        setDataError("تعذر مزامنة كشف الترشيحات مع الخادم. تحقق من الاتصال أو أعد تسجيل الدخول.");
+        return;
+      }
       setNominations(data || []);
     });
 
@@ -157,6 +168,7 @@ export const AppProvider = ({ children }) => {
     campProfile,
     setCampProfile,
     isSubscriptionExpired,
+    dataError,
     handleLogout
   };
 
@@ -209,6 +221,11 @@ export const AppProvider = ({ children }) => {
     <AppContext.Provider value={contextValue}>
       {user && <Navbar user={user} campProfile={campProfile} onLogout={handleLogout} />}
       {user && <AnnouncementBar />}
+      {dataError && (
+        <div className="system-data-alert" role="alert">
+          {dataError}
+        </div>
+      )}
       <main className="main-content-layout">
         {children}
       </main>

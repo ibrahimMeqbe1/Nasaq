@@ -10,12 +10,15 @@ export async function loginUser(username, password) {
     return { success: false, error: "يرجى إدخال اسم المستخدم وكلمة المرور." };
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
   try {
     const response = await fetch("/api/auth/login", {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: cleanUser, password: cleanPass }),
+      signal: controller.signal,
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.success) {
@@ -29,8 +32,13 @@ export async function loginUser(username, password) {
       if (error) return { success: false, error: "تعذر إنشاء جلسة آمنة" };
     }
     return data;
-  } catch {
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      return { success: false, error: "استغرق الاتصال وقتًا طويلًا. تحقق من الإنترنت وحاول مجددًا." };
+    }
     return { success: false, error: "تعذر الاتصال بالخادم. حاول مرة أخرى." };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

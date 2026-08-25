@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { FaLock, FaCheckCircle, FaExclamationTriangle, FaUniversity, FaMobileAlt, FaWallet, FaPaperPlane, FaWhatsapp } from "react-icons/fa";
+import { FaLock, FaCheckCircle, FaExclamationTriangle, FaUniversity, FaMobileAlt, FaWallet, FaPaperPlane, FaWhatsapp, FaCampground, FaCreditCard } from "react-icons/fa";
 import { getPaymentMethods, submitRenewalRequest } from "../services/campService";
 
 const SubscriptionExpired = ({ user, campProfile, onLogout }) => {
@@ -60,19 +60,19 @@ const SubscriptionExpired = ({ user, campProfile, onLogout }) => {
 
       // 2. إعداد رسالة الواتساب الاحترافية المباشرة للمهندس إبراهيم مقبل
       const messageText =
-        `السلام عليكم ورحمة الله وبركاته 🌿
+        `السلام عليكم ورحمة الله وبركاته
 الأستاذ م. إبراهيم مقبل،
 
 تم إرسال إثبات دفع جديد لتجديد اشتراك لوحة المخيم:
 ----------------------------------------
-⛺ *المخيم:* ${currentCampName}
-🔑 *معرف المخيم:* ${currentCampId}
-👤 *مسؤول المخيم:* ${managerName}
-💳 *طريقة الدفع:* ${chosenMethodName}
-🔢 *رقم المعاملة / السند (TxID):* ${txId}
-💰 *المبلغ المحول:* ${amount}
-${notes ? `📝 *ملاحظات:* ${notes}\n` : ''}----------------------------------------
-يرجى المراجعة وتأكيد تفعيل اشتراك اللوحة الرقمية. وشكراً لجهودكم! ✨`;
+*المخيم:* ${currentCampName}
+*معرف المخيم:* ${currentCampId}
+*مسؤول المخيم:* ${managerName}
+*طريقة الدفع:* ${chosenMethodName}
+*رقم المعاملة / السند (TxID):* ${txId}
+*المبلغ المحول:* ${amount}
+${notes ? `*ملاحظات:* ${notes}\n` : ''}----------------------------------------
+يرجى المراجعة وتأكيد تفعيل اشتراك اللوحة الرقمية. وشكراً لجهودكم.`;
 
       const whatsappUrl = `https://wa.me/${whatsappCleanNumber}?text=${encodeURIComponent(messageText)}`;
 
@@ -118,8 +118,8 @@ ${notes ? `📝 *ملاحظات:* ${notes}\n` : ''}-----------------------------
           </div>
           <h1>انتهت صلاحية اشتراك لوحة التحكم!</h1>
           <div className="camp-expired-info-badge">
-            <span>⛺ مخيم {campProfile?.name || user?.name || "المخيم الحالي"}</span>
-            <span>•</span>
+            <span><FaCampground aria-hidden="true" /> مخيم {campProfile?.name || user?.name || "المخيم الحالي"}</span>
+            <span aria-hidden="true">—</span>
             <span>المنظومة غير نشطة حالياً</span>
           </div>
         </div>
@@ -146,8 +146,8 @@ ${notes ? `📝 *ملاحظات:* ${notes}\n` : ''}-----------------------------
 
           {/* طرق الدفع المتوفرة */}
           <div style={{ marginBottom: "1.8rem" }}>
-            <h3 style={{ fontSize: "1.05rem", fontWeight: "800", color: "#0f172a", marginBottom: "1rem" }}>
-              💳 الحسابات وقنوات الدفع الرسمية للتجديد:
+            <h3 style={{ fontSize: "1.05rem", fontWeight: "800", color: "#0f172a", marginBottom: "1rem", display: "flex", alignItems: "center", gap: "8px" }}>
+              <FaCreditCard aria-hidden="true" /> الحسابات وقنوات الدفع الرسمية للتجديد:
             </h3>
 
             {methods ? (

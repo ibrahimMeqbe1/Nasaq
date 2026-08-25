@@ -2,8 +2,72 @@
 
 import React, { useState, useRef } from "react";
 import { FaFileExcel, FaEye, FaSave, FaTimes, FaExclamationTriangle } from "react-icons/fa";
-import * as XLSX from "xlsx";
+import readXlsxFile from "read-excel-file/browser";
 import { formatDateForExcel } from "../utils/exportExcel";
+
+const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
+const MAX_IMPORT_ROWS = 10000;
+
+const unwrapExcelCell = (value) => {
+  if (value === null || value === undefined) return "";
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (typeof value !== "object") return value;
+  if (value.result !== undefined) return unwrapExcelCell(value.result);
+  if (Array.isArray(value.richText)) return value.richText.map((part) => part.text || "").join("");
+  if (value.text !== undefined) return value.text;
+  if (value.hyperlink !== undefined) return value.text || value.hyperlink;
+  return String(value);
+};
+
+const parseCsv = (text) => {
+  const source = text.replace(/^\uFEFF/, "");
+  const firstLine = source.split(/\r?\n/, 1)[0] || "";
+  const delimiter = [",", ";", "\t"].sort(
+    (a, b) => firstLine.split(b).length - firstLine.split(a).length
+  )[0];
+  const rows = [];
+  let row = [];
+  let cell = "";
+  let quoted = false;
+
+  for (let index = 0; index < source.length; index += 1) {
+    const char = source[index];
+    const next = source[index + 1];
+    if (char === '"' && quoted && next === '"') {
+      cell += '"';
+      index += 1;
+    } else if (char === '"') {
+      quoted = !quoted;
+    } else if (char === delimiter && !quoted) {
+      row.push(cell);
+      cell = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(cell);
+      rows.push(row);
+      row = [];
+      cell = "";
+    } else {
+      cell += char;
+    }
+  }
+  row.push(cell);
+  if (row.some((value) => String(value).trim())) rows.push(row);
+  return rows;
+};
+
+const readImportRows = async (file, arrayBuffer) => {
+  const extension = file.name.split(".").pop()?.toLowerCase();
+  if (extension === "csv") {
+    return parseCsv(new TextDecoder("utf-8").decode(arrayBuffer));
+  }
+  if (extension !== "xlsx") {
+    throw new Error("يدعم النظام ملفات XLSX وCSV فقط.");
+  }
+
+  const rows = await readXlsxFile(file);
+  return rows.map((row) => row.map(unwrapExcelCell));
+};
 
 const ExcelImportModal = ({ isOpen, onClose, campId, onImportComplete, importType = "families" }) => {
   const [step, setStep] = useState(1); // 1: Upload, 2: Map, 3: Preview & Confirm
@@ -35,10 +99,12 @@ const ExcelImportModal = ({ isOpen, onClose, campId, onImportComplete, importTyp
     idNumber: { label: "رقم الهوية", required: true, aliases: ["رقم الهوية", "رقم هوية رب الأسرة", "رقم هوية رب الاسرة", "هوية رب الاسرة", "هوية رب الأسرة", "الهوية"] },
     phone: { label: "رقم الجوال", required: true, aliases: ["رقم الجوال", "جوال", "الجوال", "رقم الهاتف", "الهاتف", "رقم الهاتف / الجوال"] },
     phoneAlt: { label: "رقم الجوال البديل", required: false, aliases: ["رقم الجوال البديل", "الجوال البديل", "هاتف بديل", "رقم الهاتف البديل", "الهاتف البديل", "رقم الجوال الثاني"] },
+    dob: { label: "تاريخ ميلاد رب الأسرة", required: false, aliases: ["تاريخ ميلاد رب الأسرة", "تاريخ الميلاد", "تاريخ ميلاد", "الميلاد"] },
     gender: { label: "الجنس", required: false, aliases: ["الجنس ( ذكر / انثى )", "الجنس (ذكر / انثى)", "الجنس", "نوع الجنس", "النوع"] },
     status: { label: "الحالة الاجتماعية", required: false, aliases: ["الحالة الاجتماعية ( متزوج/ة - ارمل/ه - مطلق/ة - متعدد )", "الحالة الاجتماعية", "الحالة", "الوضع الاجتماعي"] },
     wifeName: { label: "اسم الزوجة الأولى رباعي", required: false, aliases: ["اسم الزوجة رباعي", "اسم الزوجة الأولى رباعي", "اسم الزوجة", "اسم الزوجه رباعي", "اسم الزوجه", "الزوجة الأولى", "الزوجة"] },
     wifeId: { label: "رقم هوية الزوجة الأولى", required: false, aliases: ["رقم هوية الزوجة", "هوية الزوجة الأولى", "رقم هوية الزوجة الاولى", "هوية الزوجة", "رقم هوية الزوجه"] },
+    wifeDob: { label: "تاريخ ميلاد الزوجة", required: false, aliases: ["تاريخ ميلاد الزوجة", "تاريخ ميلاد الزوجة الأولى", "ميلاد الزوجة"] },
     wife2Name: { label: "اسم الزوجة الثانية رباعي", required: false, aliases: ["اسم الزوجة الثانية رباعي", "اسم الزوجة الثانية", "الزوجة الثانية"] },
     wife2Id: { label: "رقم هوية الزوجة الثانية", required: false, aliases: ["هوية الزوجة الثانية", "رقم هوية الزوجة الثانية"] },
     membersCount: { label: "إجمالي أفراد الأسرة", required: false, aliases: ["إجمالي أفراد الأسرة", "عدد أفراد الأسرة", "الأفراد", "الافراد", "اجمالي عدد أفراد الأسرة", "عدد الأفراد", "العدد"] },
@@ -88,20 +154,23 @@ const ExcelImportModal = ({ isOpen, onClose, campId, onImportComplete, importTyp
     const file = e.target.files[0];
     if (!file) return;
 
+    if (file.size > MAX_IMPORT_BYTES) {
+      setError("حجم الملف أكبر من 10 ميغابايت. قسّم الكشف ثم أعد المحاولة.");
+      e.target.value = "";
+      return;
+    }
+
     setFileName(file.name);
     setError("");
     setLoading(true);
 
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = async (evt) => {
       try {
-        const data = evt.target.result;
-        const workbook = XLSX.read(data, { type: "binary" });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        
-        // جلب البيانات كمصفوفة صفوف
-        const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        const rows = await readImportRows(file, evt.target.result);
+        if (rows.length > MAX_IMPORT_ROWS + 15) {
+          throw new Error("يحتوي الملف على أكثر من 10,000 سجل. قسّم الكشف ثم أعد المحاولة.");
+        }
 
         // البحث الذكي عن صف الترويسة الأنسب بأسماء الحقول بدلاً من الاعتماد فقط على امتلاء الخلايا
         let headerRowIndex = -1;
@@ -236,12 +305,16 @@ const ExcelImportModal = ({ isOpen, onClose, campId, onImportComplete, importTyp
         setColumnMapping(initialMapping);
         setStep(2);
       } catch (err) {
-        setError("فشل في قراءة ملف Excel. تأكد من أن الملف سليم وغير محمي.");
+        setError(err?.message || "فشل في قراءة الملف. تأكد من أن الملف سليم وغير محمي.");
       } finally {
         setLoading(false);
       }
     };
-    reader.readAsBinaryString(file);
+    reader.onerror = () => {
+      setError("تعذر قراءة الملف من الجهاز. أعد اختياره وحاول مرة أخرى.");
+      setLoading(false);
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   // المضي قدماً خطوة المعاينة
@@ -381,12 +454,12 @@ const ExcelImportModal = ({ isOpen, onClose, campId, onImportComplete, importTyp
                 type="file" 
                 ref={fileInputRef} 
                 onChange={handleFileChange} 
-                accept=".xlsx, .xls, .csv" 
+                accept=".xlsx, .csv"
                 style={{ display: "none" }} 
               />
               <FaFileExcel className="upload-zone-icon" />
               <h3>اسحب ملف Excel هنا أو اضغط للاختيار</h3>
-              <p>يدعم ملفات بصيغة .xlsx أو .xls أو .csv</p>
+              <p>يدعم ملفات بصيغة .xlsx أو .csv حتى 10 ميغابايت</p>
               {loading && <div className="spinner mt-3">جاري قراءة الملف...</div>}
             </div>
           )}

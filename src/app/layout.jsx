@@ -5,8 +5,25 @@ import "../index.css";
 import "../views/PerformanceDashboard.css";
 
 export const metadata = {
-  title: "نظام إدارة المخيمات | المنصة المتكاملة لإدارة العائلات والترشيحات",
-  description: "لوحة التحكم الرئيسية والمنصة المتكاملة لإدارة سجلات المخيمات والعائلات والترشيحات الإغاثية",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
+  title: {
+    default: "نَسَق | منصة إدارة المخيمات والاستجابة الإنسانية",
+    template: "%s | نَسَق",
+  },
+  description: "منصة مؤسسية آمنة لإدارة المخيمات، سجلات العائلات، الترشيحات الإغاثية والتقارير التشغيلية.",
+  applicationName: "نَسَق",
+  keywords: ["إدارة المخيمات", "الاستجابة الإنسانية", "إدارة الإغاثة", "سجلات العائلات"],
+  icons: {
+    icon: "/nasaq-logo.png",
+    apple: "/nasaq-logo.png",
+  },
+  openGraph: {
+    title: "نَسَق | منصة إدارة المخيمات والاستجابة الإنسانية",
+    description: "إدارة موثوقة للمخيمات والبيانات الإنسانية من منصة واحدة.",
+    images: ["/nasaq-logo.png"],
+    locale: "ar_PS",
+    type: "website",
+  },
 };
 
 export default function RootLayout({ children }) {
@@ -27,4 +44,3 @@ export default function RootLayout({ children }) {
     </html>
   );
 }
-
