@@ -66,10 +66,10 @@ test("UI source uses SVG icon components instead of emoji controls", async () =>
 });
 
 test("responsive and security contracts are configured", async () => {
-  const [tokens, nextConfig, proxy] = await Promise.all([
+  const [tokens, nextConfig, middleware] = await Promise.all([
     read("tokens.css"),
     read("next.config.mjs"),
-    read("src/proxy.js"),
+    read("src/middleware.js"),
   ]);
   assert.match(tokens, /@media \(max-width: 39\.99rem\)/);
   assert.match(tokens, /min-block-size:\s*2\.75rem/);
@@ -77,8 +77,8 @@ test("responsive and security contracts are configured", async () => {
   assert.match(nextConfig, /Content-Security-Policy/);
   assert.match(nextConfig, /Strict-Transport-Security/);
   assert.match(nextConfig, /frame-ancestors 'none'/);
-  assert.match(proxy, /export async function proxy/);
-  assert.match(proxy, /jwtVerify/);
+  assert.match(middleware, /export async function middleware/);
+  assert.match(middleware, /jwtVerify/);
 });
 
 test("spreadsheet imports are bounded and avoid vulnerable legacy parsers", async () => {

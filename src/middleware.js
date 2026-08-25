@@ -3,7 +3,7 @@ import { jwtVerify } from "jose";
 
 const publicRoutes = ["/login"];
 
-export async function proxy(request) {
+export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
   if (publicRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
