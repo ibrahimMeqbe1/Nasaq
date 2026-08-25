@@ -10,6 +10,8 @@
     "test": "npm run test:contract",
     "test:contract": "node --test tests/*.test.mjs",
     "verify": "npm run test:contract && npm run build",
+    "build:cloudflare": "opennextjs-cloudflare build",
+    "cloudflare:build": "opennextjs-cloudflare build",
     "preview:cloudflare": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy:cloudflare": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     "upload:cloudflare": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
