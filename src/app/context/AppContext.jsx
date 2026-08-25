@@ -140,13 +140,17 @@ export const AppProvider = ({ children }) => {
   };
 
   // 4. حماية المسارات والتوجيه التلقائي
+  const protectedRoutes = ["/families", "/nominations", "/settings", "/super-admin"];
+  const isProtectedPath = Boolean(
+    pathname && protectedRoutes.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  );
+
   useEffect(() => {
     if (loading) return;
 
-    const isPublicPath = pathname === "/login" || pathname === "/print";
     const isSuperAdminPath = pathname === "/super-admin";
 
-    if (!user && !isPublicPath) {
+    if (!user && isProtectedPath) {
       router.replace("/login");
     } else if (user && user.role !== "superadmin" && isSuperAdminPath) {
       router.replace("/");
@@ -157,7 +161,7 @@ export const AppProvider = ({ children }) => {
         router.replace("/");
       }
     }
-  }, [user, loading, pathname, router]);
+  }, [user, loading, pathname, router, isProtectedPath]);
 
   const contextValue = {
     user,
@@ -169,11 +173,11 @@ export const AppProvider = ({ children }) => {
     setCampProfile,
     isSubscriptionExpired,
     dataError,
-    handleLogout
+    handleLogout,
   };
 
-  // إذا لم يكن المستخدم مسجلاً لدخوله والصفحة غير عامة، نمنع عرض المحتوى ونتوجّه للوجين
-  if (!user && pathname !== "/login" && pathname !== "/print") {
+  // إذا لم يكن المستخدم مسجلاً لدخوله والصفحة محمية حصراً، نمنع عرض المحتوى ونتوجّه للوجين
+  if (!user && isProtectedPath) {
     return (
       <AppContext.Provider value={contextValue}>
         <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#f8fafc", direction: "rtl" }}>
@@ -181,6 +185,15 @@ export const AppProvider = ({ children }) => {
             <p style={{ color: "#475569", fontWeight: "bold", fontSize: "1.1rem" }}>جاري التوجيه لصفحة تسجيل الدخول...</p>
           </div>
         </div>
+      </AppContext.Provider>
+    );
+  }
+
+  // إذا لم يكن المستخدم مسجلاً لدخوله والصفحة عامة (مثل / أو /about أو /privacy أو /login أو /print)
+  if (!user) {
+    return (
+      <AppContext.Provider value={contextValue}>
+        {children}
       </AppContext.Provider>
     );
   }

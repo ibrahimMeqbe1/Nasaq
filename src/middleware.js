@@ -1,12 +1,28 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-const publicRoutes = ["/login"];
+const publicRoutes = [
+  "/",
+  "/login",
+  "/about",
+  "/contact",
+  "/privacy",
+  "/terms",
+  "/features",
+  "/faq",
+  "/robots.txt",
+  "/ads.txt",
+  "/sitemap.xml",
+];
 
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
-  if (publicRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`))) {
+  const isPublic = publicRoutes.some(
+    (route) => pathname === route || (route !== "/" && pathname.startsWith(`${route}/`))
+  );
+
+  if (isPublic) {
     return NextResponse.next();
   }
 
@@ -43,5 +59,5 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|manifest.json|robots.txt|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico)$).*)"],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|manifest.json|robots.txt|ads.txt|sitemap.xml|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico)$).*)"],
 };
