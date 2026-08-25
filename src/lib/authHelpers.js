@@ -11,7 +11,10 @@ export async function loginUser(username, password) {
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  // Supabase Auth and the protected profile lookup may each incur a cold-start
+  // delay. Keep the browser timeout above the server-side request budget so a
+  // successful response is never discarded at the last millisecond.
+  const timeout = setTimeout(() => controller.abort(), 30000);
   try {
     const response = await fetch("/api/auth/login", {
       method: "POST",

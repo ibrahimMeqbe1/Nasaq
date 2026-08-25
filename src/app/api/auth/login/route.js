@@ -17,6 +17,48 @@ const fetchWithTimeout = async (url, options = {}) => {
   return fetch(url, { ...options, signal });
 };
 
+async function resolveProfileByLogin(username) {
+  if (!isAdminConfigured || !supabaseAdmin) return null;
+
+  const { data: usernameProfile, error: usernameError } = await supabaseAdmin
+    .from("users")
+    .select("id, username, role, camp_id, name")
+    .ilike("username", username)
+    .maybeSingle();
+  if (usernameError) throw usernameError;
+  if (usernameProfile) return usernameProfile;
+
+  let { data: camp, error: campIdError } = await supabaseAdmin
+    .from("camps")
+    .select("id")
+    .eq("id", username)
+    .maybeSingle();
+  if (campIdError) throw campIdError;
+
+  if (!camp) {
+    const { data: campByName, error: campNameError } = await supabaseAdmin
+      .from("camps")
+      .select("id")
+      .ilike("name", username)
+      .limit(1)
+      .maybeSingle();
+    if (campNameError) throw campNameError;
+    camp = campByName;
+  }
+
+  if (!camp?.id) return null;
+
+  const { data: campProfile, error: campProfileError } = await supabaseAdmin
+    .from("users")
+    .select("id, username, role, camp_id, name")
+    .eq("camp_id", camp.id)
+    .eq("role", "admin")
+    .limit(1)
+    .maybeSingle();
+  if (campProfileError) throw campProfileError;
+  return campProfile;
+}
+
 export async function POST(request) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -45,49 +87,20 @@ export async function POST(request) {
     // database round-trips for the common case and keeps login responsive.
     let resolvedProfile = null;
     let email = username.includes("@") ? username : `${username}@camp.com`;
-    let { data: authData, error: authError } = await authClient.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const profilePromise = resolveProfileByLogin(username);
+    const [authResult, profileResult] = await Promise.all([
+      authClient.auth.signInWithPassword({ email, password }),
+      profilePromise,
+    ]);
+    let { data: authData, error: authError } = authResult;
+    resolvedProfile = profileResult;
 
     // Camp ID/name login needs server-side resolution, so use it only as a
     // fallback when direct username authentication did not succeed.
-    if ((authError || !authData?.session) && isAdminConfigured && supabaseAdmin) {
-      const { data: usernameProfile } = await supabaseAdmin
-        .from("users")
-        .select("id, username, role, camp_id, name")
-        .ilike("username", username)
-        .maybeSingle();
-      resolvedProfile = usernameProfile;
-
-      if (!resolvedProfile) {
-        let { data: camp } = await supabaseAdmin
-          .from("camps")
-          .select("id")
-          .eq("id", username)
-          .maybeSingle();
-        if (!camp) {
-          const result = await supabaseAdmin
-            .from("camps")
-            .select("id")
-            .ilike("name", username)
-            .limit(1)
-            .maybeSingle();
-          camp = result.data;
-        }
-        if (camp?.id) {
-          const { data: campProfile } = await supabaseAdmin
-            .from("users")
-            .select("id, username, role, camp_id, name")
-            .eq("camp_id", camp.id)
-            .eq("role", "admin")
-            .limit(1)
-            .maybeSingle();
-          resolvedProfile = campProfile;
-        }
-      }
-      if (!resolvedProfile) return invalidCredentials();
-      email = `${resolvedProfile.username.toLowerCase()}@camp.com`;
+    if ((authError || !authData?.session) && resolvedProfile) {
+      const resolvedEmail = `${resolvedProfile.username.toLowerCase()}@camp.com`;
+      if (resolvedEmail === email) return invalidCredentials();
+      email = resolvedEmail;
       ({ data: authData, error: authError } = await authClient.auth.signInWithPassword({
         email,
         password,

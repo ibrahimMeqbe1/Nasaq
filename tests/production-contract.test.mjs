@@ -75,6 +75,8 @@ test("responsive and security contracts are configured", async () => {
   assert.match(tokens, /min-block-size:\s*2\.75rem/);
   assert.match(tokens, /overflow-x:\s*clip/);
   assert.match(nextConfig, /Content-Security-Policy/);
+  assert.match(nextConfig, /process\.env\.NODE_ENV === "development"/);
+  assert.match(nextConfig, /unsafe-eval/);
   assert.match(nextConfig, /Strict-Transport-Security/);
   assert.match(nextConfig, /frame-ancestors 'none'/);
   assert.match(middleware, /export async function middleware/);
@@ -108,4 +110,15 @@ test("camp editing exposes validation errors and makes password changes opt-in",
   assert.match(superAdmin, /ستبقى كلمة المرور الحالية دون تغيير/);
   assert.match(updateRoute, /select\("id"\)/);
   assert.match(updateRoute, /المخيم المطلوب غير موجود/);
+});
+
+test("login does not discard successful cold-start responses", async () => {
+  const [authHelpers, loginRoute] = await Promise.all([
+    read("src/lib/authHelpers.js"),
+    read("src/app/api/auth/login/route.js"),
+  ]);
+
+  assert.match(authHelpers, /controller\.abort\(\), 30000/);
+  assert.match(loginRoute, /Promise\.all/);
+  assert.match(loginRoute, /resolveProfileByLogin/);
 });
