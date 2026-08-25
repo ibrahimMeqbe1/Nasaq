@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { createRecordId } from "../src/lib/recordIds.mjs";
+import { readSheet as readExcelSheet } from "read-excel-file/node";
 
 const root = new URL("../", import.meta.url);
 const read = (path) => readFile(new URL(path, root), "utf8");
@@ -96,6 +97,21 @@ test("spreadsheet imports are bounded and avoid vulnerable legacy parsers", asyn
   assert.match(importer, /MAX_IMPORT_BYTES/);
   assert.match(importer, /MAX_IMPORT_ROWS/);
   assert.doesNotMatch(importer, /readAsBinaryString/);
+});
+
+test("spreadsheet importer reads rows from both production templates", async () => {
+  const importer = await read("src/components/ExcelImportModal.jsx");
+  assert.match(importer, /import \{ readSheet \} from "read-excel-file\/browser"/);
+  assert.match(importer, /readSheet\(arrayBuffer\)/);
+  assert.doesNotMatch(importer, /import readXlsxFile from "read-excel-file\/browser"/);
+
+  for (const template of ["families-template.xlsx", "nominations-template.xlsx"]) {
+    const file = await readFile(new URL(`public/templates/${template}`, root));
+    const rows = await readExcelSheet(file);
+    assert.ok(Array.isArray(rows), `${template} should parse to rows`);
+    assert.ok(rows.length > 1, `${template} should include headers and sample rows`);
+    assert.ok(Array.isArray(rows[0]), `${template} should contain row arrays`);
+  }
 });
 
 test("camp editing exposes validation errors and makes password changes opt-in", async () => {

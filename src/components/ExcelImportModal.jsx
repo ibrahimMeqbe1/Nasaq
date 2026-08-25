@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import { FaFileExcel, FaEye, FaSave, FaTimes, FaExclamationTriangle } from "react-icons/fa";
-import readXlsxFile from "read-excel-file/browser";
+import { readSheet } from "read-excel-file/browser";
 import { formatDateForExcel } from "../utils/exportExcel";
 
 const MAX_IMPORT_BYTES = 10 * 1024 * 1024;
@@ -65,7 +65,10 @@ const readImportRows = async (file, arrayBuffer) => {
     throw new Error("يدعم النظام ملفات XLSX وCSV فقط.");
   }
 
-  const rows = await readXlsxFile(file);
+  const rows = await readSheet(arrayBuffer);
+  if (!Array.isArray(rows)) {
+    throw new Error("تعذر قراءة صفوف ملف Excel. تأكد من أن الملف سليم ويحتوي ورقة بيانات واحدة على الأقل.");
+  }
   return rows.map((row) => row.map(unwrapExcelCell));
 };
 
