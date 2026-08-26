@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { 
   FaTimes, FaSave, FaUser, FaIdCard, FaPhone, FaUsers, 
   FaMapMarkerAlt, FaHeartbeat, FaWheelchair, FaBaby, FaFemale,
-  FaEdit, FaPlus, FaHome
+  FaEdit, FaPlus, FaHome, FaHandsHelping
 } from "react-icons/fa";
 
 const NominationForm = ({ isOpen, onClose, onSave, nomination }) => {
@@ -35,6 +35,7 @@ const NominationForm = ({ isOpen, onClose, onSave, nomination }) => {
     hasChronicDisease: false,
     isLactatingOrPregnant: false,
     isFemaleHeaded: false,
+    isChildHeaded: false,
     currentAddress: "",
     originalAddress: "",
     governorate: "شمال غزة",
@@ -50,41 +51,61 @@ const NominationForm = ({ isOpen, onClose, onSave, nomination }) => {
 
   useEffect(() => {
     if (nomination) {
+      const getNum = (...keys) => {
+        for (const k of keys) {
+          if (nomination[k] !== undefined && nomination[k] !== null && nomination[k] !== "") {
+            const parsed = parseInt(nomination[k]);
+            if (!isNaN(parsed) && parsed >= 0) return parsed;
+          }
+        }
+        return 0;
+      };
+
+      const getBool = (...keys) => {
+        for (const k of keys) {
+          if (nomination[k] === 1 || nomination[k] === true || nomination[k] === "1" || nomination[k] === "true" || nomination[k] === "نعم") {
+            return true;
+          }
+        }
+        return false;
+      };
+
       setFormData({
         name: nomination.name || "",
-        idNumber: nomination.idNumber || "",
+        idNumber: nomination.idNumber || nomination.id_number || "",
         gender: nomination.gender || "ذكر",
         status: nomination.status || "متزوج",
         phone: nomination.phone || "",
-        phoneAlt: nomination.phoneAlt || "",
-        wifeName: nomination.wifeName || "",
-        wifeId: nomination.wifeId || "",
-        wife2Name: nomination.wife2Name || "",
-        wife2Id: nomination.wife2Id || "",
-        membersCount: nomination.membersCount || 1,
-        age_0_2_male: nomination.age_0_2_male || 0,
-        age_0_2_female: nomination.age_0_2_female || 0,
-        age_3_5_male: nomination.age_3_5_male || 0,
-        age_3_5_female: nomination.age_3_5_female || 0,
-        age_6_18_male: nomination.age_6_18_male || 0,
-        age_6_18_female: nomination.age_6_18_female || 0,
-        age_19_60_male: nomination.age_19_60_male || 0,
-        age_19_60_female: nomination.age_19_60_female || 0,
-        age_over_60_male: nomination.age_over_60_male || 0,
-        age_over_60_female: nomination.age_over_60_female || 0,
-        hasDisabled: nomination.hasDisabled === 1,
-        hasChronicDisease: nomination.hasChronicDisease === 1,
-        isLactatingOrPregnant: nomination.isLactatingOrPregnant === 1,
-        isFemaleHeaded: nomination.isFemaleHeaded === 1,
-        currentAddress: nomination.currentAddress || "",
-        originalAddress: nomination.originalAddress || "",
+        phoneAlt: nomination.phoneAlt || nomination.phone_alt || "",
+        wifeName: nomination.wifeName || nomination.wife_name || "",
+        wifeId: nomination.wifeId || nomination.wife_id || "",
+        wife2Name: nomination.wife2Name || nomination.wife_2_name || "",
+        wife2Id: nomination.wife2Id || nomination.wife_2_id || "",
+        membersCount: getNum("membersCount", "members_count") || 1,
+        age_0_2_male: getNum("age_0_2_male", "age02Male"),
+        age_0_2_female: getNum("age_0_2_female", "age02Female"),
+        age_3_5_male: getNum("age_3_5_male", "age35Male"),
+        age_3_5_female: getNum("age_3_5_female", "age35Female"),
+        age_6_18_male: getNum("age_6_18_male", "age618Male"),
+        age_6_18_female: getNum("age_6_18_female", "age618Female"),
+        age_19_60_male: getNum("age_19_60_male", "age1960Male"),
+        age_19_60_female: getNum("age_19_60_female", "age1960Female"),
+        age_over_60_male: getNum("age_over_60_male", "ageOver60Male"),
+        age_over_60_female: getNum("age_over_60_female", "ageOver60Female"),
+        hasDisabled: getBool("hasDisabled", "has_disabled"),
+        hasChronicDisease: getBool("hasChronicDisease", "has_chronic_disease"),
+        isLactatingOrPregnant: getBool("isLactatingOrPregnant", "is_lactating_or_pregnant"),
+        isFemaleHeaded: getBool("isFemaleHeaded", "is_female_headed"),
+        isChildHeaded: getBool("isChildHeaded", "is_child_headed", "isOrphanHeaded") || (nomination.status || "").includes("يتيم"),
+        currentAddress: nomination.currentAddress || nomination.current_address || nomination.location || "",
+        originalAddress: nomination.originalAddress || nomination.original_address || "",
         governorate: nomination.governorate || "شمال غزة",
-        campName: nomination.campName || "نظام إدارة المخيمات",
-        shelterManager: nomination.shelterManager || "",
-        shelterPhone: nomination.shelterPhone || "",
-        shelterPhoneAlt: nomination.shelterPhoneAlt || "",
-        shelterAddress: nomination.shelterAddress || "",
-        shelterGps: nomination.shelterGps || ""
+        campName: nomination.campName || nomination.camp_name || "نظام إدارة المخيمات",
+        shelterManager: nomination.shelterManager || nomination.shelter_manager || "",
+        shelterPhone: nomination.shelterPhone || nomination.shelter_phone || "",
+        shelterPhoneAlt: nomination.shelterPhoneAlt || nomination.shelter_phone_alt || "",
+        shelterAddress: nomination.shelterAddress || nomination.shelter_address || "",
+        shelterGps: nomination.shelterGps || nomination.shelter_gps || ""
       });
     } else {
       setFormData({
@@ -139,28 +160,32 @@ const NominationForm = ({ isOpen, onClose, onSave, nomination }) => {
 
     if (!formData.idNumber.trim()) {
       tempErrors.idNumber = "رقم الهوية مطلوب";
-    } else if (!/^\d{9}$/.test(formData.idNumber.trim())) {
-      tempErrors.idNumber = "يجب أن يتكون من 9 أرقام";
     }
 
-    if (!formData.phone.trim()) {
-      tempErrors.phone = "رقم الجوال مطلوب";
+    const isMarriedMale = (formData.status === "متزوج" || formData.status === "متعدد" || formData.status === "متزوج/ة") && formData.gender !== "انثى";
+    const isPlaceholder = (val) => !val || val === "-" || val === "لا يوجد" || val === "null" || val === "undefined";
+
+    // التحقق من هوية الزوجة فقط إذا كانت الأسرة متزوجة وتم إدخال أرقام جزئية
+    if (isMarriedMale) {
+      if (!isPlaceholder(formData.wifeId)) {
+        const digits = String(formData.wifeId).replace(/\D/g, "");
+        if (digits.length > 0 && digits.length !== 9) {
+          tempErrors.wifeId = "هوية الزوجة يجب أن تكون 9 أرقام (أو اتركها فارغة)";
+        }
+      }
+
+      if (!isPlaceholder(formData.wife2Id)) {
+        const digits2 = String(formData.wife2Id).replace(/\D/g, "");
+        if (digits2.length > 0 && digits2.length !== 9) {
+          tempErrors.wife2Id = "هوية الزوجة الثانية يجب أن تكون 9 أرقام (أو اتركها فارغة)";
+        }
+      }
     }
 
-    if (formData.wifeId.trim() && !/^\d{9}$/.test(formData.wifeId.trim())) {
-      tempErrors.wifeId = "هوية الزوجة يجب أن تكون 9 أرقام";
-    }
-
-    if (formData.wife2Id.trim() && !/^\d{9}$/.test(formData.wife2Id.trim())) {
-      tempErrors.wife2Id = "هوية الزوجة الثانية يجب أن تكون 9 أرقام";
-    }
-
-    if (!formData.currentAddress.trim()) {
-      tempErrors.currentAddress = "عنوان السكن الحالي مطلوب";
-    }
-
-    setErrors(tempErrors);
-    return Object.keys(tempErrors).length === 0;
+    return {
+      isValid: Object.keys(tempErrors).length === 0,
+      errors: tempErrors
+    };
   };
 
   const handleChange = (e) => {
@@ -174,16 +199,17 @@ const NominationForm = ({ isOpen, onClose, onSave, nomination }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (validateForm()) {
+    const { isValid, errors: tempErrors } = validateForm();
+    setErrors(tempErrors);
+
+    if (isValid) {
       onSave(formData);
     } else {
-      // Switch tab to the first tab that has an error
-      if (errors.name || errors.idNumber || errors.phone) {
+      // التبديل فوراً إلى التبويب الذي يحتوي على خطأ
+      if (tempErrors.name || tempErrors.idNumber) {
         setActiveTab("personal");
-      } else if (errors.wifeId || errors.wife2Id) {
+      } else if (tempErrors.wifeId || tempErrors.wife2Id) {
         setActiveTab("family");
-      } else if (errors.currentAddress) {
-        setActiveTab("location");
       }
     }
   };
@@ -200,6 +226,21 @@ const NominationForm = ({ isOpen, onClose, onSave, nomination }) => {
             <FaTimes />
           </button>
         </div>
+
+        {Object.keys(errors).length > 0 && (
+          <div style={{
+            background: "#fee2e2",
+            color: "#991b1b",
+            padding: "10px 15px",
+            borderRadius: "8px",
+            marginBottom: "12px",
+            fontSize: "0.88rem",
+            fontWeight: "700",
+            border: "1px solid #fecaca"
+          }}>
+            يرجى تصحيح الأخطاء التالية: {Object.values(errors).join("، ")}
+          </div>
+        )}
 
         {/* Tab Selection */}
         <div className="form-tabs" style={{ display: "flex", borderBottom: "2px solid #e2e8f0", marginBottom: "15px", gap: "10px" }}>
@@ -358,6 +399,12 @@ const NominationForm = ({ isOpen, onClose, onSave, nomination }) => {
           {/* Tab 2: Family & Wives */}
           {activeTab === "family" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "15px" }}>
+              {(formData.status === "أرملة" || formData.status === "أرمل" || formData.status === "مطلقة" || formData.status === "مطلق" || formData.gender === "انثى" || formData.isFemaleHeaded) && (
+                <div style={{ background: "#ecfdf5", border: "1px solid #a7f3d0", padding: "10px 14px", borderRadius: "8px", color: "#065f46", fontSize: "0.88rem", fontWeight: "700" }}>
+                  ملاحظة: هذه الحالة ({formData.status || "معيل امرأة"}) لا تشترط بيانات زوجة، وتُحفظ البيانات مباشرة بدون الحاجة لإدخال هوية أو اسم زوجة.
+                </div>
+              )}
+
               <div style={{ background: "#f8fafc", padding: "12px", borderRadius: "6px", borderRight: "4px solid #b89647" }}>
                 <h4 style={{ margin: "0 0 10px 0", color: "var(--primary-dark)" }}>بيانات الزوجة الأولى (إن وجدت):</h4>
                 <div className="form-row">
@@ -587,6 +634,23 @@ const NominationForm = ({ isOpen, onClose, onSave, nomination }) => {
                     <div>
                       <strong style={{ color: "var(--primary-dark)" }}>امرأة تعيل الأسرة</strong>
                       <p style={{ margin: "2px 0 0 0", fontSize: "0.82rem", color: "#64748b" }}>يعني أن رب الأسرة امرأة (أرملة، مطلقة، أو زوجها عاجز/مفقود) وهي المسؤولة عن رعايتها.</p>
+                    </div>
+                  </div>
+                </label>
+
+                <label style={{ display: "flex", alignItems: "center", gap: "12px", cursor: "pointer", background: "#f8fafc", padding: "12px 15px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                  <input
+                    type="checkbox"
+                    name="isChildHeaded"
+                    checked={formData.isChildHeaded}
+                    onChange={handleChange}
+                    style={{ width: "18px", height: "18px" }}
+                  />
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <FaHandsHelping style={{ color: "#d97706", fontSize: "1.1rem" }} />
+                    <div>
+                      <strong style={{ color: "var(--primary-dark)" }}>معيل الأسرة طفل يتيم (دون سن 18 عاماً)</strong>
+                      <p style={{ margin: "2px 0 0 0", fontSize: "0.82rem", color: "#64748b" }}>يعني أن رب الأسرة طفل دون سن 18 عاماً يتيم الأبوين أو فاقد المعيل وهو المسؤول عن إخوته.</p>
                     </div>
                   </div>
                 </label>

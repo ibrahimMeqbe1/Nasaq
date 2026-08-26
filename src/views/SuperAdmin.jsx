@@ -597,9 +597,39 @@ const SuperAdmin = ({ user, onLogout }) => {
             <span className="system-status-dot" aria-hidden="true"></span>
             <span>متصل بـ Supabase (المنظومة نشطة)</span>
           </div>
-          <button onClick={() => { setError(""); setSuccess(""); setIsAddCampOpen(true); }} className="admin-header-create"><FaPlus /> مخيم جديد</button>
+          <button type="button" onClick={() => { setError(""); setSuccess(""); setIsAddCampOpen(true); }} className="admin-header-create">
+            <FaPlus /> مخيم جديد
+          </button>
+          <button type="button" onClick={onLogout} className="btn-super-logout-luxury" title="تسجيل الخروج">
+            <FaSignOutAlt /> تسجيل الخروج
+          </button>
         </div>
       </header>
+
+      {/* شريط التنقل السفلي للمشرف العام على الهاتف */}
+      <nav className="super-admin-mobile-nav" aria-label="تنقل المشرف العام على الهاتف">
+        <button type="button" className={activeTab === "camps" ? "active" : ""} onClick={() => setActiveTab("camps")}>
+          <FaCampground />
+          <span>المخيمات</span>
+        </button>
+        <button type="button" className={activeTab === "requests" ? "active" : ""} onClick={() => setActiveTab("requests")}>
+          <FaCoins />
+          <span>الطلبات</span>
+          {stats.pendingRequests > 0 && <b className="badge-count">{stats.pendingRequests}</b>}
+        </button>
+        <button type="button" className={activeTab === "announcement" ? "active" : ""} onClick={() => setActiveTab("announcement")}>
+          <FaBullhorn />
+          <span>التعميمات</span>
+        </button>
+        <button type="button" className={activeTab === "settings" ? "active" : ""} onClick={() => setActiveTab("settings")}>
+          <FaWallet />
+          <span>الدفع</span>
+        </button>
+        <button type="button" onClick={onLogout} className="super-mobile-logout-btn" title="تسجيل الخروج">
+          <FaSignOutAlt />
+          <span>خروج</span>
+        </button>
+      </nav>
 
       {/* المحتوى الرئيسي */}
       <main className="super-admin-content" dir="rtl">

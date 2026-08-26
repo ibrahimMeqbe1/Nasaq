@@ -45,6 +45,36 @@ export default function RootLayout({ children }) {
             src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${adsenseClientId}`}
           />
         )}
+        <Script
+          id="sw-register"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').then(
+                    function(reg) {
+                      reg.update();
+                      reg.onupdatefound = function() {
+                        var installingWorker = reg.installing;
+                        if (installingWorker) {
+                          installingWorker.onstatechange = function() {
+                            if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                              window.location.reload();
+                            }
+                          };
+                        }
+                      };
+                    },
+                    function(err) {
+                      console.warn('[Nasaq PWA] ServiceWorker registration warning:', err);
+                    }
+                  );
+                });
+              }
+            `,
+          }}
+        />
       </head>
       <body suppressHydrationWarning>
         <div className="app-container" dir="rtl">

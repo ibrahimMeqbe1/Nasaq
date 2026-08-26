@@ -7,12 +7,14 @@ const PrintPage = () => {
   const [data, setData] = useState([]);
   const [type, setType] = useState("families");
   const [campProfile, setCampProfile] = useState(null);
+  const [filterTitle, setFilterTitle] = useState("");
 
   useEffect(() => {
-    // جلب البيانات المخزنة للطباعة
+    // قراءة البيانات ونوع الكشف المنقول عبر sessionStorage
     const printData = sessionStorage.getItem("kareem_camp_print_data");
     const printType = sessionStorage.getItem("kareem_camp_print_type") || "families";
     const printProfile = sessionStorage.getItem("kareem_camp_print_profile");
+    const printFilterTitle = sessionStorage.getItem("kareem_camp_print_filter_title") || "";
     
     let activeProfile = null;
     if (printProfile) {
@@ -20,12 +22,13 @@ const PrintPage = () => {
       setCampProfile(activeProfile);
     }
 
-    // تغيير عنوان التبويب ليكون احترافياً بدلاً من React App
-    if (activeProfile) {
-      document.title = printType === "nominations" ? `كشف ترشيحات ${activeProfile.name || "المخيم"} العام` : `كشف عائلات ${activeProfile.name || "المخيم"} العام`;
-    } else {
-      document.title = printType === "nominations" ? "كشف الترشيحات العام - نظام إدارة المخيمات" : "كشف العائلات العام - نظام إدارة المخيمات";
+    if (printFilterTitle) {
+      setFilterTitle(printFilterTitle);
     }
+
+    // تغيير عنوان التبويب ليكون احترافياً بدلاً من React App
+    const baseTitle = printType === "nominations" ? `كشف ترشيحات ${activeProfile?.name || "المخيم"}` : `كشف عائلات ${activeProfile?.name || "المخيم"}`;
+    document.title = printFilterTitle ? `${baseTitle} (${printFilterTitle})` : `${baseTitle} العام`;
 
     if (printData) {
       setData(JSON.parse(printData));
@@ -34,6 +37,7 @@ const PrintPage = () => {
     sessionStorage.removeItem("kareem_camp_print_data");
     sessionStorage.removeItem("kareem_camp_print_type");
     sessionStorage.removeItem("kareem_camp_print_profile");
+    sessionStorage.removeItem("kareem_camp_print_filter_title");
     
     // تشغيل نافذة الطباعة تلقائياً بعد رندر بيانات الصفحة بالكامل للجوال والكمبيوتر
     const timer = setTimeout(() => {
@@ -54,12 +58,14 @@ const PrintPage = () => {
   const totalMembers = data.reduce((sum, item) => sum + (parseInt(item.membersCount) || 0), 0);
   const reportReference = `${campProfile?.id || "CAMP"}-${type === "nominations" ? "NOM" : "FAM"}-${today.toISOString().slice(0, 10).replaceAll("-", "")}`;
 
-  // إحصائيات الترشيحات الخاصة بالطباعة
   const isPos = (v) => v === 1 || v === "1" || v === true || v === "true" || v === "نعم";
   const disabledCount = type === "nominations" ? data.filter(n => isPos(n.hasDisabled || n.has_disabled)).length : 0;
   const chronicCount = type === "nominations" ? data.filter(n => isPos(n.hasChronicDisease || n.has_chronic_disease)).length : 0;
   const pregnantCount = type === "nominations" ? data.filter(n => isPos(n.isLactatingOrPregnant || n.is_lactating_or_pregnant)).length : 0;
   const femaleHeadedCount = type === "nominations" ? data.filter(n => isPos(n.isFemaleHeaded || n.is_female_headed)).length : 0;
+  const orphanChildCount = type === "nominations" 
+    ? data.filter(n => isPos(n.isChildHeaded || n.is_child_headed || n.isOrphanHeaded) || (n.status || "").includes("يتيم")).length 
+    : data.filter(f => (f.status || "").includes("يتيم")).length;
 
   // حساب وتوزيع الأعمار التفصيلي لكل عائلة لسحب الأرقام الحقيقية في الطباعة
   const getRowAgeBreakdown = (nom) => {
@@ -154,13 +160,13 @@ const PrintPage = () => {
   };
 
   return (
-    <div className="print-page-layout" dir="rtl" style={{ padding: "20px", backgroundColor: "white", minHeight: "100vh" }}>
-      {/* تنسيقات الطباعة الفائقة الوضوح للهواتف والكمبيوتر بالاتجاه الأفقي */}
+    <div className="print-page-layout" dir="rtl" style={{ padding: "15px 20px", backgroundColor: "white", minHeight: "100vh", maxWidth: "100%", boxSizing: "border-box" }}>
+      {/* تنسيقات الطباعة الفائقة الوضوح والاحتواء الكامل للهواتف والكمبيوتر */}
       <style>{`
         @media print {
           @page {
             size: A4 landscape !important;
-            margin: 3mm 4mm !important;
+            margin: 4mm 5mm !important;
           }
           @page :left {
             size: landscape !important;
@@ -185,16 +191,20 @@ const PrintPage = () => {
             padding: 0 !important;
             margin: 0 !important;
             width: 100% !important;
+            max-width: 100% !important;
             box-shadow: none !important;
+            box-sizing: border-box !important;
           }
           .print-table-wrapper {
             overflow: visible !important;
             width: 100% !important;
+            box-sizing: border-box !important;
           }
           table.print-table {
             width: 100% !important;
+            max-width: 100% !important;
             border-collapse: collapse !important;
-            table-layout: auto !important;
+            table-layout: fixed !important;
             page-break-inside: auto;
           }
           table.print-table tr {
@@ -212,28 +222,31 @@ const PrintPage = () => {
             page-break-inside: avoid !important;
           }
           table.print-table th, table.print-table td {
-            line-height: 1.45 !important;
+            line-height: 1.25 !important;
             word-wrap: break-word !important;
             overflow-wrap: break-word !important;
-            border: 1.5px solid #0f172a !important;
+            border: 1px solid #0f172a !important;
             color: #000000 !important;
-            font-size: 9pt !important;
+            font-size: 7.2pt !important;
             font-weight: 700 !important;
-            padding: 5px 3px !important;
+            padding: 3px 2px !important;
+            box-sizing: border-box !important;
+            vertical-align: middle !important;
           }
           table.print-table th {
             font-weight: 900 !important;
             background-color: #0f5132 !important;
             color: #ffffff !important;
-            font-size: 9.5pt !important;
-            padding: 6px 4px !important;
+            font-size: 7.8pt !important;
+            padding: 4px 2px !important;
+            text-align: center !important;
           }
         }
 
-        /* تحسينات العرض على شاشات الموبايل قبل الطباعة */
+        /* تحسينات العرض على الشاشات */
         @media screen and (max-width: 768px) {
           .print-page-layout {
-            padding: 10px !important;
+            padding: 8px !important;
           }
           .header {
             flex-direction: column !important;
@@ -247,11 +260,11 @@ const PrintPage = () => {
             overflow-x: auto !important;
             -webkit-overflow-scrolling: touch !important;
             border: 1px solid #cbd5e1;
-            border-radius: 10px;
+            border-radius: 8px;
             margin-bottom: 15px;
           }
           table.print-table {
-            min-width: 900px !important;
+            min-width: 920px !important;
           }
         }
       `}</style>
@@ -262,7 +275,7 @@ const PrintPage = () => {
         color: "#ffffff", 
         padding: "12px 18px", 
         borderRadius: "14px", 
-        marginBottom: "20px", 
+        marginBottom: "15px", 
         display: "flex", 
         alignItems: "center", 
         justifyContent: "space-between", 
@@ -272,7 +285,7 @@ const PrintPage = () => {
       }}>
         <div style={{ fontSize: "0.88rem", fontWeight: "700", display: "flex", alignItems: "flex-start", gap: "8px" }}>
           <FaLightbulb aria-hidden="true" style={{ marginTop: "4px", flexShrink: 0 }} />
-          <span><span style={{ color: "#fef08a" }}>تلميح للطباعة من الجوال:</span> يرجى التأكد من تفعيل وضع <strong>"أفقي (Landscape)"</strong> في خيارات حفظ الـ PDF من هاتفك للحصول على أفضل قراءة احترافية لكافة الأعمدة.</span>
+          <span><span style={{ color: "#fef08a" }}>تلميح للطباعة والحفظ:</span> الكشف مهيأ تلقائياً للطباعة العرضية <strong>(Landscape A4)</strong> مع احتواء تام للنصوص والحدود دون أي اقتصاص.</span>
         </div>
         <button 
           onClick={() => window.print()}
@@ -293,28 +306,28 @@ const PrintPage = () => {
       </div>
 
       {/* الترويسة الرئيسية */}
-      <div className="header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "3px double #0f5132", paddingBottom: "15px", marginBottom: "25px" }}>
-        <div className="logo-section" style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-          <img className="logo" src={campProfile?.logoUrl || "/nasaq-logo.png"} alt={`شعار ${campProfile?.name || "المخيم"}`} style={{ width: "82px", height: "82px", objectFit: "contain", borderRadius: "18px", border: "2px solid #b89647", padding: "3px", background: "#fff" }} onError={(e) => { e.currentTarget.src = "/nasaq-logo.png"; }} />
+      <div className="header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "3px double #0f5132", paddingBottom: "12px", marginBottom: "15px", width: "100%", boxSizing: "border-box" }}>
+        <div className="logo-section" style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <img className="logo" src={campProfile?.logoUrl || "/nasaq-logo.png"} alt={`شعار ${campProfile?.name || "المخيم"}`} style={{ width: "72px", height: "72px", objectFit: "contain", borderRadius: "12px", border: "2px solid #b89647", padding: "2px", background: "#fff", flexShrink: 0 }} onError={(e) => { e.currentTarget.src = "/nasaq-logo.png"; }} />
           <div className="camp-title">
-            <h1 style={{ fontSize: "18pt", color: "#0f5132", margin: 0, fontWeight: 700 }}>{campProfile?.name || "نظام إدارة المخيمات"}</h1>
-            <p style={{ fontSize: "10pt", color: "#b89647", margin: "5px 0 0 0", fontWeight: 600 }}>منصة متكاملة لإدارة المخيمات بسهولة وكفاءة</p>
+            <h1 style={{ fontSize: "16pt", color: "#0f5132", margin: 0, fontWeight: 800 }}>{campProfile?.name || "نظام إدارة المخيمات"}</h1>
+            <p style={{ fontSize: "9.5pt", color: "#b89647", margin: "3px 0 0 0", fontWeight: 700 }}>منصة متكاملة لإدارة المخيمات والاستجابة الإنسانية</p>
           </div>
         </div>
-        <div className="meta-info" style={{ textAlign: "left", fontSize: "10pt" }}>
-          <p><span style={{ fontWeight: "bold", color: "#0f5132" }}>مسؤول المخيم:</span> {campProfile?.managerName || "غير محدد"}</p>
-          <p><span style={{ fontWeight: "bold", color: "#0f5132" }}>رقم الجوال:</span> {campProfile?.managerPhone || "غير محدد"}</p>
-          <p><span style={{ fontWeight: "bold", color: "#0f5132" }}>التاريخ:</span> {dateStr}</p>
-          <p><span style={{ fontWeight: "bold", color: "#0f5132" }}>الموقع:</span> {campProfile?.address || "غير محدد"}</p>
-          <p><span style={{ fontWeight: "bold", color: "#0f5132" }}>مرجع الكشف:</span> <span dir="ltr">{reportReference}</span></p>
+        <div className="meta-info" style={{ textAlign: "right", fontSize: "9pt", lineHeight: "1.45", flexShrink: 0, minWidth: "260px", paddingRight: "10px", boxSizing: "border-box" }}>
+          <p style={{ margin: "2px 0" }}><span style={{ fontWeight: "bold", color: "#0f5132" }}>مسؤول المخيم:</span> {campProfile?.managerName || "غير محدد"}</p>
+          <p style={{ margin: "2px 0" }}><span style={{ fontWeight: "bold", color: "#0f5132" }}>رقم الجوال:</span> <span dir="ltr" style={{ display: "inline-block" }}>{campProfile?.managerPhone || "غير محدد"}</span></p>
+          <p style={{ margin: "2px 0" }}><span style={{ fontWeight: "bold", color: "#0f5132" }}>التاريخ:</span> {dateStr}</p>
+          <p style={{ margin: "2px 0" }}><span style={{ fontWeight: "bold", color: "#0f5132" }}>الموقع:</span> {campProfile?.address || "غير محدد"}</p>
+          <p style={{ margin: "2px 0" }}><span style={{ fontWeight: "bold", color: "#0f5132" }}>مرجع الكشف:</span> <span dir="ltr" style={{ display: "inline-block" }}>{reportReference}</span></p>
         </div>
       </div>
 
-      <div className="report-title-bar" style={{ textAlign: "center", marginBottom: "20px", background: "#f4f6f4", padding: "10px", borderRadius: "6px", borderRight: "5px solid #0f5132" }}>
-        <h2 style={{ margin: 0, fontSize: "14pt", color: "#0f5132" }}>
+      <div className="report-title-bar" style={{ textAlign: "center", marginBottom: "15px", background: "#f4f6f4", padding: "8px", borderRadius: "6px", borderRight: "5px solid #0f5132" }}>
+        <h2 style={{ margin: 0, fontSize: "13pt", color: "#0f5132", fontWeight: 800 }}>
           {type === "nominations" 
-            ? `كشف ترشيحات ${campProfile?.name || "المخيم"} العام (كشف الترشيحات المفصل)` 
-            : `كشف عائلات ${campProfile?.name || "المخيم"} العام`}
+            ? (filterTitle ? `كشف ترشيحات ${campProfile?.name || "المخيم"} (${filterTitle})` : `كشف ترشيحات ${campProfile?.name || "المخيم"} العام (المفصل)`)
+            : (filterTitle ? `كشف عائلات ${campProfile?.name || "المخيم"} (${filterTitle})` : `كشف عائلات ${campProfile?.name || "المخيم"} العام`)}
         </h2>
       </div>
 
@@ -356,6 +369,11 @@ const PrintPage = () => {
               <span style={{ fontWeight: "bold", color: "#64748b" }}>معيل امرأة:</span>
               <span style={{ fontWeight: "bold", color: "#4a148c" }}> {femaleHeadedCount}</span>
             </div>
+            <div style={{ color: "#cbd5e1" }}>|</div>
+            <div className="stats-item">
+              <span style={{ fontWeight: "bold", color: "#64748b" }}>معيل طفل يتيم:</span>
+              <span style={{ fontWeight: "bold", color: "#d97706" }}> {orphanChildCount}</span>
+            </div>
           </>
         )}
       </div>
@@ -363,17 +381,43 @@ const PrintPage = () => {
       {/* جدول البيانات العريض المسطح */}
       <div className="print-table-wrapper">
         {type === "nominations" ? (
-          <table className="print-table" style={{ width: "100%", borderCollapse: "collapse", marginBottom: "30px", direction: "rtl", tableLayout: "auto" }}>
+          <table className="print-table" style={{ width: "100%", borderCollapse: "collapse", marginBottom: "25px", direction: "rtl", tableLayout: "fixed" }}>
+          <colgroup>
+            <col style={{ width: "2.5%" }} />
+            <col style={{ width: "9.5%" }} />
+            <col style={{ width: "7%" }} />
+            <col style={{ width: "3.5%" }} />
+            <col style={{ width: "9.5%" }} />
+            <col style={{ width: "7.5%" }} />
+            <col style={{ width: "2.5%" }} />
+            <col style={{ width: "1.8%" }} />
+            <col style={{ width: "1.8%" }} />
+            <col style={{ width: "1.8%" }} />
+            <col style={{ width: "1.8%" }} />
+            <col style={{ width: "1.8%" }} />
+            <col style={{ width: "1.8%" }} />
+            <col style={{ width: "1.8%" }} />
+            <col style={{ width: "1.8%" }} />
+            <col style={{ width: "1.8%" }} />
+            <col style={{ width: "1.8%" }} />
+            <col style={{ width: "2%" }} />
+            <col style={{ width: "2%" }} />
+            <col style={{ width: "2%" }} />
+            <col style={{ width: "2%" }} />
+            <col style={{ width: "2%" }} />
+            <col style={{ width: "13%" }} />
+            <col style={{ width: "17%" }} />
+          </colgroup>
           <thead>
             {/* الصف الأول من الهيدر */}
             <tr style={{ backgroundColor: "#0f5132", color: "white" }}>
-              <th rowSpan="2" style={{ width: "2.5%", fontSize: "7.5pt", padding: "4px 2px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>رقم</th>
-              <th rowSpan="2" style={{ width: "10%", fontSize: "7.5pt", padding: "4px 3px", border: "1px solid #0f5132", textAlign: "right", verticalAlign: "middle" }}>اسم رب الأسرة</th>
-              <th rowSpan="2" style={{ width: "7%", fontSize: "7.5pt", padding: "4px 3px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>الهوية</th>
-              <th rowSpan="2" style={{ width: "4%", fontSize: "7.5pt", padding: "4px 2px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>الحالة</th>
-              <th rowSpan="2" style={{ width: "10%", fontSize: "7.5pt", padding: "4px 3px", border: "1px solid #0f5132", textAlign: "right", verticalAlign: "middle" }}>اسم الزوجة / الهوية</th>
-              <th rowSpan="2" style={{ width: "7.5%", fontSize: "7.5pt", padding: "4px 2px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>رقم الجوال</th>
-              <th rowSpan="2" style={{ width: "3%", fontSize: "7.5pt", padding: "4px 2px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>الأفراد</th>
+              <th rowSpan="2" style={{ fontSize: "7.5pt", padding: "4px 2px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>رقم</th>
+              <th rowSpan="2" style={{ fontSize: "7.5pt", padding: "4px 3px", border: "1px solid #0f5132", textAlign: "right", verticalAlign: "middle" }}>اسم رب الأسرة</th>
+              <th rowSpan="2" style={{ fontSize: "7.5pt", padding: "4px 3px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>الهوية والميلاد</th>
+              <th rowSpan="2" style={{ fontSize: "7.5pt", padding: "4px 2px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>الحالة</th>
+              <th rowSpan="2" style={{ fontSize: "7.5pt", padding: "4px 3px", border: "1px solid #0f5132", textAlign: "right", verticalAlign: "middle" }}>اسم الزوجة / الهوية والميلاد</th>
+              <th rowSpan="2" style={{ fontSize: "7.5pt", padding: "4px 2px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>رقم الجوال</th>
+              <th rowSpan="2" style={{ fontSize: "7.5pt", padding: "4px 2px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>الأفراد</th>
               
               {/* أعمدة الفئات العمرية */}
               <th colSpan="2" style={{ fontSize: "7pt", padding: "3px 1px", border: "1px solid #0f5132", textAlign: "center", backgroundColor: "#1e3d59" }}>2-0</th>
@@ -382,12 +426,13 @@ const PrintPage = () => {
               <th colSpan="2" style={{ fontSize: "7pt", padding: "3px 1px", border: "1px solid #0f5132", textAlign: "center", backgroundColor: "#7b68ee" }}>60-19</th>
               <th colSpan="2" style={{ fontSize: "7pt", padding: "3px 1px", border: "1px solid #0f5132", textAlign: "center", backgroundColor: "#ff8c00" }}>60+</th>
               
-              <th rowSpan="2" style={{ width: "2.5%", fontSize: "7.5pt", padding: "4px 1px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>إعاقة</th>
-              <th rowSpan="2" style={{ width: "2.5%", fontSize: "7.5pt", padding: "4px 1px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>مزمن</th>
-              <th rowSpan="2" style={{ width: "2.5%", fontSize: "7.5pt", padding: "4px 1px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>حامل</th>
-              <th rowSpan="2" style={{ width: "2.5%", fontSize: "7.5pt", padding: "4px 1px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>معيل</th>
-              <th rowSpan="2" style={{ width: "12%", fontSize: "7.5pt", padding: "4px 3px", border: "1px solid #0f5132", textAlign: "right", verticalAlign: "middle" }}>المحافظة / المندوب</th>
-              <th rowSpan="2" style={{ width: "14%", fontSize: "7.5pt", padding: "4px 3px", border: "1px solid #0f5132", textAlign: "right", verticalAlign: "middle" }}>عنوان السكن (الحالي / الأصلي)</th>
+              <th rowSpan="2" style={{ width: "2%", fontSize: "7.5pt", padding: "4px 1px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>إعاقة</th>
+              <th rowSpan="2" style={{ width: "2%", fontSize: "7.5pt", padding: "4px 1px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>مزمن</th>
+              <th rowSpan="2" style={{ width: "2%", fontSize: "7.5pt", padding: "4px 1px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>حامل</th>
+              <th rowSpan="2" style={{ width: "2%", fontSize: "7.5pt", padding: "4px 1px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>معيل امرأة</th>
+              <th rowSpan="2" style={{ width: "2%", fontSize: "7.5pt", padding: "4px 1px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>طفل يتيم</th>
+              <th rowSpan="2" style={{ width: "11%", fontSize: "7.5pt", padding: "4px 3px", border: "1px solid #0f5132", textAlign: "right", verticalAlign: "middle" }}>المحافظة / المندوب</th>
+              <th rowSpan="2" style={{ width: "13%", fontSize: "7.5pt", padding: "4px 3px", border: "1px solid #0f5132", textAlign: "right", verticalAlign: "middle" }}>عنوان السكن (الحالي / الأصلي)</th>
             </tr>
             {/* الصف الثاني من الهيدر لتحديد ذكر/أنثى */}
             <tr style={{ backgroundColor: "#0f5132", color: "white" }}>
@@ -410,18 +455,23 @@ const PrintPage = () => {
               const hasChr = isPos(nom.hasChronicDisease || nom.has_chronic_disease);
               const hasPreg = isPos(nom.isLactatingOrPregnant || nom.is_lactating_or_pregnant);
               const hasFem = isPos(nom.isFemaleHeaded || nom.is_female_headed);
+              const hasOrphan = isPos(nom.isChildHeaded || nom.is_child_headed || nom.isOrphanHeaded) || (nom.status || "").includes("يتيم");
 
               return (
                 <tr key={nom.id} style={{ backgroundColor: index % 2 === 1 ? "#f8fafc" : "transparent" }}>
                   <td style={{ textAlign: "center", fontWeight: "bold", padding: "4px 2px", border: "1px solid #cbd5e1", fontSize: "7pt", lineHeight: "1.3" }}>{nom.serialNo || index + 1}</td>
                   <td style={{ fontWeight: "bold", color: "#0f5132", padding: "4px 3px", border: "1px solid #cbd5e1", fontSize: "7.5pt", lineHeight: "1.3", wordBreak: "break-word" }}>{nom.name}</td>
-                  <td style={{ padding: "4px 2px", border: "1px solid #cbd5e1", fontSize: "7pt", textAlign: "center", lineHeight: "1.3" }}>{nom.idNumber}</td>
+                  <td style={{ padding: "4px 2px", border: "1px solid #cbd5e1", fontSize: "7pt", textAlign: "center", lineHeight: "1.3" }}>
+                    <div>{nom.idNumber}</div>
+                    {nom.dob && nom.dob !== "-" && <div style={{ fontSize: "6.5pt", color: "#64748b" }}>{nom.dob}</div>}
+                  </td>
                   <td style={{ textAlign: "center", padding: "4px 2px", border: "1px solid #cbd5e1", fontSize: "7pt", lineHeight: "1.3" }}>{nom.status || "متزوج"}</td>
                   <td style={{ color: "#b89647", fontWeight: "600", padding: "4px 3px", border: "1px solid #cbd5e1", fontSize: "7.5pt", lineHeight: "1.3", wordBreak: "break-word" }}>
                     {nom.wifeName ? (
                       <div>
                         {nom.wifeName}
                         {nom.wifeId && <span style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: "normal", marginRight: "3px" }}>({nom.wifeId})</span>}
+                        {nom.wifeDob && nom.wifeDob !== "-" && <div style={{ fontSize: "6.2pt", color: "#64748b" }}>م: {nom.wifeDob}</div>}
                       </div>
                     ) : "-"}
                     {nom.wife2Name && (
@@ -453,6 +503,7 @@ const PrintPage = () => {
                   <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt" }}>{hasChr ? "نعم" : "-"}</td>
                   <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt" }}>{hasPreg ? "نعم" : "-"}</td>
                   <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt" }}>{hasFem ? "نعم" : "-"}</td>
+                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt" }}>{hasOrphan ? "نعم" : "-"}</td>
 
                   {/* المحافظة / المندوب */}
                   <td style={{ padding: "4px 3px", border: "1px solid #cbd5e1", fontSize: "7.5pt", lineHeight: "1.35", wordBreak: "break-word" }}>
@@ -490,40 +541,56 @@ const PrintPage = () => {
           </tbody>
         </table>
       ) : (
-        <table className="print-table" style={{ width: "100%", borderCollapse: "collapse", marginBottom: "30px", direction: "rtl" }}>
+        <table className="print-table" style={{ width: "100%", tableLayout: "fixed", borderCollapse: "collapse", marginBottom: "25px", direction: "rtl" }}>
+          <colgroup>
+            <col style={{ width: "3.5%" }} />
+            <col style={{ width: "16.5%" }} />
+            <col style={{ width: "9%" }} />
+            <col style={{ width: "8.5%" }} />
+            <col style={{ width: "6%" }} />
+            <col style={{ width: "16%" }} />
+            <col style={{ width: "9%" }} />
+            <col style={{ width: "8.5%" }} />
+            <col style={{ width: "9%" }} />
+            <col style={{ width: "4%" }} />
+            <col style={{ width: "10%" }} />
+          </colgroup>
           <thead>
             <tr style={{ backgroundColor: "#0f5132", color: "white" }}>
-              <th style={{ width: "3%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>رقم</th>
-              <th style={{ width: "15%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>اسم رب الأسرة</th>
-              <th style={{ width: "10%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>هوية رب الأسرة</th>
-              <th style={{ width: "10%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>تاريخ الميلاد</th>
-              <th style={{ width: "7%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>الحالة</th>
-              <th style={{ width: "15%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>اسم الزوجة</th>
-              <th style={{ width: "10%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>هوية الزوجة</th>
-              <th style={{ width: "10%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>ميلاد الزوجة</th>
-              <th style={{ width: "10%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>رقم الهاتف</th>
-              <th style={{ width: "4%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "center" }}>الأفراد</th>
-              <th style={{ width: "10%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>مكان السكن</th>
-              <th style={{ width: "12%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>ملاحظات</th>
+              <th style={{ textAlign: "center", padding: "5px 2px" }}>رقم</th>
+              <th style={{ textAlign: "right", padding: "5px 4px" }}>اسم رب الأسرة</th>
+              <th style={{ textAlign: "center", padding: "5px 2px" }}>هوية رب الأسرة</th>
+              <th style={{ textAlign: "center", padding: "5px 2px" }}>تاريخ الميلاد</th>
+              <th style={{ textAlign: "center", padding: "5px 2px" }}>الحالة</th>
+              <th style={{ textAlign: "right", padding: "5px 4px" }}>اسم الزوجة</th>
+              <th style={{ textAlign: "center", padding: "5px 2px" }}>هوية الزوجة</th>
+              <th style={{ textAlign: "center", padding: "5px 2px" }}>ميلاد الزوجة</th>
+              <th style={{ textAlign: "center", padding: "5px 2px" }}>رقم الهاتف</th>
+              <th style={{ textAlign: "center", padding: "5px 2px" }}>الأفراد</th>
+              <th style={{ textAlign: "right", padding: "5px 4px" }}>مكان السكن / ملاحظات</th>
             </tr>
           </thead>
           <tbody>
             {data.map((f, index) => {
-              const isMarried = f.status === "متزوج";
+              const isMarried = (f.status || "").includes("متزوج");
+              const wifeName = isMarried ? (f.wifeName || f.wife_name || "-") : "-";
+              const wifeId = isMarried ? (f.wifeId || f.wife_id || "-") : "-";
+              const wifeDob = isMarried ? (f.wifeDob || f.wife_dob || "-") : "-";
+              const locNotes = [f.location, f.notes].filter(Boolean).join(" - ") || "-";
+
               return (
                 <tr key={f.id} style={{ backgroundColor: index % 2 === 1 ? "#f8fafc" : "transparent" }}>
-                  <td style={{ textAlign: "center", fontWeight: "bold", padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{index + 1}</td>
-                  <td style={{ fontWeight: "bold", color: "#0f5132", padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{f.name}</td>
-                  <td style={{ padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{f.idNumber}</td>
-                  <td style={{ padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{f.dob || "-"}</td>
-                  <td style={{ textAlign: "center", padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{f.status || "أعزب"}</td>
-                  <td style={{ color: "#b89647", fontWeight: "600", padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{isMarried ? (f.wifeName || "-") : "-"}</td>
-                  <td style={{ padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{isMarried ? (f.wifeId || "-") : "-"}</td>
-                  <td style={{ padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{isMarried ? (f.wifeDob || "-") : "-"}</td>
-                  <td style={{ direction: "ltr", textAlign: "right", padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{f.phone}</td>
-                  <td style={{ textAlign: "center", fontWeight: "bold", padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{f.membersCount}</td>
-                  <td style={{ padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{f.location}</td>
-                  <td style={{ padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt", wordBreak: "break-word" }}>{f.notes || "-"}</td>
+                  <td style={{ textAlign: "center", fontWeight: "bold", padding: "4px 2px", border: "1px solid #cbd5e1" }}>{index + 1}</td>
+                  <td style={{ fontWeight: "bold", color: "#0f5132", padding: "4px 4px", border: "1px solid #cbd5e1", wordBreak: "break-word" }}>{f.name}</td>
+                  <td style={{ textAlign: "center", padding: "4px 2px", border: "1px solid #cbd5e1", whiteSpace: "nowrap" }}>{f.idNumber || f.id_number}</td>
+                  <td style={{ textAlign: "center", padding: "4px 2px", border: "1px solid #cbd5e1", whiteSpace: "nowrap" }}>{f.dob || f.birthDate || "-"}</td>
+                  <td style={{ textAlign: "center", padding: "4px 2px", border: "1px solid #cbd5e1", whiteSpace: "nowrap" }}>{f.status || "متزوج"}</td>
+                  <td style={{ color: "#b89647", fontWeight: "600", padding: "4px 4px", border: "1px solid #cbd5e1", wordBreak: "break-word" }}>{wifeName}</td>
+                  <td style={{ textAlign: "center", padding: "4px 2px", border: "1px solid #cbd5e1", whiteSpace: "nowrap" }}>{wifeId}</td>
+                  <td style={{ textAlign: "center", padding: "4px 2px", border: "1px solid #cbd5e1", whiteSpace: "nowrap" }}>{wifeDob}</td>
+                  <td style={{ textAlign: "center", padding: "4px 2px", border: "1px solid #cbd5e1", whiteSpace: "nowrap", direction: "ltr" }}>{f.phone || "-"}</td>
+                  <td style={{ textAlign: "center", fontWeight: "bold", padding: "4px 2px", border: "1px solid #cbd5e1" }}>{f.membersCount || f.members_count || 1}</td>
+                  <td style={{ padding: "4px 4px", border: "1px solid #cbd5e1", wordBreak: "break-word", fontSize: "7pt" }}>{locNotes}</td>
                 </tr>
               );
             })}

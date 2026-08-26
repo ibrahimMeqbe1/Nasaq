@@ -196,6 +196,17 @@ export const updateCampProfile = async (campId, updatedFields) => {
     return { success: true };
   }
 
+  // Non-Supabase: persist to SQLite via the server API so changes survive page navigation
+  const res = await fetch("/api/camps", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: campId, ...updatedFields }),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(json.error || "فشل تحديث بيانات المخيم");
+  }
+  // Also update local mirror so the UI reflects the change immediately
   initCampLocalStorage();
   const camps = getCampsFromLocal();
   camps[campId] = camps[campId]
@@ -497,6 +508,18 @@ export const updateAnnouncement = async (announcementData) => {
 // ─── System stats (Super Admin) ───────────────────────────────────────────────
 
 export const getAdminSystemStats = async () => {
+  try {
+    const res = await fetch("/api/admin/stats", { credentials: "same-origin" });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.stats) {
+        return data.stats;
+      }
+    }
+  } catch (err) {
+    console.warn("API admin stats fetch warning:", err);
+  }
+
   const camps = await getAllCamps();
   const now = new Date();
 
@@ -509,172 +532,45 @@ export const getAdminSystemStats = async () => {
     else activeCamps++;
   });
 
-  let totalUsers = camps.length;
-  let activeUsersCount = activeCamps;
-  let totalFamilies = 0;
-  let totalMembers = 0;
-  let totalNominations = 0;
-  let pendingRequests = 0;
-  let totalRequests = 0;
-
-  if (isSupabaseConfigured) {
-    try {
-      const { data: usersData } = await supabase.from("users").select("id, role");
-      if (usersData?.length) {
-        totalUsers = usersData.length;
-        activeUsersCount = usersData.filter(
-          (u) => u.role === "admin" || u.role === "superadmin" || !u.role
-        ).length;
-      }
-
-      const { data: famData, count: famCount, error: famErr } = await supabase
-        .from("families").select("id, members_count", { count: "exact" });
-      if (!famErr && famData?.length) {
-        totalFamilies = famCount || famData.length;
-        totalMembers = famData.reduce((sum, f) => sum + (parseInt(f.members_count) || 1), 0);
-      }
-
-      const { count: nomCount, error: nomErr } = await supabase
-        .from("nominations").select("id", { count: "exact", head: true });
-      if (!nomErr && typeof nomCount === "number" && nomCount > 0) totalNominations = nomCount;
-
-      const { data: reqsData } = await supabase.from("renewal_requests").select("*");
-      if (reqsData) {
-        totalRequests = reqsData.length;
-        pendingRequests = reqsData.filter((r) => r.status === "pending").length;
-      }
-    } catch (err) {
-      console.error("Error calculating Supabase stats:", err);
-    }
-  }
-
-  // Demo data is only valid when Supabase is not configured. A valid empty
-  // production database must stay empty after camps are deleted.
-  if (!isSupabaseConfigured && totalFamilies === 0 && typeof window !== "undefined") {
-    if (localStorage.getItem("kareem_camp_families_cleared") !== "true") {
-      try {
-        const raw = localStorage.getItem("kareem_camp_families_v5");
-        if (raw) {
-          const parsed = decryptData(raw);
-          if (Array.isArray(parsed)) {
-            totalFamilies = parsed.length;
-            totalMembers = parsed.reduce((sum, f) => sum + (parseInt(f.membersCount) || 1), 0);
-          }
-        }
-      } catch {}
-    }
-  }
-
-  if (!isSupabaseConfigured && totalNominations === 0 && typeof window !== "undefined") {
-    if (localStorage.getItem("kareem_camp_nominations_cleared") !== "true") {
-      try {
-        const raw = localStorage.getItem("kareem_camp_nominations_v3");
-        if (raw) {
-          const parsed = decryptData(raw);
-          if (Array.isArray(parsed)) totalNominations = parsed.length;
-        }
-      } catch {}
-    }
-  }
-
   return {
-    totalCamps: camps.length, activeCamps, expiredCamps,
-    totalUsers, activeUsersCount, totalFamilies, totalMembers,
-    totalNominations, pendingRequests, totalRequests,
+    totalCamps: camps.length,
+    activeCamps,
+    expiredCamps,
+    totalUsers: camps.length,
+    activeUsersCount: activeCamps,
+    totalFamilies: 0,
+    totalMembers: 0,
+    totalNominations: 0,
+    pendingRequests: 0,
+    totalRequests: 0,
   };
 };
 
 export const getGlobalSystemMetrics = async () => {
-  let families = [];
-  let nominations = [];
-
-  const isPositive = (val) =>
-    val === 1 || val === "1" || val === true || val === "true" || val === "نعم";
-
-  if (isSupabaseConfigured) {
-    try {
-      const { data: famData } = await supabase.from("families").select("*");
-      if (famData) families = famData;
-      const { data: nomData } = await supabase.from("nominations").select("*");
-      if (nomData) nominations = nomData;
-    } catch (e) {
-      console.warn("Supabase fetch global metrics warning:", e);
-    }
-  }
-
-  if (!isSupabaseConfigured && families.length === 0 && typeof window !== "undefined") {
-    try {
-      const raw = localStorage.getItem("kareem_camp_families_v5");
-      if (raw) families = decryptData(raw) || [];
-    } catch {}
-  }
-
-  if (!isSupabaseConfigured && nominations.length === 0 && typeof window !== "undefined") {
-    try {
-      const raw = localStorage.getItem("kareem_camp_nominations_v3");
-      if (raw) nominations = decryptData(raw) || [];
-    } catch {}
-  }
-
-  const familiesWithSpecialCases = nominations.filter((n) =>
-    isPositive(n.hasDisabled || n.has_disabled) ||
-    isPositive(n.hasChronicDisease || n.has_chronic_disease) ||
-    isPositive(n.isLactatingOrPregnant || n.is_lactating_or_pregnant) ||
-    isPositive(n.isFemaleHeaded || n.is_female_headed)
-  ).length;
-
-  const getNumVal = (n, ...keys) => {
-    for (const k of keys) {
-      if (n?.[k] !== undefined && n[k] !== null && n[k] !== "") {
-        const parsed = parseInt(n[k]);
-        if (!isNaN(parsed) && parsed > 0) return parsed;
+  try {
+    const res = await fetch("/api/admin/stats", { credentials: "same-origin" });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.metrics) {
+        return data.metrics;
       }
     }
-    return 0;
-  };
-
-  let age_0_2 = nominations.reduce((s, n) => s + getNumVal(n, "age_0_2_male", "age02Male", "age_0_2_m") + getNumVal(n, "age_0_2_female", "age02Female", "age_0_2_f"), 0);
-  let age_3_5 = nominations.reduce((s, n) => s + getNumVal(n, "age_3_5_male", "age35Male") + getNumVal(n, "age_3_5_female", "age35Female"), 0);
-  let age_6_18 = nominations.reduce((s, n) => s + getNumVal(n, "age_6_18_male", "age618Male") + getNumVal(n, "age_6_18_female", "age618Female"), 0);
-  let age_19_60 = nominations.reduce((s, n) => s + getNumVal(n, "age_19_60_male", "age1960Male") + getNumVal(n, "age_19_60_female", "age1960Female"), 0);
-  let age_over_60 = nominations.reduce((s, n) => s + getNumVal(n, "age_over_60_male", "ageOver60Male") + getNumVal(n, "age_over_60_female", "ageOver60Female"), 0);
-
-  const sumAgeFields = age_0_2 + age_3_5 + age_6_18 + age_19_60 + age_over_60;
-  const totalNominationMembers = nominations.reduce(
-    (s, n) => s + (parseInt(n.membersCount || n.members_count) || 1), 0
-  );
-
-  if (sumAgeFields === 0 && totalNominationMembers > 0) {
-    nominations.forEach((n) => {
-      const mCount = parseInt(n.membersCount || n.members_count) || 1;
-      const isWidowOrSingle = ["أرمل", "أعزب", "مطلق"].some((s) => (n.status || "").includes(s));
-      const parentsCount = isWidowOrSingle ? 1 : Math.min(mCount, 2);
-      const kidsCount = Math.max(0, mCount - parentsCount);
-      age_19_60 += parentsCount;
-      age_0_2 += Math.round(kidsCount * 0.15);
-      age_3_5 += Math.round(kidsCount * 0.25);
-      age_6_18 += Math.max(0, kidsCount - Math.round(kidsCount * 0.15) - Math.round(kidsCount * 0.25));
-    });
+  } catch (err) {
+    console.warn("API admin metrics fetch warning:", err);
   }
 
-  const grandAgeTotal =
-    age_0_2 + age_3_5 + age_6_18 + age_19_60 + age_over_60 || totalNominationMembers;
-  const totalChildrenCount = age_0_2 + age_3_5 + age_6_18;
-  const totalAdultsCount = age_19_60 + age_over_60;
-
   return {
-    familiesWithSpecialCases,
-    totalNominationsCount: nominations.length,
-    totalFamiliesCount: families.length,
-    totalChildrenCount,
-    totalAdultsCount,
-    grandAgeTotal,
-    percentSpecial: nominations.length ? Math.min(100, Math.round((familiesWithSpecialCases / nominations.length) * 100)) : 0,
-    percentChildren: grandAgeTotal ? Math.round((totalChildrenCount / grandAgeTotal) * 100) : 0,
-    percentCoverage: families.length
-      ? Math.min(100, Math.round((nominations.length / families.length) * 100))
-      : 0,
-    percentAdults: grandAgeTotal ? Math.round((totalAdultsCount / grandAgeTotal) * 100) : 0,
+    familiesWithSpecialCases: 0,
+    totalChildrenCount: 0,
+    totalAdultsCount: 0,
+    totalSeniorsCount: 0,
+    grandAgeTotal: 0,
+    totalFamiliesCount: 0,
+    totalNominationsCount: 0,
+    percentSpecial: 0,
+    percentChildren: 0,
+    percentAdults: 0,
+    percentCoverage: 0,
   };
 };
 

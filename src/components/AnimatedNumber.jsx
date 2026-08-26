@@ -42,9 +42,9 @@ export const AnimatedNumber = ({ value, duration = 1200, decimals = 0, formatter
   const isFloat = decimals > 0 || (target % 1 !== 0);
   const formattedVal = isFloat 
     ? current.toFixed(decimals || 1) 
-    : Math.round(current).toLocaleString("ar-EG");
+    : Math.round(current).toLocaleString();
 
-  return <span>{formattedVal}</span>;
+  return <span style={{ direction: "ltr", display: "inline-block" }}>{formattedVal}</span>;
 };
 
 export const AnimatedDonut = ({ percent, label, subText }) => {

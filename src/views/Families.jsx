@@ -146,6 +146,14 @@ const Families = ({ families = [], user, campProfile }) => {
     }
   };
 
+  const [exportableFamilies, setExportableFamilies] = useState([]);
+  const [activeFilterDesc, setActiveFilterDesc] = useState("");
+
+  const handleFilteredChange = (filtered, desc) => {
+    setExportableFamilies(filtered);
+    setActiveFilterDesc(desc);
+  };
+
   return (
     <div className="families-page-container">
       {/* التنبيهات النصية السريعة */}
@@ -180,20 +188,20 @@ const Families = ({ families = [], user, campProfile }) => {
             <FaTrash /> مسح الكشف
           </button>
           <button 
-            onClick={() => exportToExcel(families, campProfile)} 
+            onClick={() => exportToExcel(exportableFamilies.length > 0 || activeFilterDesc ? exportableFamilies : families, campProfile, activeFilterDesc)} 
             className="btn btn-excel"
-            title="تصدير Excel"
+            title={activeFilterDesc ? `تصدير النتائج المصفاة (${exportableFamilies.length}) إلى Excel` : "تصدير الكشف إلى Excel"}
             disabled={families.length === 0}
           >
-            <FaFileExcel /> تصدير Excel
+            <FaFileExcel /> {activeFilterDesc ? `تصدير المصفّى (${exportableFamilies.length})` : "تصدير Excel"}
           </button>
           <button 
-            onClick={() => exportToPDF(families, "families", campProfile)} 
+            onClick={() => exportToPDF(exportableFamilies.length > 0 || activeFilterDesc ? exportableFamilies : families, "families", campProfile, activeFilterDesc)} 
             className="btn btn-pdf"
-            title="تصدير PDF"
+            title={activeFilterDesc ? `تصدير وطباعة النتائج المصفاة (${exportableFamilies.length})` : "تصدير الكشف للطباعة و PDF"}
             disabled={families.length === 0}
           >
-            <FaFilePdf /> تصدير PDF
+            <FaFilePdf /> {activeFilterDesc ? `طباعة المصفّى (${exportableFamilies.length})` : "تصدير PDF"}
           </button>
         </div>
       </header>
@@ -246,6 +254,7 @@ const Families = ({ families = [], user, campProfile }) => {
         families={families}
         onEdit={handleOpenEdit}
         onDelete={handleOpenDelete}
+        onFilteredChange={handleFilteredChange}
       />
 
       {/* نموذج الإضافة والتعديل */}

@@ -141,6 +141,14 @@ const Nominations = ({ nominations = [], user, campProfile }) => {
     }
   };
 
+  const [exportableNominations, setExportableNominations] = useState([]);
+  const [activeFilterDesc, setActiveFilterDesc] = useState("");
+
+  const handleFilteredChange = (filtered, desc) => {
+    setExportableNominations(filtered);
+    setActiveFilterDesc(desc);
+  };
+
   return (
     <div className="families-page-container">
       {/* التنبيهات النصية السريعة */}
@@ -175,20 +183,20 @@ const Nominations = ({ nominations = [], user, campProfile }) => {
             <FaTrash /> مسح الكشف
           </button>
           <button 
-            onClick={() => exportNominationsToExcel(nominations, campProfile)} 
+            onClick={() => exportNominationsToExcel(exportableNominations.length > 0 || activeFilterDesc ? exportableNominations : nominations, campProfile, activeFilterDesc)} 
             className="btn btn-excel"
-            title="تصدير Excel"
+            title={activeFilterDesc ? `تصدير النتائج المصفاة (${exportableNominations.length}) إلى Excel` : "تصدير الكشف إلى Excel"}
             disabled={nominations.length === 0}
           >
-            <FaFileExcel /> تصدير Excel
+            <FaFileExcel /> {activeFilterDesc ? `تصدير المصفّى (${exportableNominations.length})` : "تصدير Excel"}
           </button>
           <button 
-            onClick={() => exportToPDF(nominations, "nominations", campProfile)} 
+            onClick={() => exportToPDF(exportableNominations.length > 0 || activeFilterDesc ? exportableNominations : nominations, "nominations", campProfile, activeFilterDesc)} 
             className="btn btn-pdf"
-            title="تصدير PDF"
+            title={activeFilterDesc ? `تصدير وطباعة النتائج المصفاة (${exportableNominations.length})` : "تصدير الكشف للطباعة و PDF"}
             disabled={nominations.length === 0}
           >
-            <FaFilePdf /> تصدير PDF / طباعة
+            <FaFilePdf /> {activeFilterDesc ? `طباعة المصفّى (${exportableNominations.length})` : "تصدير PDF / طباعة"}
           </button>
         </div>
       </header>
@@ -198,6 +206,7 @@ const Nominations = ({ nominations = [], user, campProfile }) => {
         nominations={nominations}
         onEdit={handleOpenEdit}
         onDelete={handleOpenDelete}
+        onFilteredChange={handleFilteredChange}
       />
 
       {/* نموذج الإضافة والتعديل */}

@@ -91,10 +91,17 @@ const escapeHtml = (value) => String(value ?? "-")
   .replaceAll('"', "&quot;")
   .replaceAll("'", "&#039;");
 
+const getColumnWidth = (header, index) => {
+  if (index === 0) return 45;
+  if (header.includes("اسم")) return 210;
+  if (header.includes("هوية") || header.includes("جوال") || header.includes("هاتف")) return 125;
+  if (header.includes("تاريخ") || header.includes("ميلاد")) return 110;
+  if (header.includes("أفراد") || header.includes("ذكور") || header.includes("إناث") || header.includes("0-2") || header.includes("3-5") || header.includes("6-18") || header.includes("19-60") || header.includes("60+") || header.includes("إعاقة") || header.includes("مزمن") || header.includes("حامل") || header.includes("معيل") || header.includes("يتيم")) return 65;
+  if (header.includes("عنوان") || header.includes("مكان") || header.includes("ملاحظات")) return 220;
+  return 120;
+};
+
 const downloadPdfStyledExcel = (filename, title, metaDetails, headers, rows) => {
-  const resolvedLogoUrl = metaDetails.logoUrl?.startsWith("/")
-    ? `${window.location.origin}${metaDetails.logoUrl}`
-    : metaDetails.logoUrl;
   const html = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
     <head>
@@ -115,129 +122,118 @@ const downloadPdfStyledExcel = (filename, title, metaDetails, headers, rows) => 
       </xml>
       <![endif]-->
       <style>
-        body { font-family: 'Cairo', 'Tajawal', 'Segoe UI', sans-serif; direction: rtl; text-align: right; background-color: #ffffff; }
-        table { border-collapse: collapse; width: 100%; direction: rtl; margin-bottom: 20px; }
+        body { font-family: 'Cairo', 'Tajawal', 'Segoe UI', Arial, sans-serif; direction: rtl; text-align: right; background-color: #ffffff; margin: 0; padding: 0; }
+        table { border-collapse: collapse; width: 100%; direction: rtl; margin-bottom: 20px; table-layout: fixed; }
         .main-header-banner {
           background-color: #0f5132;
           color: #ffffff;
-          font-size: 16pt;
+          font-size: 15pt;
           font-weight: 800;
           text-align: center;
-          height: 55px;
+          height: 48px;
           vertical-align: middle;
-          border: 2px solid #0f5132;
+          border: 1.5px solid #0f5132;
         }
         .subtitle-banner {
-          background-color: #f4f6f4;
-          color: #b89647;
-          font-size: 11pt;
-          font-weight: bold;
-          text-align: center;
-          height: 32px;
-          vertical-align: middle;
-          border-left: 5px solid #0f5132;
-        }
-        .meta-row {
-          background-color: #ffffff;
+          background-color: #f1f5f9;
           color: #0f5132;
-          font-size: 10.5pt;
+          font-size: 10pt;
           font-weight: 700;
-          text-align: right;
-          height: 34px;
+          text-align: center;
+          height: 30px;
           vertical-align: middle;
-          padding-right: 15px;
-          border-bottom: 2px double #0f5132;
+          border: 1px solid #cbd5e1;
         }
-        .th-pdf-style {
+        .th-excel-header {
           background-color: #0f5132;
           color: #ffffff;
-          font-size: 11pt;
-          font-weight: 900;
-          text-align: center;
-          height: 42px;
-          vertical-align: middle;
-          border: 1.5px solid #0f172a;
-          white-space: nowrap;
-          padding: 6px 12px;
-        }
-        .td-pdf-style {
-          border: 1.5px solid #0f172a;
           font-size: 10pt;
-          height: 34px;
+          font-weight: 800;
+          text-align: center;
+          height: 38px;
           vertical-align: middle;
-          padding: 4px 10px;
-          font-weight: 600;
+          border: 1px solid #0f172a;
+          white-space: nowrap;
+          padding: 6px 8px;
+        }
+        .td-excel-cell {
+          border: 1px solid #cbd5e1;
+          font-size: 9.5pt;
+          height: 28px;
+          vertical-align: middle;
+          padding: 4px 8px;
           color: #000000;
         }
         .td-text-explicit {
           mso-number-format: "\\@";
           text-align: center;
-          font-weight: 700;
+          font-weight: 600;
         }
         .td-center { text-align: center; }
-        .td-right { text-align: right; }
+        .td-right { text-align: right; font-weight: 600; }
         .row-even { background-color: #ffffff; }
         .row-odd { background-color: #f8fafc; }
-        .brand-cell { width: 110px; text-align: center; vertical-align: middle; border: 2px solid #0f5132; }
-        .brand-logo { width: 76px; height: 76px; object-fit: contain; }
-        .signature { height: 90px; vertical-align: bottom; text-align: center; font-weight: 700; color: #0f5132; }
+        .signature-cell {
+          border: none;
+          font-size: 10pt;
+          font-weight: 700;
+          color: #0f5132;
+          height: 60px;
+          vertical-align: bottom;
+        }
       </style>
     </head>
     <body dir="rtl">
-      <table>
-        <!-- 1. ترويسة اسم المنظومة والمخيم باللون الأخضر الزمردي #0f5132 -->
+      <table border="1">
+        <colgroup>
+          ${headers.map((h, i) => `<col width="${getColumnWidth(h, i)}" style="width: ${getColumnWidth(h, i)}pt;" />`).join("")}
+        </colgroup>
+        
+        <!-- 1. ترويسة اسم المنظومة والمخيم -->
         <tr>
-          <td colspan="2" rowspan="3" class="brand-cell">
-            ${resolvedLogoUrl ? `<img class="brand-logo" src="${escapeHtml(resolvedLogoUrl)}" alt="شعار المخيم" />` : "شعار المخيم"}
-          </td>
-          <td colspan="${Math.max(headers.length - 2, 1)}" class="main-header-banner">${escapeHtml(metaDetails.campName || "نظام إدارة المخيمات")}</td>
-        </tr>
-        <tr>
-          <td colspan="${Math.max(headers.length - 2, 1)}" class="subtitle-banner">كشف رسمي صادر عن إدارة المخيم</td>
-        </tr>
-        <tr>
-          <td colspan="${Math.max(headers.length - 2, 1)}" class="meta-row">
-            مسؤول المخيم: ${escapeHtml(metaDetails.managerName)} | جوال التواصل: ${escapeHtml(metaDetails.managerPhone)} | التاريخ: ${escapeHtml(metaDetails.dateStr)} | إجمالي السجلات: ${escapeHtml(metaDetails.totalCount)}
+          <td colspan="${headers.length}" class="main-header-banner">
+            نظام إدارة المخيمات — ${escapeHtml(metaDetails.campName || "كشف رسمي")}
           </td>
         </tr>
-
-        <!-- سطر فاصل -->
-        <tr><td colspan="${headers.length}" style="height:12px; border:none;"></td></tr>
-
-        <!-- 2. عنوان الكشف الرئيسي -->
         <tr>
-          <td colspan="${headers.length}" style="background-color:#f4f6f4; color:#0f5132; font-size:13pt; font-weight:800; text-align:center; height:40px; border:1.5px solid #0f5132;">
-            ${escapeHtml(title)}
+          <td colspan="${headers.length}" class="subtitle-banner">
+            ${escapeHtml(title)} &nbsp;|&nbsp; مسؤول المخيم: ${escapeHtml(metaDetails.managerName)} &nbsp;|&nbsp; رقم الجوال: ${escapeHtml(metaDetails.managerPhone)} &nbsp;|&nbsp; التاريخ: ${escapeHtml(metaDetails.dateStr)} &nbsp;|&nbsp; إجمالي السجلات: ${escapeHtml(metaDetails.totalCount)}
           </td>
         </tr>
 
         <!-- سطر فاصل -->
-        <tr><td colspan="${headers.length}" style="height:8px; border:none;"></td></tr>
+        <tr style="height: 10px;"><td colspan="${headers.length}" style="height: 10px; border: none; background: #ffffff;"></td></tr>
 
-        <!-- 3. ترويسات الجدول بنفس لون ترويسة PDF (#0f5132 مع حدود كحلية #0f172a) -->
+        <!-- 2. ترويسات الجدول الرسمية -->
         <thead>
           <tr>
-            ${headers.map(h => `<th class="th-pdf-style">${escapeHtml(h)}</th>`).join("")}
+            ${headers.map((h, i) => `<th class="th-excel-header" width="${getColumnWidth(h, i)}" style="width: ${getColumnWidth(h, i)}pt;">${escapeHtml(h)}</th>`).join("")}
           </tr>
         </thead>
 
-        <!-- 4. صفوف البيانات بنفس تنسيق وحدود PDF -->
+        <!-- 3. صفوف البيانات المتناسقة -->
         <tbody>
           ${rows.map((row, rIdx) => `
             <tr class="${rIdx % 2 === 0 ? "row-even" : "row-odd"}">
               ${row.map(cell => {
                 const alignClass = cell.isText ? "td-text-explicit" : cell.align === "center" ? "td-center" : "td-right";
                 const displayVal = cell.value !== null && cell.value !== undefined && cell.value !== "" ? String(cell.value) : "-";
-                return `<td class="td-pdf-style ${alignClass}">${escapeHtml(displayVal)}</td>`;
+                return `<td class="td-excel-cell ${alignClass}">${escapeHtml(displayVal)}</td>`;
               }).join("")}
             </tr>
           `).join("")}
         </tbody>
+
+        <!-- 4. التوقيع والختم -->
         <tfoot>
-          <tr><td colspan="${headers.length}" style="height:18px;border:none"></td></tr>
+          <tr style="height: 18px;"><td colspan="${headers.length}" style="border: none;"></td></tr>
           <tr>
-            <td colspan="${Math.ceil(headers.length / 2)}" class="signature">توقيع مسؤول المخيم: ${escapeHtml(metaDetails.managerName)}<br/><br/>________________________</td>
-            <td colspan="${Math.floor(headers.length / 2)}" class="signature">الختم الرسمي<br/><br/>________________________</td>
+            <td colspan="${Math.ceil(headers.length / 2)}" class="signature-cell" style="text-align: right;">
+              توقيع مسؤول المخيم: ${escapeHtml(metaDetails.managerName)}<br/><br/>________________________
+            </td>
+            <td colspan="${Math.floor(headers.length / 2)}" class="signature-cell" style="text-align: left;">
+              الختم الرسمي للمخيم<br/><br/>________________________
+            </td>
           </tr>
         </tfoot>
       </table>
@@ -259,7 +255,7 @@ const downloadPdfStyledExcel = (filename, title, metaDetails, headers, rows) => 
 /**
  * تصدير قائمة العائلات بتنسيق وألوان مطابقة لكشف الـ PDF الرسمي 100%
  */
-export const exportToExcel = (families, campProfile = null) => {
+export const exportToExcel = (families, campProfile = null, filterTitle = "") => {
   const campName = campProfile?.name || "نظام إدارة المخيمات";
   const managerName = campProfile?.managerName || "غير محدد";
   const managerPhone = campProfile?.managerPhone || "غير محدد";
@@ -306,7 +302,7 @@ export const exportToExcel = (families, campProfile = null) => {
     ];
   });
 
-  const title = `كشف عائلات ${campName} العام`;
+  const title = filterTitle ? `كشف عائلات ${campName} (${filterTitle})` : `كشف عائلات ${campName} العام`;
   const metaDetails = {
     campName,
     managerName,
@@ -316,13 +312,13 @@ export const exportToExcel = (families, campProfile = null) => {
     ,logoUrl: campProfile?.logoUrl || "/nasaq-logo.png"
   };
 
-  downloadPdfStyledExcel(`كشف عائلات ${campName}.xls`, title, metaDetails, headers, rows);
+  downloadPdfStyledExcel(`${title}.xls`, title, metaDetails, headers, rows);
 };
 
 /**
  * تصدير قائمة الترشيحات المفصلة بتنسيق وألوان مطابقة لكشف الـ PDF الرسمي 100%
  */
-export const exportNominationsToExcel = (nominations, campProfile = null) => {
+export const exportNominationsToExcel = (nominations, campProfile = null, filterTitle = "") => {
   const campName = campProfile?.name || "نظام إدارة المخيمات";
   const managerName = campProfile?.managerName || "غير محدد";
   const managerPhone = campProfile?.managerPhone || "غير محدد";
@@ -364,6 +360,7 @@ export const exportNominationsToExcel = (nominations, campProfile = null) => {
     "أمراض مزمنة",
     "حامل/مرضعة",
     "معيل امرأة",
+    "معيل طفل يتيم",
     "عنوان السكن الحالي",
     "عنوان السكن الأصلي",
     "المحافظة",
@@ -378,6 +375,25 @@ export const exportNominationsToExcel = (nominations, campProfile = null) => {
   const rows = (nominations || []).map((n, index) => {
     const cleanedWife1 = cleanWifeDetails(n.wifeName || n.wife_name, n.wifeId || n.wife_id);
     const cleanedWife2 = cleanWifeDetails(n.wife2Name || n.wife_2_name, n.wife2Id || n.wife_2_id);
+
+    const getNum = (...keys) => {
+      for (const k of keys) {
+        if (n && n[k] !== undefined && n[k] !== null && n[k] !== "") {
+          const val = parseInt(n[k]);
+          if (!isNaN(val) && val >= 0) return val;
+        }
+      }
+      return 0;
+    };
+
+    const isPos = (...keys) => {
+      for (const k of keys) {
+        if (n && (n[k] === 1 || n[k] === true || n[k] === "1" || n[k] === "true" || n[k] === "نعم")) {
+          return true;
+        }
+      }
+      return false;
+    };
 
     return [
       { value: n.serialNo || index + 1, align: "center" },
@@ -394,20 +410,21 @@ export const exportNominationsToExcel = (nominations, campProfile = null) => {
       { value: cleanedWife2.wifeName, align: "right" },
       { value: cleanedWife2.wifeId, isText: true },
       { value: parseInt(n.membersCount || n.members_count) || 1, align: "center" },
-      { value: parseInt(n.age_0_2_male) || 0, align: "center" },
-      { value: parseInt(n.age_0_2_female) || 0, align: "center" },
-      { value: parseInt(n.age_3_5_male) || 0, align: "center" },
-      { value: parseInt(n.age_3_5_female) || 0, align: "center" },
-      { value: parseInt(n.age_6_18_male) || 0, align: "center" },
-      { value: parseInt(n.age_6_18_female) || 0, align: "center" },
-      { value: parseInt(n.age_19_60_male) || 0, align: "center" },
-      { value: parseInt(n.age_19_60_female) || 0, align: "center" },
-      { value: parseInt(n.age_over_60_male) || 0, align: "center" },
-      { value: parseInt(n.age_over_60_female) || 0, align: "center" },
-      { value: n.hasDisabled ? "1" : "0", align: "center" },
-      { value: n.hasChronicDisease ? "1" : "0", align: "center" },
-      { value: n.isLactatingOrPregnant ? "1" : "0", align: "center" },
-      { value: n.isFemaleHeaded ? "1" : "0", align: "center" },
+      { value: getNum("age_0_2_male", "age02Male"), align: "center" },
+      { value: getNum("age_0_2_female", "age02Female"), align: "center" },
+      { value: getNum("age_3_5_male", "age35Male"), align: "center" },
+      { value: getNum("age_3_5_female", "age35Female"), align: "center" },
+      { value: getNum("age_6_18_male", "age618Male"), align: "center" },
+      { value: getNum("age_6_18_female", "age618Female"), align: "center" },
+      { value: getNum("age_19_60_male", "age1960Male"), align: "center" },
+      { value: getNum("age_19_60_female", "age1960Female"), align: "center" },
+      { value: getNum("age_over_60_male", "ageOver60Male"), align: "center" },
+      { value: getNum("age_over_60_female", "ageOver60Female"), align: "center" },
+      { value: isPos("hasDisabled", "has_disabled") ? "1" : "0", align: "center" },
+      { value: isPos("hasChronicDisease", "has_chronic_disease") ? "1" : "0", align: "center" },
+      { value: isPos("isLactatingOrPregnant", "is_lactating_or_pregnant") ? "1" : "0", align: "center" },
+      { value: isPos("isFemaleHeaded", "is_female_headed") ? "1" : "0", align: "center" },
+      { value: isPos("isChildHeaded", "is_child_headed", "isOrphanHeaded") || (n.status || "").includes("يتيم") ? "1" : "0", align: "center" },
       { value: n.currentAddress || n.location || "-", align: "right" },
       { value: n.originalAddress || "-", align: "right" },
       { value: n.governorate || "شمال غزة", align: "center" },
@@ -420,7 +437,7 @@ export const exportNominationsToExcel = (nominations, campProfile = null) => {
     ];
   });
 
-  const title = `كشف ترشيحات ${campName} العام (المفصل)`;
+  const title = filterTitle ? `كشف ترشيحات ${campName} (${filterTitle})` : `كشف ترشيحات ${campName} العام (المفصل)`;
   const metaDetails = {
     campName,
     managerName,
@@ -430,7 +447,7 @@ export const exportNominationsToExcel = (nominations, campProfile = null) => {
     ,logoUrl: campProfile?.logoUrl || "/nasaq-logo.png"
   };
 
-  downloadPdfStyledExcel(`كشف ترشيحات ${campName}.xls`, title, metaDetails, headers, rows);
+  downloadPdfStyledExcel(`${title}.xls`, title, metaDetails, headers, rows);
 };
 
 const downloadStaticTemplate = (url, filename) => {

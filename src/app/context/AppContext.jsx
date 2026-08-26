@@ -32,6 +32,41 @@ export const AppProvider = ({ children }) => {
   // 1. مراقبة حالة المصادقة عند البداية واستعادة الجلسة
   useEffect(() => {
     const restoreSession = async () => {
+      // إذا كان المستخدم خارجاً صراحةً من النظام عبر معامل logout
+      if (typeof window !== "undefined") {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get("logout") === "1" || urlParams.get("logged_out") === "1") {
+          setUser(null);
+          setCampProfile(null);
+          try {
+            sessionStorage.clear();
+            localStorage.clear();
+            document.cookie = "session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0";
+          } catch {}
+          setLoading(false);
+          return;
+        }
+      }
+
+      // محاولة استعادة الجلسة من السيرفر أولاً
+      try {
+        const sessionRes = await fetch("/api/auth/session", { credentials: "same-origin" });
+        if (sessionRes.ok) {
+          const sessionData = await sessionRes.json();
+          if (sessionData.authenticated && sessionData.user) {
+            setUser(sessionData.user);
+            if (typeof window !== "undefined") {
+              sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(sessionData.user));
+            }
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn("Session check notice:", e);
+      }
+
+      // الرجوع إلى التخزين المحلي في حال عدم استجابة السيرفر
       const savedUserStr = typeof window !== "undefined" ? sessionStorage.getItem("kareem_camp_logged_in") : null;
 
       if (savedUserStr) {
@@ -50,7 +85,7 @@ export const AppProvider = ({ children }) => {
     restoreSession();
   }, []);
 
-  // 2. التحقق من حالة اشتراك المخيم عند تسجيل الدخول
+  // 2. التحقق من حالة اشتراك المخيم وتشغيل فحص النسخ الاحتياطي التلقائي
   useEffect(() => {
     if (!user || user.role === "superadmin" || !user.campId) {
       setCampProfile(null);
@@ -72,6 +107,15 @@ export const AppProvider = ({ children }) => {
       console.error("Error checking camp profile:", err);
       setIsSubscriptionExpired(false);
     });
+
+    // تشغيل فحص النسخ الاحتياطي الأسبوعي التلقائي في الخلفية
+    try {
+      fetch("/api/backup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "auto_check", campId: user.campId }),
+      }).catch(() => {});
+    } catch {}
   }, [user?.campId, user?.role]);
 
   // 3. جلب بيانات العائلات والترشيحات والاشتراك الفوري
@@ -108,13 +152,26 @@ export const AppProvider = ({ children }) => {
   }, [user?.campId, user?.role]);
 
   const handleLogout = async () => {
+    setUser(null);
+    setCampProfile(null);
+    setIsSubscriptionExpired(false);
+
     if (typeof window !== "undefined") {
-      sessionStorage.clear();
-      localStorage.removeItem("kareem_camp_logged_in");
+      try {
+        sessionStorage.clear();
+        localStorage.clear();
+        document.cookie = "session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; max-age=0";
+      } catch (err) {
+        console.warn("Storage clear notice:", err);
+      }
     }
 
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      await fetch("/api/auth/logout", { 
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" }
+      });
     } catch (e) {
       console.warn("Logout fetch warning:", e);
     }
@@ -127,15 +184,10 @@ export const AppProvider = ({ children }) => {
       }
     }
 
-    setUser(null);
-    setCampProfile(null);
-    setIsSubscriptionExpired(false);
-
-    // إعادة تحميل كاملة من المتصفح لتنظيف أي ذواكر متبقية بالـ React Memory / Closures
     if (typeof window !== "undefined") {
-      window.location.href = "/login";
+      window.location.href = "/login?logout=1";
     } else {
-      router.replace("/login");
+      router.replace("/login?logout=1");
     }
   };
 
@@ -155,10 +207,13 @@ export const AppProvider = ({ children }) => {
     } else if (user && user.role !== "superadmin" && isSuperAdminPath) {
       router.replace("/");
     } else if (user && pathname === "/login") {
-      if (user.role === "superadmin") {
-        router.replace("/super-admin");
-      } else {
-        router.replace("/");
+      const isLogoutMode = typeof window !== "undefined" && window.location.search.includes("logout");
+      if (!isLogoutMode) {
+        if (user.role === "superadmin") {
+          router.replace("/super-admin");
+        } else {
+          router.replace("/");
+        }
       }
     }
   }, [user, loading, pathname, router, isProtectedPath]);
@@ -207,8 +262,8 @@ export const AppProvider = ({ children }) => {
     );
   }
 
-  // إذا كان المطور في لوحة تحكمه
-  if (user && user.role === "superadmin") {
+  // إذا كان المشرف العام داخل صفحة لوحة المشرف العام الحصرية
+  if (user && user.role === "superadmin" && pathname === "/super-admin") {
     return (
       <AppContext.Provider value={contextValue}>
         {children}
@@ -232,27 +287,31 @@ export const AppProvider = ({ children }) => {
   // الهيكل المعياري المحمي للصفحات الداخلية
   return (
     <AppContext.Provider value={contextValue}>
-      {user && <Navbar user={user} campProfile={campProfile} onLogout={handleLogout} />}
-      {user && <AnnouncementBar />}
-      {dataError && (
-        <div className="system-data-alert" role="alert">
-          {dataError}
+      <div className="app-shell-layout">
+        {user && <Navbar user={user} campProfile={campProfile} onLogout={handleLogout} />}
+        <div className="app-main-area">
+          {user && <AnnouncementBar />}
+          {dataError && (
+            <div className="system-data-alert" role="alert">
+              {dataError}
+            </div>
+          )}
+          <main className="main-content-layout">
+            {children}
+          </main>
+          {user && (
+            <footer className="app-footer no-print">
+              <p className="copyright-text">© 2026 م. إبراهيم مقبل - كافة الحقوق محفوظة</p>
+              <p className="developer-credit">
+                تم تطوير الموقع بواسطة 
+                <button onClick={() => setShowDeveloperModal(true)} className="developer-link-btn">
+                  م. إبراهيم مقبل
+                </button>
+              </p>
+            </footer>
+          )}
         </div>
-      )}
-      <main className="main-content-layout">
-        {children}
-      </main>
-      {user && (
-        <footer className="app-footer no-print">
-          <p className="copyright-text">© 2026 م. إبراهيم مقبل - كافة الحقوق محفوظة</p>
-          <p className="developer-credit">
-            تم تطوير الموقع بواسطة 
-            <button onClick={() => setShowDeveloperModal(true)} className="developer-link-btn">
-              م. إبراهيم مقبل
-            </button>
-          </p>
-        </footer>
-      )}
+      </div>
       {showDeveloperModal && (
         <DeveloperModal onClose={() => setShowDeveloperModal(false)} />
       )}

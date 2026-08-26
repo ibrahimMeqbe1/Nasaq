@@ -4,10 +4,22 @@ import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { FaBars, FaTimes, FaSignInAlt, FaCompass, FaLayerGroup, FaInfoCircle, FaQuestionCircle, FaEnvelope } from "react-icons/fa";
+import {
+  FaBars,
+  FaTimes,
+  FaSignInAlt,
+  FaSignOutAlt,
+  FaCompass,
+  FaLayerGroup,
+  FaInfoCircle,
+  FaQuestionCircle,
+  FaEnvelope
+} from "react-icons/fa";
+import { useApp } from "../../app/context/AppContext";
 
 export default function PublicHeader() {
   const pathname = usePathname();
+  const { user, handleLogout } = useApp() || {};
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
@@ -55,11 +67,36 @@ export default function PublicHeader() {
         </nav>
 
         {/* Action Button */}
-        <div className="public-nav-actions">
-          <Link href="/login" className="public-btn-login">
-            <FaSignInAlt />
-            <span>تسجيل الدخول</span>
-          </Link>
+        <div className="public-nav-actions" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          {user ? (
+            <>
+              <Link 
+                href={user.role === "superadmin" ? "/super-admin" : "/families"} 
+                className="public-btn-login"
+                style={{ background: "#059669" }}
+              >
+                <FaCompass />
+                <span>لوحة التحكم</span>
+              </Link>
+              {handleLogout && (
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="public-btn-login"
+                  style={{ background: "#dc2626", border: "none", cursor: "pointer" }}
+                  title="تسجيل الخروج"
+                >
+                  <FaSignOutAlt />
+                  <span>خروج</span>
+                </button>
+              )}
+            </>
+          ) : (
+            <Link href="/login" className="public-btn-login">
+              <FaSignInAlt />
+              <span>تسجيل الدخول</span>
+            </Link>
+          )}
 
           {/* Mobile Hamburger */}
           <button
@@ -92,14 +129,41 @@ export default function PublicHeader() {
                 </Link>
               );
             })}
-            <Link
-              href="/login"
-              className="public-mobile-login-btn"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              <FaSignInAlt />
-              <span>دخول النظام للمخيمات</span>
-            </Link>
+            {user ? (
+              <>
+                <Link
+                  href={user.role === "superadmin" ? "/super-admin" : "/families"}
+                  className="public-mobile-login-btn"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <FaCompass />
+                  <span>لوحة التحكم</span>
+                </Link>
+                {handleLogout && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      handleLogout();
+                    }}
+                    className="public-mobile-login-btn"
+                    style={{ background: "#dc2626", border: "none", width: "100%", marginTop: "6px" }}
+                  >
+                    <FaSignOutAlt />
+                    <span>تسجيل الخروج</span>
+                  </button>
+                )}
+              </>
+            ) : (
+              <Link
+                href="/login"
+                className="public-mobile-login-btn"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <FaSignInAlt />
+                <span>دخول النظام للمخيمات</span>
+              </Link>
+            )}
           </nav>
         </div>
       )}
