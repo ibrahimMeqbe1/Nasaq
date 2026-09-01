@@ -1,57 +1,38 @@
 import fs from "fs";
 import path from "path";
 import bcrypt from "bcryptjs";
-import Database from "better-sqlite3";
-import { MongoClient } from "mongodb";
-
-// ─── Environment & Configurations ──────────────────────────────────────────
-
-const MONGODB_URI = process.env.MONGODB_URI || process.env.DATABASE_URL || "";
-const DB_NAME = process.env.MONGODB_DB_NAME || "nasaq";
-
-const isMongoConfigured = Boolean(
-  MONGODB_URI &&
-  (MONGODB_URI.startsWith("mongodb://") || MONGODB_URI.startsWith("mongodb+srv://")) &&
-  !MONGODB_URI.includes("YOUR_")
-);
-
-let mongoClient = null;
-let mongoClientPromise = null;
-
-if (isMongoConfigured) {
-  if (process.env.NODE_ENV === "development") {
-    if (!global._mongoClientPromise) {
-      mongoClient = new MongoClient(MONGODB_URI);
-      global._mongoClientPromise = mongoClient.connect();
-    }
-    mongoClientPromise = global._mongoClientPromise;
-  } else {
-    mongoClient = new MongoClient(MONGODB_URI);
-    mongoClientPromise = mongoClient.connect();
-  }
-}
-
-// ─── Production SQLite Relational Database Engine ───────────────────────────
 
 const DB_DIR = path.join(process.cwd(), "database");
 const SQLITE_FILE = path.join(DB_DIR, "nasaq_production.sqlite");
-
 let sqliteDb = null;
 
-function getOneYearFromNow() {
-  const date = new Date();
-  date.setFullYear(date.getFullYear() + 1);
-  return date.toISOString();
+let Database = null;
+function getDatabaseConstructor() {
+  if (!Database) {
+    try {
+      const req = typeof __non_webpack_require__ !== "undefined" ? __non_webpack_require__ : eval("require");
+      Database = req("better-sqlite3");
+    } catch (e) {
+      console.warn("better-sqlite3 is not available in this runtime environment:", e.message);
+      return null;
+    }
+  }
+  return Database;
 }
 
 export function getSqliteDatabase() {
   if (sqliteDb) return sqliteDb;
 
+  const DbConstructor = getDatabaseConstructor();
+  if (!DbConstructor) {
+    throw new Error("محرك SQLite يتطلب بيئة تشغيل Node.js كاملة.");
+  }
+
   if (!fs.existsSync(DB_DIR)) {
     fs.mkdirSync(DB_DIR, { recursive: true });
   }
 
-  sqliteDb = new Database(SQLITE_FILE, { verbose: null });
+  sqliteDb = new DbConstructor(SQLITE_FILE, { verbose: null });
   
   // Enable Write-Ahead Logging (WAL) for high concurrency and performance
   sqliteDb.pragma("journal_mode = WAL");
