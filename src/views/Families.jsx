@@ -45,8 +45,9 @@ const Families = ({ families = [], user, campProfile }) => {
   // تنفيذ مسح الكشف بالكامل
   const handleConfirmClearAll = async () => {
     if (clearConfirmText !== "مسح") return;
+    const effectiveCampId = (user?.campId && user.campId !== "system") ? user.campId : (campProfile?.id || "kareem");
     try {
-      await deleteAllFamilies(user.campId);
+      await deleteAllFamilies(effectiveCampId);
       showNotification("تم مسح كشف العائلات بالكامل بنجاح");
       setIsClearAllModalOpen(false);
     } catch (error) {
@@ -75,6 +76,7 @@ const Families = ({ families = [], user, campProfile }) => {
 
   // حفظ الإضافة أو التعديل
   const handleSaveFamily = async (formData) => {
+    const effectiveCampId = (user?.campId && user.campId !== "system") ? user.campId : (campProfile?.id || "kareem");
     try {
       if (selectedFamily) {
         // تعديل
@@ -82,7 +84,7 @@ const Families = ({ families = [], user, campProfile }) => {
         showNotification(`تم تحديث بيانات العائلة "${formData.name}" بنجاح`);
       } else {
         // إضافة جديدة
-        await addFamily(user.campId, formData);
+        await addFamily(effectiveCampId, formData);
         showNotification(`تم تسجيل العائلة "${formData.name}" بنجاح`);
       }
       setIsFormOpen(false);
@@ -94,37 +96,51 @@ const Families = ({ families = [], user, campProfile }) => {
 
   // معالجة البيانات المستوردة من Excel مع إزالة التكرار تلقائياً
   const handleImportComplete = async (parsedData) => {
-    const seenNames = new Set();
-    const seenIds = new Set();
+    const seenKeys = new Set();
     const uniqueIncoming = [];
 
-    parsedData.forEach(record => {
-      const nameKey = record.name ? record.name.trim() : "";
-      const idKey = record.idNumber ? record.idNumber.trim() : "";
-      
-      if (nameKey && idKey && !seenNames.has(nameKey) && !seenIds.has(idKey)) {
-        seenNames.add(nameKey);
-        seenIds.add(idKey);
-        uniqueIncoming.push(record);
+    (parsedData || []).forEach((record) => {
+      const nameKey = record.name ? String(record.name).trim() : "";
+      const idKey = record.idNumber ? String(record.idNumber).trim() : "";
+
+      if (nameKey) {
+        const uniqueKey = idKey ? `${nameKey}_${idKey}` : nameKey;
+        if (!seenKeys.has(uniqueKey)) {
+          seenKeys.add(uniqueKey);
+          uniqueIncoming.push(record);
+        }
       }
     });
 
-    const existingNames = new Set((families || []).map(f => f.name ? f.name.trim() : ""));
-    const existingIds = new Set((families || []).map(f => f.idNumber ? f.idNumber.trim() : ""));
+    if (uniqueIncoming.length === 0) {
+      showNotification("لم يتم العثور على أي أسماء صالحة للاستيراد في الملف.", "error");
+      return;
+    }
 
-    const recordsToInsert = uniqueIncoming.filter(record => {
-      const nameKey = record.name ? record.name.trim() : "";
-      const idKey = record.idNumber ? record.idNumber.trim() : "";
-      return !existingNames.has(nameKey) && !existingIds.has(idKey);
+    const existingNames = new Set((families || []).map((f) => (f.name ? String(f.name).trim() : "")));
+    const existingIds = new Set((families || []).map((f) => (f.idNumber ? String(f.idNumber).trim() : "")).filter(Boolean));
+
+    const recordsToInsert = uniqueIncoming.filter((record) => {
+      const nameKey = record.name ? String(record.name).trim() : "";
+      const idKey = record.idNumber ? String(record.idNumber).trim() : "";
+      if (idKey && existingIds.has(idKey)) return false;
+      if (!idKey && existingNames.has(nameKey)) return false;
+      return true;
     });
 
     const skippedCount = uniqueIncoming.length - recordsToInsert.length;
+    const effectiveCampId = (user?.campId && user.campId !== "system") ? user.campId : (campProfile?.id || "kareem");
+
+    if (recordsToInsert.length === 0) {
+      showNotification(`تم فحص الملف: جميع الأسماء (${uniqueIncoming.length}) مسجلة وموجودة مسبقاً في النظام.`, "error");
+      return;
+    }
 
     try {
-      await batchAddFamilies(user.campId, recordsToInsert);
+      await batchAddFamilies(effectiveCampId, recordsToInsert);
       const successCount = recordsToInsert.length;
       if (skippedCount > 0) {
-        showNotification(`تم استيراد ${successCount} عائلة بنجاح، وتم تخطي ${skippedCount} سجل مكرر.`, "success");
+        showNotification(`تم استيراد ${successCount} عائلة بنجاح، وتخطي ${skippedCount} سجل مكرر مسجل مسبقاً.`, "success");
       } else {
         showNotification(`تم استيراد ${successCount} عائلة بنجاح من ملف Excel!`, "success");
       }
@@ -144,6 +160,14 @@ const Families = ({ families = [], user, campProfile }) => {
       console.error("Error deleting family:", error);
       showNotification(error.message || "تعذر حذف سجل العائلة من قاعدة البيانات.", "error");
     }
+  };
+
+  const [exportableFamilies, setExportableFamilies] = useState([]);
+  const [activeFilterDesc, setActiveFilterDesc] = useState("");
+
+  const handleFilteredChange = (filtered, desc) => {
+    setExportableFamilies(filtered);
+    setActiveFilterDesc(desc);
   };
 
   return (
@@ -180,20 +204,20 @@ const Families = ({ families = [], user, campProfile }) => {
             <FaTrash /> مسح الكشف
           </button>
           <button 
-            onClick={() => exportToExcel(families, campProfile)} 
+            onClick={() => exportToExcel(exportableFamilies.length > 0 || activeFilterDesc ? exportableFamilies : families, campProfile, activeFilterDesc)} 
             className="btn btn-excel"
-            title="تصدير Excel"
+            title={activeFilterDesc ? `تصدير النتائج المصفاة (${exportableFamilies.length}) إلى Excel` : "تصدير الكشف إلى Excel"}
             disabled={families.length === 0}
           >
-            <FaFileExcel /> تصدير Excel
+            <FaFileExcel /> {activeFilterDesc ? `تصدير المصفّى (${exportableFamilies.length})` : "تصدير Excel"}
           </button>
           <button 
-            onClick={() => exportToPDF(families, "families", campProfile)} 
+            onClick={() => exportToPDF(exportableFamilies.length > 0 || activeFilterDesc ? exportableFamilies : families, "families", campProfile, activeFilterDesc)} 
             className="btn btn-pdf"
-            title="تصدير PDF"
+            title={activeFilterDesc ? `تصدير وطباعة النتائج المصفاة (${exportableFamilies.length})` : "تصدير الكشف للطباعة و PDF"}
             disabled={families.length === 0}
           >
-            <FaFilePdf /> تصدير PDF
+            <FaFilePdf /> {activeFilterDesc ? `طباعة المصفّى (${exportableFamilies.length})` : "تصدير PDF"}
           </button>
         </div>
       </header>
@@ -246,6 +270,7 @@ const Families = ({ families = [], user, campProfile }) => {
         families={families}
         onEdit={handleOpenEdit}
         onDelete={handleOpenDelete}
+        onFilteredChange={handleFilteredChange}
       />
 
       {/* نموذج الإضافة والتعديل */}

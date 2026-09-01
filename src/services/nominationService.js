@@ -1,34 +1,36 @@
 import { supabase, isSupabaseConfigured } from "../lib/supabase";
 import { encryptData, decryptData } from "../utils/security";
 import { assertSupabaseSuccess, createRecordId } from "./helpers";
+import { enqueueMutation } from "../lib/syncEngine";
 
 const loadDefaultNominations = async () => (await import("./nominationsDefault.json")).default;
 
 const initLocalStorage = () => {
+  if (typeof window === "undefined") return;
   if (!localStorage.getItem("kareem_camp_nominations_v3") && !localStorage.getItem("kareem_camp_nominations_cleared")) {
     localStorage.setItem("kareem_camp_nominations_v3", encryptData([]));
   }
 };
 
 const demoSubscribers = new Set();
-
 const notifyDemoSubscribers = () => {
-  demoSubscribers.forEach(cb => cb());
+  demoSubscribers.forEach((cb) => cb());
 };
 
 const getDemoNominations = (campId) => {
+  if (typeof window === "undefined") return [];
   initLocalStorage();
   const ciphertext = localStorage.getItem("kareem_camp_nominations_v3");
   const data = ciphertext ? decryptData(ciphertext) : null;
   const nominations = data || [];
-  
-  const filtered = nominations.filter(n => {
+
+  const filtered = nominations.filter((n) => {
     if (!n.campId || n.campId === "kareem") {
       return campId === "kareem";
     }
     return n.campId === campId;
   });
-  
+
   return filtered.sort((a, b) => (a.serialNo || 0) - (b.serialNo || 0));
 };
 
@@ -73,7 +75,7 @@ const mapSupabaseNominationToJS = (row) => ({
   dob: row.dob || row.birth_date || row.date_of_birth || row.birthDate || "",
   wifeDob: row.wife_dob || row.wife_birth_date || row.wife_date_of_birth || row.wifeDob || "",
   notes: row.notes || "",
-  createdAt: row.created_at || new Date().toISOString()
+  createdAt: row.created_at || new Date().toISOString(),
 });
 
 export const subscribeNominations = (campId, callback) => {
@@ -103,9 +105,7 @@ export const subscribeNominations = (campId, callback) => {
       )
       .subscribe();
 
-    const wrapper = () => {
-      fetchAndNotify();
-    };
+    const wrapper = () => fetchAndNotify();
     demoSubscribers.add(wrapper);
 
     return () => {
@@ -114,23 +114,40 @@ export const subscribeNominations = (campId, callback) => {
     };
   }
 
+  // Central Database API with local cache
   initLocalStorage();
-  const wrapper = () => {
-    callback(getDemoNominations(campId));
+  const fetchFromApi = async () => {
+    try {
+      const res = await fetch(`/api/nominations?campId=${encodeURIComponent(campId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.nominations)) {
+          if (data.nominations.length > 0 || localStorage.getItem("kareem_camp_nominations_cleared") === "true") {
+            localStorage.setItem("kareem_camp_nominations_v3", encryptData(data.nominations));
+            callback(data.nominations, null);
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("API nominations sync notice:", e);
+    }
+    callback(getDemoNominations(campId), null);
   };
+
+  fetchFromApi();
+
+  const wrapper = () => fetchFromApi();
   demoSubscribers.add(wrapper);
-  wrapper();
-  return () => {
-    demoSubscribers.delete(wrapper);
-  };
+  return () => demoSubscribers.delete(wrapper);
 };
 
 const cleanPhone = (val) => {
-  if (!val) return '';
+  if (!val) return "";
   let str = String(val).trim();
   if (/^\d+$/.test(str)) {
-    if (!str.startsWith('0') && str.length === 9) {
-      str = '0' + str;
+    if (!str.startsWith("0") && str.length === 9) {
+      str = "0" + str;
     }
   }
   return str;
@@ -170,6 +187,7 @@ const mapNominationToSupabase = (campId, nomData, id) => ({
   has_chronic_disease: nomData.hasChronicDisease ? 1 : 0,
   is_lactating_or_pregnant: nomData.isLactatingOrPregnant ? 1 : 0,
   is_female_headed: nomData.isFemaleHeaded ? 1 : 0,
+  is_child_headed: nomData.isChildHeaded ? 1 : 0,
   location: (nomData.currentAddress || nomData.location || "").trim(),
   current_address: (nomData.currentAddress || nomData.location || "").trim(),
   original_address: (nomData.originalAddress || "").trim(),
@@ -188,12 +206,10 @@ const mapNominationToSupabase = (campId, nomData, id) => ({
 
 /**
  * إضافة ترشيح جديد
- * @param {string} campId - معرّف المخيم
- * @param {Object} nomData - بيانات الترشيح
  */
 export const addNomination = async (campId, nomData) => {
   const customId = nomData.id || createRecordId("nom");
-  
+
   if (isSupabaseConfigured) {
     const { error } = await supabase
       .from("nominations")
@@ -203,11 +219,12 @@ export const addNomination = async (campId, nomData) => {
   }
 
   const newNomination = {
+    ...nomData,
     id: customId,
     campId,
     serialNo: nomData.serialNo || 0,
-    name: nomData.name.trim(),
-    idNumber: nomData.idNumber.trim(),
+    name: (nomData.name || "").trim(),
+    idNumber: (nomData.idNumber || "").trim(),
     gender: nomData.gender || "ذكر",
     status: nomData.status || "متزوج",
     phone: cleanPhone(nomData.phone),
@@ -230,14 +247,36 @@ export const addNomination = async (campId, nomData) => {
     shelterPhoneAlt: cleanPhone(nomData.shelterPhoneAlt),
     shelterAddress: nomData.shelterAddress ? nomData.shelterAddress.trim() : "",
     shelterGps: nomData.shelterGps ? nomData.shelterGps.trim() : "",
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
   };
+
+  // Save to Central API or Enqueue Offline
+  let apiSucceeded = false;
+  try {
+    const res = await fetch("/api/nominations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ campId, nomination: newNomination }),
+    });
+    if (res.ok) apiSucceeded = true;
+  } catch (e) {
+    console.warn("API save nomination notice (Offline Mode):", e);
+  }
+
+  if (!apiSucceeded) {
+    enqueueMutation({
+      entity: "nomination",
+      type: "add",
+      campId,
+      payload: newNomination,
+    });
+  }
 
   localStorage.removeItem("kareem_camp_nominations_cleared");
   initLocalStorage();
   const ciphertext = localStorage.getItem("kareem_camp_nominations_v3");
   let nominations = ciphertext ? decryptData(ciphertext) : [];
-  nominations = nominations.filter(n => n.id !== customId);
+  nominations = nominations.filter((n) => n.id !== customId);
   nominations.push(newNomination);
   localStorage.setItem("kareem_camp_nominations_v3", encryptData(nominations));
   notifyDemoSubscribers();
@@ -249,8 +288,9 @@ export const addNomination = async (campId, nomData) => {
  */
 export const updateNomination = async (id, nomData) => {
   const updatedNom = {
-    name: nomData.name.trim(),
-    idNumber: nomData.idNumber.trim(),
+    ...nomData,
+    name: (nomData.name || "").trim(),
+    idNumber: (nomData.idNumber || "").trim(),
     gender: nomData.gender || "ذكر",
     status: nomData.status || "متزوج",
     phone: cleanPhone(nomData.phone),
@@ -264,6 +304,7 @@ export const updateNomination = async (id, nomData) => {
     hasChronicDisease: nomData.hasChronicDisease ? 1 : 0,
     isLactatingOrPregnant: nomData.isLactatingOrPregnant ? 1 : 0,
     isFemaleHeaded: nomData.isFemaleHeaded ? 1 : 0,
+    isChildHeaded: nomData.isChildHeaded ? 1 : 0,
     currentAddress: nomData.currentAddress ? nomData.currentAddress.trim() : "",
     originalAddress: nomData.originalAddress ? nomData.originalAddress.trim() : "",
     governorate: nomData.governorate || "شمال غزة",
@@ -272,7 +313,7 @@ export const updateNomination = async (id, nomData) => {
     shelterPhone: cleanPhone(nomData.shelterPhone),
     shelterPhoneAlt: cleanPhone(nomData.shelterPhoneAlt),
     shelterAddress: nomData.shelterAddress ? nomData.shelterAddress.trim() : "",
-    shelterGps: nomData.shelterGps ? nomData.shelterGps.trim() : ""
+    shelterGps: nomData.shelterGps ? nomData.shelterGps.trim() : "",
   };
 
   if (isSupabaseConfigured) {
@@ -286,15 +327,38 @@ export const updateNomination = async (id, nomData) => {
     return true;
   }
 
+  // Update in Central API or Enqueue Offline
+  let apiSucceeded = false;
+  try {
+    const res = await fetch("/api/nominations", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ...updatedNom }),
+    });
+    if (res.ok) apiSucceeded = true;
+  } catch (e) {
+    console.warn("API update nomination notice (Offline Mode):", e);
+  }
+
+  if (!apiSucceeded) {
+    enqueueMutation({
+      entity: "nomination",
+      type: "update",
+      recordId: id,
+      payload: { id, ...updatedNom },
+    });
+  }
+
   initLocalStorage();
   const ciphertext = localStorage.getItem("kareem_camp_nominations_v3");
   const nominations = ciphertext ? decryptData(ciphertext) : [];
-  const index = nominations.findIndex(n => n.id === id);
+  const index = nominations.findIndex((n) => n.id === id);
   if (index !== -1) {
     nominations[index] = { ...nominations[index], ...updatedNom };
     localStorage.setItem("kareem_camp_nominations_v3", encryptData(nominations));
   }
   notifyDemoSubscribers();
+  return true;
 };
 
 /**
@@ -308,62 +372,50 @@ export const deleteNomination = async (id) => {
     return true;
   }
 
+  // Delete in Central API or Enqueue Offline
+  let apiSucceeded = false;
+  try {
+    const res = await fetch(`/api/nominations?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (res.ok) apiSucceeded = true;
+  } catch (e) {
+    console.warn("API delete nomination notice (Offline Mode):", e);
+  }
+
+  if (!apiSucceeded) {
+    enqueueMutation({
+      entity: "nomination",
+      type: "delete",
+      recordId: id,
+    });
+  }
+
   initLocalStorage();
   const ciphertext = localStorage.getItem("kareem_camp_nominations_v3");
   let nominations = ciphertext ? decryptData(ciphertext) : [];
-  nominations = nominations.filter(n => n.id !== id);
+  nominations = nominations.filter((n) => n.id !== id);
   localStorage.setItem("kareem_camp_nominations_v3", encryptData(nominations));
   notifyDemoSubscribers();
+  return true;
 };
 
 /**
- * استيراد الترشيحات الافتراضية بالكامل لمخيم محدد
+ * استيراد الترشيحات الافتراضية
  */
 export const importDefaultNominationsToFirestore = async (campId) => {
-  if (isSupabaseConfigured) {
-    try {
-      const defaultNominations = await loadDefaultNominations();
-      const rows = defaultNominations.map((n, i) => ({
-        id: n.id || `nom-csv-${i}-${Date.now()}`,
-        camp_id: campId,
-        name: n.name,
-        id_number: n.idNumber,
-        phone: n.phone,
-        members_count: parseInt(n.membersCount) || 1,
-        location: n.currentAddress || n.location || "",
-        status: n.status || "متزوج",
-        has_disabled: n.hasDisabled ? 1 : 0,
-        has_chronic_disease: n.hasChronicDisease ? 1 : 0,
-        is_lactating_or_pregnant: n.isLactatingOrPregnant ? 1 : 0,
-        is_female_headed: n.isFemaleHeaded ? 1 : 0,
-        dob: n.dob || "",
-        wife_name: n.wifeName || "",
-        wife_id: n.wifeId || "",
-        wife_dob: n.wifeDob || "",
-        notes: n.notes || "",
-        created_at: n.createdAt || new Date().toISOString()
-      }));
-      const { error } = await supabase.from("nominations").upsert(rows);
-      if (error) throw error;
-      return { success: true };
-    } catch (error) {
-      console.error("Error during bulk import of nominations to Supabase:", error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  return { success: false, error: "النظام يعمل حالياً في الوضع التجريبي. يرجى ربط Supabase." };
+  const defaultNominations = await loadDefaultNominations();
+  return await batchAddNominations(campId, defaultNominations);
 };
 
 /**
- * استيراد دفعة ترشيحات دفعة واحدة بشكل سريع
+ * استيراد دفعة ترشيحات دفعة واحدة
  */
 export const batchAddNominations = async (campId, nomList) => {
   if (!nomList || nomList.length === 0) return true;
+  const effectiveCampId = (campId && campId !== "system") ? campId : "kareem";
 
   if (isSupabaseConfigured) {
     const rows = nomList.map((nom) => ({
-      ...mapNominationToSupabase(campId, nom, nom.id || createRecordId("nom")),
+      ...mapNominationToSupabase(effectiveCampId, nom, nom.id || createRecordId("nom")),
       created_at: nom.createdAt || new Date().toISOString(),
     }));
     const chunkSize = 100;
@@ -374,13 +426,10 @@ export const batchAddNominations = async (campId, nomList) => {
     return true;
   }
 
-  localStorage.removeItem("kareem_camp_nominations_cleared");
-  initLocalStorage();
-  const ciphertext = localStorage.getItem("kareem_camp_nominations_v3");
-  let nominations = ciphertext ? decryptData(ciphertext) : [];
-  nominations = [...nominations, ...nomList.map((n, i) => ({
-    id: n.id || `nom_${Date.now()}_${i}`,
-    campId: campId,
+  const mappedBatch = nomList.map((n, i) => ({
+    ...n,
+    id: n.id || createRecordId("nom"),
+    campId: effectiveCampId,
     name: (n.name || "").trim(),
     idNumber: (n.idNumber || "").trim(),
     phone: (n.phone || "").trim(),
@@ -396,22 +445,65 @@ export const batchAddNominations = async (campId, nomList) => {
     wifeId: (n.wifeId || "").trim(),
     wifeDob: (n.wifeDob || "").trim(),
     notes: (n.notes || "").trim(),
-    createdAt: n.createdAt || new Date().toISOString()
-  }))];
-  localStorage.setItem("kareem_camp_nominations_v3", encryptData(nominations));
+    createdAt: n.createdAt || new Date().toISOString(),
+  }));
+
+  // Save to Central API or Enqueue Offline
+  let apiSucceeded = false;
+  try {
+    const res = await fetch("/api/nominations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        campId: effectiveCampId,
+        action: "batch",
+        nominations: mappedBatch,
+      }),
+    });
+    if (res.ok) {
+      apiSucceeded = true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "فشل حفظ الترشيحات في قاعدة البيانات");
+    }
+  } catch (e) {
+    console.error("API batch nominations error:", e);
+    throw e;
+  }
+
+  localStorage.removeItem("kareem_camp_nominations_cleared");
+  initLocalStorage();
+  const ciphertext = localStorage.getItem("kareem_camp_nominations_v3");
+  let nominations = ciphertext ? decryptData(ciphertext) : [];
+  localStorage.setItem("kareem_camp_nominations_v3", encryptData([...nominations, ...mappedBatch]));
   notifyDemoSubscribers();
   return true;
 };
 
 /**
  * حذف جميع ترشيحات المخيم الحالي
- * @param {string} campId - معرّف المخيم
  */
 export const deleteAllNominations = async (campId) => {
+  const effectiveCampId = (campId && campId !== "system") ? campId : "kareem";
   if (isSupabaseConfigured) {
-    const { error } = await supabase.from("nominations").delete().eq("camp_id", campId);
+    const { error } = await supabase.from("nominations").delete().eq("camp_id", effectiveCampId);
     assertSupabaseSuccess(error, "مسح كشف الترشيحات");
     return true;
+  }
+
+  // Delete all in Central API or Enqueue Offline
+  let apiSucceeded = false;
+  try {
+    const res = await fetch(`/api/nominations?campId=${encodeURIComponent(effectiveCampId)}&action=all`, { method: "DELETE" });
+    if (res.ok) {
+      apiSucceeded = true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "فشل مسح كشف الترشيحات");
+    }
+  } catch (e) {
+    console.error("API delete all nominations error:", e);
+    throw e;
   }
 
   localStorage.setItem("kareem_camp_nominations_v3", encryptData([]));

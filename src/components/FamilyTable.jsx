@@ -1,26 +1,71 @@
+"use client";
+
 import React, { useState, useEffect } from "react";
-import { FaEdit, FaTrashAlt, FaSearch, FaUserFriends, FaMapMarkerAlt, FaPhoneAlt, FaIdCard } from "react-icons/fa";
+import { 
+  FaEdit, 
+  FaTrashAlt, 
+  FaSearch, 
+  FaUserFriends, 
+  FaMapMarkerAlt, 
+  FaPhoneAlt, 
+  FaIdCard, 
+  FaCalendarAlt, 
+  FaThList, 
+  FaThLarge,
+  FaHeart,
+  FaFemale,
+  FaUser,
+  FaHandsHelping
+} from "react-icons/fa";
 import { formatDateForExcel } from "../utils/exportExcel";
 
-const FamilyTable = ({ families, onEdit, onDelete }) => {
+const FamilyTable = ({ families = [], onEdit, onDelete, onFilteredChange }) => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("الكل");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(15);
+  const [itemsPerPage, setItemsPerPage] = useState(10); // 10 أسماء بالصفحة كافتراضي
+  const [viewMode, setViewMode] = useState("table"); // "table" or "cards"
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, itemsPerPage]);
+  }, [searchTerm, statusFilter, itemsPerPage]);
 
-  // فلترة العائلات بناءً على كلمة البحث (الاسم أو رقم الهاتف أو الهوية أو مكان السكن)
+  // فلترة العائلات
   const filteredFamilies = families.filter((family) => {
-    const term = searchTerm.toLowerCase();
-    return (
-      family.name.toLowerCase().includes(term) ||
-      family.phone.includes(term) ||
-      family.idNumber.includes(term) ||
-      family.location.toLowerCase().includes(term)
+    const term = (searchTerm || "").toLowerCase().trim();
+    const matchesSearch = !term || (
+      (family.name && family.name.toLowerCase().includes(term)) ||
+      (family.phone && family.phone.includes(term)) ||
+      (family.idNumber && family.idNumber.includes(term)) ||
+      (family.location && family.location.toLowerCase().includes(term)) ||
+      (family.wifeName && family.wifeName.toLowerCase().includes(term))
     );
+
+    let matchesStatus = true;
+    if (statusFilter === "معيل طفل يتيم") {
+      const s = (family.status || "").toLowerCase();
+      matchesStatus = s.includes("يتيم") || s.includes("طفل");
+      if (!matchesStatus && family.dob) {
+        const year = parseInt(String(family.dob).substring(0, 4));
+        if (!isNaN(year) && (2026 - year) < 18) matchesStatus = true;
+      }
+    } else if (statusFilter !== "الكل") {
+      matchesStatus = family.status === statusFilter || (family.status || "").includes(statusFilter);
+    }
+
+    return matchesSearch && matchesStatus;
   });
+
+  useEffect(() => {
+    if (onFilteredChange) {
+      const activeFilters = [];
+      if (statusFilter !== "الكل") activeFilters.push(`حالة: ${statusFilter}`);
+      if (searchTerm) activeFilters.push(`بحث: ${searchTerm}`);
+
+      const filterDesc = activeFilters.join(" + ");
+      onFilteredChange(filteredFamilies, filterDesc);
+    }
+  }, [families, searchTerm, statusFilter]);
 
   const totalPages = itemsPerPage === -1 ? 1 : Math.max(1, Math.ceil(filteredFamilies.length / itemsPerPage));
   const startIndex = (currentPage - 1) * (itemsPerPage === -1 ? filteredFamilies.length : itemsPerPage);
@@ -28,320 +73,336 @@ const FamilyTable = ({ families, onEdit, onDelete }) => {
     ? filteredFamilies 
     : filteredFamilies.slice(startIndex, startIndex + itemsPerPage);
 
+  const getPageNumbers = () => {
+    const maxButtons = 5;
+    if (totalPages <= maxButtons) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    let start = Math.max(1, currentPage - 2);
+    let end = start + maxButtons - 1;
+
+    if (end > totalPages) {
+      end = totalPages;
+      start = Math.max(1, end - maxButtons + 1);
+    }
+
+    const pages = [];
+    for (let p = start; p <= end; p++) {
+      pages.push(p);
+    }
+    return pages;
+  };
+
+  const getStatusBadge = (status) => {
+    const s = (status || "").trim();
+    if (s === "متزوج") return { bg: "#ecfdf5", color: "#065f46", border: "#a7f3d0", label: "متزوج" };
+    if (s === "أرملة" || s === "أرمل") return { bg: "#fef2f2", color: "#991b1b", border: "#fecaca", label: s };
+    if (s === "يتيم") return { bg: "#fffbeb", color: "#92400e", border: "#fde68a", label: "يتيم" };
+    if (s === "مطلق" || s === "مطلقة") return { bg: "#faf5ff", color: "#6b21a8", border: "#e9d5ff", label: s };
+    return { bg: "#f1f5f9", color: "#334155", border: "#cbd5e1", label: s || "غير محدد" };
+  };
+
   return (
-    <div className="table-section">
-      {/* شريط البحث */}
-      <div className="search-container">
-        <div className="search-wrapper">
-          <FaSearch className="search-icon" />
+    <div className="table-section-card">
+      {/* شريط البحث والفلاتر والتحكم في العرض */}
+      <div className="table-controls-bar">
+        <div className="search-input-group">
+          <FaSearch className="search-icon-inside" aria-hidden="true" />
           <input
             type="text"
-            placeholder="ابحث باسم رب الأسرة، رقم الهاتف، رقم الهوية أو مكان السكن..."
+            placeholder="ابحث بالاسم، رقم الهوية، الهاتف، أو مكان السكن..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
+            className="search-input-field"
           />
-        </div>
-        <div className="search-count">
-          نتائج البحث: <strong>{filteredFamilies.length}</strong> عائلة
-        </div>
-      </div>
-
-      {/* جدول العائلات التفاعلي مدمج الارتفاع لتفادي السكرول الطويل */}
-      <div className="table-responsive" style={{ maxHeight: "65vh", overflowY: "auto", position: "relative", borderRadius: "14px", border: "1px solid #cbd5e1", boxShadow: "0 4px 14px rgba(0,0,0,0.03)" }}>
-        {filteredFamilies.length > 0 ? (
-          <table className="family-table" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
-            <thead style={{ position: "sticky", top: 0, zIndex: 12, boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
-              <tr>
-                <th style={{ width: "3%", minWidth: "40px" }} className="text-center">رقم</th>
-                <th style={{ width: "15%", minWidth: "130px" }}>اسم رب الأسرة</th>
-                <th style={{ width: "9%", minWidth: "105px" }}>هوية رب الأسرة</th>
-                <th style={{ width: "8%", minWidth: "90px" }}>تاريخ ميلاد رب الأسرة</th>
-                <th style={{ width: "6%", minWidth: "65px" }} className="text-center">الحالة</th>
-                <th style={{ width: "13%", minWidth: "120px" }}>اسم الزوجة</th>
-                <th style={{ width: "8%", minWidth: "100px" }}>رقم هوية الزوجة</th>
-                <th style={{ width: "8%", minWidth: "90px" }}>تاريخ ميلاد الزوجة</th>
-                <th style={{ width: "9%", minWidth: "100px" }}>رقم الهاتف</th>
-                <th style={{ width: "4%", minWidth: "55px" }} className="text-center">الأفراد</th>
-                <th style={{ width: "8%", minWidth: "95px" }}>مكان السكن</th>
-                <th style={{ width: "9%", minWidth: "90px" }}>ملاحظات</th>
-                <th style={{ width: "5%", minWidth: "70px" }} className="text-center">الإجراءات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {paginatedFamilies.map((family, index) => {
-                const isMarried = family.status === "متزوج";
-                
-                // تحديد شارة الحالة الاجتماعية
-                let statusBg = "#e2e8f0";
-                let statusColor = "#334155";
-                if (family.status === "متزوج") { statusBg = "#d1e7dd"; statusColor = "#0f5132"; }
-                else if (family.status === "أرملة") { statusBg = "#f8d7da"; statusColor = "#842029"; }
-                else if (family.status === "يتيم") { statusBg = "#fff3cd"; statusColor = "#664d03"; }
-                else if (family.status === "مطلق") { statusBg = "#f3e5f5"; statusColor = "#4a148c"; }
-
-                return (
-                  <tr key={family.id} className="table-row">
-                    <td className="text-center" style={{ fontWeight: "bold" }}>{startIndex + index + 1}</td>
-                    
-                    {/* اسم رب الأسرة */}
-                    <td style={{ fontWeight: "600", color: "var(--primary-dark)" }}>{family.name}</td>
-
-                    {/* هوية رب الأسرة */}
-                    <td>
-                      <div className="icon-text">
-                        <FaIdCard className="td-icon muted" />
-                        <span>{family.idNumber}</span>
-                      </div>
-                    </td>
-
-                    {/* تاريخ ميلاد رب الأسرة */}
-                    <td>{family.dob ? formatDateForExcel(family.dob) : <span className="text-muted">-</span>}</td>
-
-                    {/* الحالة الاجتماعية */}
-                    <td className="text-center">
-                      <span style={{
-                        background: statusBg,
-                        color: statusColor,
-                        padding: "3px 9px",
-                        borderRadius: "50px",
-                        fontSize: "0.78rem",
-                        fontWeight: "700",
-                        display: "inline-block"
-                      }}>
-                        {family.status || "أعزب"}
-                      </span>
-                    </td>
-
-                    {/* اسم الزوجة */}
-                    <td style={{ fontWeight: "600", color: "#b89647" }}>
-                      {isMarried ? (family.wifeName || <span className="text-muted">-</span>) : <span className="text-muted">-</span>}
-                    </td>
-
-                    {/* رقم هوية الزوجة */}
-                    <td>
-                      {isMarried && family.wifeId ? (
-                        <div className="icon-text">
-                          <FaIdCard className="td-icon muted" style={{ color: "#b89647" }} />
-                          <span>{family.wifeId}</span>
-                        </div>
-                      ) : <span className="text-muted">-</span>}
-                    </td>
-
-                    {/* تاريخ ميلاد الزوجة */}
-                    <td>
-                      {isMarried && family.wifeDob ? formatDateForExcel(family.wifeDob) : <span className="text-muted">-</span>}
-                    </td>
-
-                    {/* الهاتف */}
-                    <td>
-                      <div className="icon-text">
-                        <FaPhoneAlt className="td-icon muted" />
-                        <span className="ltr-span">{family.phone}</span>
-                      </div>
-                    </td>
-
-                    {/* عدد الأفراد */}
-                    <td className="text-center">
-                      <strong className="members-badge">{family.membersCount}</strong>
-                    </td>
-
-                    {/* مكان السكن */}
-                    <td>
-                      <div className="icon-text">
-                        <FaMapMarkerAlt className="td-icon gold-icon" />
-                        <span>{family.location}</span>
-                      </div>
-                    </td>
-
-                    {/* ملاحظات */}
-                    <td className="notes-cell" title={family.notes} style={{ wordBreak: "break-word" }}>
-                      {family.notes || <span className="no-notes">-</span>}
-                    </td>
-
-                    {/* الإجراءات */}
-                    <td>
-                      <div className="actions-cell">
-                        <button
-                          onClick={() => onEdit(family)}
-                          className="btn-action edit"
-                          title="تعديل"
-                        >
-                          <FaEdit />
-                        </button>
-                        <button
-                          onClick={() => onDelete(family.id, family.name)}
-                          className="btn-action delete"
-                          title="حذف"
-                        >
-                          <FaTrashAlt />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        ) : (
-          <div className="empty-state">
-            <div className="empty-state-icon"><FaSearch aria-hidden="true" /></div>
-            <h3>لم يتم العثور على أي عائلات تطابق بحثك</h3>
-            <p>حاول إدخال تفاصيل أخرى أو أضف عائلة جديدة للنظام.</p>
-          </div>
-        )}
-      </div>
-
-      {/* شريط ترقيم الصفحات والتحكم بالحجم */}
-      {filteredFamilies.length > 0 && (
-        <div style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          flexWrap: "wrap",
-          gap: "15px",
-          marginTop: "1.25rem",
-          padding: "1rem 1.25rem",
-          background: "#ffffff",
-          borderRadius: "14px",
-          border: "1px solid #cbd5e1",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.03)"
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.88rem", color: "#475569", fontWeight: "700" }}>
-            <span>عدد السجلات بالصفحة:</span>
-            <select 
-              value={itemsPerPage} 
-              onChange={(e) => setItemsPerPage(Number(e.target.value))}
-              style={{
-                padding: "6px 12px",
-                borderRadius: "8px",
-                border: "1px solid #cbd5e1",
-                fontSize: "0.85rem",
-                fontWeight: "700",
-                color: "#1e293b",
-                cursor: "pointer",
-                background: "#f8fafc"
-              }}
+          {searchTerm && (
+            <button 
+              onClick={() => setSearchTerm("")} 
+              className="clear-search-btn"
+              title="مسح البحث"
             >
-              <option value={10}>10 سجلات</option>
-              <option value={15}>15 سجل (مستحسن)</option>
-              <option value={25}>25 سجل</option>
-              <option value={50}>50 سجل</option>
-              <option value={100}>100 سجل</option>
-              <option value={-1}>عرض الكل ({filteredFamilies.length})</option>
-            </select>
-            <span>
-              (عرض السجلات {startIndex + 1} - {Math.min(startIndex + (itemsPerPage === -1 ? filteredFamilies.length : itemsPerPage), filteredFamilies.length)} من أصل {filteredFamilies.length})
-            </span>
-          </div>
-
-          {itemsPerPage !== -1 && totalPages > 1 && (
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <button
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
-                style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid #cbd5e1", background: currentPage === 1 ? "#f1f5f9" : "#ffffff", cursor: currentPage === 1 ? "not-allowed" : "pointer", fontWeight: "bold", fontSize: "0.85rem" }}
-              >
-                « الأولى
-              </button>
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid #cbd5e1", background: currentPage === 1 ? "#f1f5f9" : "#ffffff", cursor: currentPage === 1 ? "not-allowed" : "pointer", fontWeight: "bold", fontSize: "0.85rem" }}
-              >
-                السابق
-              </button>
-
-              <span style={{ margin: "0 8px", fontWeight: "800", color: "#0d9488", fontSize: "0.9rem" }}>
-                صفحة {currentPage} من {totalPages}
-              </span>
-
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid #cbd5e1", background: currentPage === totalPages ? "#f1f5f9" : "#ffffff", cursor: currentPage === totalPages ? "not-allowed" : "pointer", fontWeight: "bold", fontSize: "0.85rem" }}
-              >
-                التالي
-              </button>
-              <button
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-                style={{ padding: "6px 12px", borderRadius: "8px", border: "1px solid #cbd5e1", background: currentPage === totalPages ? "#f1f5f9" : "#ffffff", cursor: currentPage === totalPages ? "not-allowed" : "pointer", fontWeight: "bold", fontSize: "0.85rem" }}
-              >
-                الأخيرة »
-              </button>
-            </div>
+              ✕
+            </button>
           )}
         </div>
-      )}
 
-      {/* بطاقات الهاتف المحمول المحدثة */}
-      <div className="mobile-cards">
-        {filteredFamilies.length > 0 ? (
-          filteredFamilies.map((family, index) => {
-            const isMarried = family.status === "متزوج";
-            return (
-              <div key={family.id} className="mobile-card">
-                <div className="card-header">
-                  <span className="card-index">#{index + 1}</span>
-                  <span className="card-location"><FaMapMarkerAlt /> {family.location}</span>
-                </div>
-                <div className="card-body">
-                  <h3>{family.name}</h3>
-                  <div className="card-detail">
-                    <span className="detail-label">الحالة الاجتماعية:</span>
-                    <span className="detail-val">{family.status || "أعزب"}</span>
-                  </div>
-                  <div className="card-detail">
-                    <span className="detail-label"><FaIdCard /> الهوية:</span>
-                    <span className="detail-val">{family.idNumber}</span>
-                  </div>
-                  {family.dob && (
-                    <div className="card-detail">
-                      <span className="detail-label">تاريخ الميلاد:</span>
-                      <span className="detail-val">{family.dob}</span>
-                    </div>
-                  )}
-                  {isMarried && family.wifeName && (
-                    <div style={{ margin: "8px 0", padding: "6px 10px", background: "var(--secondary-light)", borderRadius: "6px", fontSize: "0.85rem" }}>
-                      <strong style={{ color: "var(--primary-dark)" }}>الزوجة:</strong> {family.wifeName}
-                      {family.wifeId && <div><strong>هوية الزوجة:</strong> {family.wifeId}</div>}
-                      {family.wifeDob && <div><strong>تاريخ ميلاد الزوجة:</strong> {family.wifeDob}</div>}
-                    </div>
-                  )}
-                  <div className="card-detail">
-                    <span className="detail-label"><FaPhoneAlt /> الهاتف:</span>
-                    <span className="detail-val ltr-span">{family.phone}</span>
-                  </div>
-                  <div className="card-detail">
-                    <span className="detail-label"><FaUserFriends /> أفراد الأسرة:</span>
-                    <span className="detail-val badge-val">{family.membersCount} أفراد</span>
-                  </div>
-                  {family.notes && (
-                    <div className="card-detail notes">
-                      <span className="detail-label">ملاحظات:</span>
-                      <p className="detail-val">{family.notes}</p>
-                    </div>
-                  )}
-                </div>
-                <div className="card-actions">
-                  <button onClick={() => onEdit(family)} className="card-btn-action edit">
-                    <FaEdit /> تعديل البيانات
-                  </button>
-                  <button onClick={() => onDelete(family.id, family.name)} className="card-btn-action delete">
-                    <FaTrashAlt /> حذف السجل
-                  </button>
-                </div>
-              </div>
-            );
-          })
-        ) : (
-          <div className="empty-state">
-            <div className="empty-state-icon"><FaSearch aria-hidden="true" /></div>
-            <h3>لا توجد نتائج بحث مطابقة</h3>
+        <div className="filters-and-view-group">
+          {/* فلتر الحالة */}
+          <select 
+            value={statusFilter} 
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="select-filter-field"
+            aria-label="تصفية حسب الحالة الاجتماعية"
+          >
+            <option value="الكل">كل الحالات الاجتماعية</option>
+            <option value="متزوج">متزوج</option>
+            <option value="أرملة">أرملة</option>
+            <option value="أرمل">أرمل</option>
+            <option value="مطلق">مطلق / مطلقة</option>
+            <option value="يتيم">يتيم</option>
+            <option value="معيل طفل يتيم">معيل طفل يتيم (طفل &lt; 18 أو أسرة أيتام)</option>
+          </select>
+
+          {/* عدد الأسطر المعروضة بالصفحة */}
+          <select 
+            value={itemsPerPage} 
+            onChange={(e) => setItemsPerPage(Number(e.target.value))}
+            className="select-filter-field"
+            aria-label="عدد السجلات في الصفحة"
+          >
+            <option value={10}>10 أسطر</option>
+            <option value={25}>25 سطر</option>
+            <option value={50}>50 سطر</option>
+            <option value={100}>100 سطر</option>
+            <option value={-1}>عرض الكل</option>
+          </select>
+
+          {/* تبديل العرض بين جدول وبطاقات */}
+          <div className="view-mode-toggle" role="group" aria-label="طريقة العرض">
+            <button 
+              type="button"
+              className={`toggle-btn ${viewMode === "table" ? "active" : ""}`}
+              onClick={() => setViewMode("table")}
+              title="عرض جدول"
+            >
+              <FaThList aria-hidden="true" />
+              <span className="toggle-label">جدول</span>
+            </button>
+            <button 
+              type="button"
+              className={`toggle-btn ${viewMode === "cards" ? "active" : ""}`}
+              onClick={() => setViewMode("cards")}
+              title="عرض بطاقات"
+            >
+              <FaThLarge aria-hidden="true" />
+              <span className="toggle-label">بطاقات</span>
+            </button>
           </div>
-        )}
+
+          <div className="results-counter-badge">
+            <strong>{filteredFamilies.length}</strong> عائلة
+          </div>
+        </div>
       </div>
+
+      {filteredFamilies.length === 0 ? (
+        <div className="empty-state-box">
+          <div className="empty-state-icon-wrapper">
+            <FaUserFriends />
+          </div>
+          <h3>لم يتم العثور على أي نتائج</h3>
+          <p>جرّب تعديل كلمات البحث أو الفلاتر المختارة، أو أضف عائلات جديدة للكشف.</p>
+        </div>
+      ) : (
+        <>
+          {/* 1. عرض البطاقات للهواتف (Mobile Cards View) */}
+          <div className={`families-cards-mobile-grid ${viewMode === "table" ? "force-hide-cards" : ""} ${viewMode === "cards" ? "force-show-cards" : ""}`}>
+            {paginatedFamilies.map((family, index) => {
+              const badge = getStatusBadge(family.status);
+              return (
+                <div key={family.id} className="family-mobile-card">
+                  <div className="card-top-row">
+                    <div className="card-person-main">
+                      <span className="card-serial-pill">#{startIndex + index + 1}</span>
+                      <h4 className="card-person-name">{family.name}</h4>
+                    </div>
+                    <span 
+                      className="status-pill-badge" 
+                      style={{ background: badge.bg, color: badge.color, borderColor: badge.border }}
+                    >
+                      {badge.label}
+                    </span>
+                  </div>
+
+                  <div className="card-info-grid">
+                    <div className="card-info-item">
+                      <FaIdCard className="info-icon" />
+                      <span>{family.idNumber || "لا يوجد"}</span>
+                    </div>
+
+                    <div className="card-info-item">
+                      <FaUserFriends className="info-icon" />
+                      <span><strong>{family.membersCount || 1}</strong> أفراد</span>
+                    </div>
+
+                    {family.phone && (
+                      <div className="card-info-item">
+                        <FaPhoneAlt className="info-icon text-emerald" />
+                        <a href={`tel:${family.phone}`} className="phone-link">{family.phone}</a>
+                      </div>
+                    )}
+
+                    {family.location && (
+                      <div className="card-info-item">
+                        <FaMapMarkerAlt className="info-icon text-gold" />
+                        <span>{family.location}</span>
+                      </div>
+                    )}
+
+                    {family.wifeName && family.wifeName !== "لا يوجد" && (
+                      <div className="card-info-item full-width">
+                        <FaFemale className="info-icon" />
+                        <span>الزوجة: {family.wifeName} {family.wifeId ? `(${family.wifeId})` : ""}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="card-actions-row">
+                    <button 
+                      onClick={() => onEdit(family)} 
+                      className="card-action-btn edit-btn"
+                      title="تعديل"
+                    >
+                      <FaEdit /> <span>تعديل</span>
+                    </button>
+                    <button 
+                      onClick={() => onDelete(family.id, family.name)} 
+                      className="card-action-btn delete-btn"
+                      title="حذف"
+                    >
+                      <FaTrashAlt /> <span>حذف</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 2. عرض الجدول لسطح المكتب والشاشات الكبيرة (Desktop Table View) */}
+          <div className={`table-responsive-wrapper ${viewMode === "cards" ? "force-hide-table" : ""}`}>
+            <table className="nasaq-table">
+              <thead>
+                <tr>
+                  <th style={{ width: "35px" }} className="text-center">#</th>
+                  <th style={{ minWidth: "120px" }}>اسم رب الأسرة</th>
+                  <th style={{ width: "95px" }}>رقم الهوية</th>
+                  <th style={{ width: "80px" }}>تاريخ الميلاد</th>
+                  <th style={{ width: "65px" }} className="text-center">الحالة</th>
+                  <th style={{ minWidth: "105px" }}>اسم الزوجة</th>
+                  <th style={{ width: "90px" }}>هوية الزوجة</th>
+                  <th style={{ width: "85px" }}>ميلاد الزوجة</th>
+                  <th style={{ width: "95px" }}>رقم الهاتف</th>
+                  <th style={{ width: "45px" }} className="text-center">الأفراد</th>
+                  <th style={{ minWidth: "85px" }}>مكان السكن</th>
+                  <th style={{ minWidth: "80px" }}>ملاحظات</th>
+                  <th style={{ width: "120px" }} className="text-center actions-col">الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedFamilies.map((family, index) => {
+                  const badge = getStatusBadge(family.status);
+                  return (
+                    <tr key={family.id}>
+                      <td className="text-center serial-cell">{startIndex + index + 1}</td>
+                      <td className="person-name-cell">
+                        <strong>{family.name}</strong>
+                      </td>
+                      <td>
+                        <span className="mono-badge">{family.idNumber || "—"}</span>
+                      </td>
+                      <td>{family.dob ? formatDateForExcel(family.dob) : "—"}</td>
+                      <td className="text-center">
+                        <span 
+                          className="status-pill-badge" 
+                          style={{ background: badge.bg, color: badge.color, borderColor: badge.border }}
+                        >
+                          {badge.label}
+                        </span>
+                      </td>
+                      <td>{family.wifeName || "—"}</td>
+                      <td>
+                        {family.wifeId && family.wifeId !== "لا يوجد" ? (
+                          <span className="mono-badge">{family.wifeId}</span>
+                        ) : "—"}
+                      </td>
+                      <td>{family.wifeDob ? formatDateForExcel(family.wifeDob) : "—"}</td>
+                      <td>
+                        {family.phone ? (
+                          <a href={`tel:${family.phone}`} className="table-phone-link">
+                            <FaPhoneAlt className="phone-tiny-icon" />
+                            <span>{family.phone}</span>
+                          </a>
+                        ) : "—"}
+                      </td>
+                      <td className="text-center">
+                        <span className="members-count-badge">{family.membersCount || 1}</span>
+                      </td>
+                      <td>{family.location || "—"}</td>
+                      <td>
+                        <span className="notes-snippet" title={family.notes || ""}>
+                          {family.notes || "—"}
+                        </span>
+                      </td>
+                      <td className="text-center actions-cell">
+                        <div className="table-actions-btns">
+                          <button 
+                            type="button"
+                            onClick={() => onEdit(family)} 
+                            className="table-btn-action edit" 
+                            title="تعديل بيانات العائلة"
+                          >
+                            <FaEdit />
+                            <span>تعديل</span>
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => onDelete(family.id, family.name)} 
+                            className="table-btn-action delete" 
+                            title="حذف السجل"
+                          >
+                            <FaTrashAlt />
+                            <span>حذف</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ترقيم الصفحات (Pagination) */}
+          {totalPages > 1 && (
+            <div className="pagination-bar">
+              <div className="pagination-info">
+                عرض <strong>{startIndex + 1}</strong> إلى <strong>{Math.min(startIndex + itemsPerPage, filteredFamilies.length)}</strong> من أصل <strong>{filteredFamilies.length}</strong> عائلة
+              </div>
+
+              <div className="pagination-controls">
+                <button 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="page-nav-btn"
+                >
+                  السابق
+                </button>
+
+                <div className="page-numbers-group">
+                  {getPageNumbers().map((pageNum) => (
+                    <button
+                      key={`page-${pageNum}`}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`page-num-btn ${currentPage === pageNum ? "active" : ""}`}
+                    >
+                      {pageNum}
+                    </button>
+                  ))}
+                </div>
+
+                <button 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="page-nav-btn"
+                >
+                  التالي
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };

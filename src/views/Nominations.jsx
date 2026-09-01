@@ -40,13 +40,14 @@ const Nominations = ({ nominations = [], user, campProfile }) => {
   // تنفيذ مسح كشف الترشيحات بالكامل
   const handleConfirmClearAll = async () => {
     if (clearConfirmText !== "مسح") return;
+    const effectiveCampId = (user?.campId && user.campId !== "system") ? user.campId : (campProfile?.id || "kareem");
     try {
-      await deleteAllNominations(user.campId);
+      await deleteAllNominations(effectiveCampId);
       showNotification("تم مسح كشف الترشيحات بالكامل بنجاح");
       setIsClearAllModalOpen(false);
     } catch (error) {
       console.error("Error clearing nominations:", error);
-      showNotification(error.message || "تعذر مسح كشف الترشيحات من قاعدة البيانات.", "error");
+      showNotification(error.message || "تعذر مسح الكشف من قاعدة البيانات.", "error");
     }
   };
 
@@ -70,14 +71,15 @@ const Nominations = ({ nominations = [], user, campProfile }) => {
 
   // حفظ الإضافة أو التعديل
   const handleSaveNomination = async (formData) => {
+    const effectiveCampId = (user?.campId && user.campId !== "system") ? user.campId : (campProfile?.id || "kareem");
     try {
       if (selectedNomination) {
         // تعديل
         await updateNomination(selectedNomination.id, formData);
-        showNotification(`تم تحديث ترشيح "${formData.name}" بنجاح`);
+        showNotification(`تم تحديث بيانات ترشيح "${formData.name}" بنجاح`);
       } else {
         // إضافة جديدة
-        await addNomination(user.campId, formData);
+        await addNomination(effectiveCampId, formData);
         showNotification(`تم تسجيل ترشيح "${formData.name}" بنجاح`);
       }
       setIsFormOpen(false);
@@ -89,37 +91,51 @@ const Nominations = ({ nominations = [], user, campProfile }) => {
 
   // معالجة البيانات المستوردة من Excel مع إزالة التكرار تلقائياً
   const handleImportComplete = async (parsedData) => {
-    const seenNames = new Set();
-    const seenIds = new Set();
+    const seenKeys = new Set();
     const uniqueIncoming = [];
 
-    parsedData.forEach(record => {
-      const nameKey = record.name ? record.name.trim() : "";
-      const idKey = record.idNumber ? record.idNumber.trim() : "";
-      
-      if (nameKey && idKey && !seenNames.has(nameKey) && !seenIds.has(idKey)) {
-        seenNames.add(nameKey);
-        seenIds.add(idKey);
-        uniqueIncoming.push(record);
+    (parsedData || []).forEach((record) => {
+      const nameKey = record.name ? String(record.name).trim() : "";
+      const idKey = record.idNumber ? String(record.idNumber).trim() : "";
+
+      if (nameKey) {
+        const uniqueKey = idKey ? `${nameKey}_${idKey}` : nameKey;
+        if (!seenKeys.has(uniqueKey)) {
+          seenKeys.add(uniqueKey);
+          uniqueIncoming.push(record);
+        }
       }
     });
 
-    const existingNames = new Set((nominations || []).map(n => n.name ? n.name.trim() : ""));
-    const existingIds = new Set((nominations || []).map(n => n.idNumber ? n.idNumber.trim() : ""));
+    if (uniqueIncoming.length === 0) {
+      showNotification("لم يتم العثور على أي أسماء صالحة للاستيراد في الملف.", "error");
+      return;
+    }
 
-    const recordsToInsert = uniqueIncoming.filter(record => {
-      const nameKey = record.name ? record.name.trim() : "";
-      const idKey = record.idNumber ? record.idNumber.trim() : "";
-      return !existingNames.has(nameKey) && !existingIds.has(idKey);
+    const existingNames = new Set((nominations || []).map((n) => (n.name ? String(n.name).trim() : "")));
+    const existingIds = new Set((nominations || []).map((n) => (n.idNumber ? String(n.idNumber).trim() : "")).filter(Boolean));
+
+    const recordsToInsert = uniqueIncoming.filter((record) => {
+      const nameKey = record.name ? String(record.name).trim() : "";
+      const idKey = record.idNumber ? String(record.idNumber).trim() : "";
+      if (idKey && existingIds.has(idKey)) return false;
+      if (!idKey && existingNames.has(nameKey)) return false;
+      return true;
     });
 
     const skippedCount = uniqueIncoming.length - recordsToInsert.length;
+    const effectiveCampId = (user?.campId && user.campId !== "system") ? user.campId : (campProfile?.id || "kareem");
+
+    if (recordsToInsert.length === 0) {
+      showNotification(`تم فحص الملف: جميع الأسماء (${uniqueIncoming.length}) مسجلة وموجودة مسبقاً في النظام.`, "error");
+      return;
+    }
 
     try {
-      await batchAddNominations(user.campId, recordsToInsert);
+      await batchAddNominations(effectiveCampId, recordsToInsert);
       const successCount = recordsToInsert.length;
       if (skippedCount > 0) {
-        showNotification(`تم استيراد ${successCount} ترشيح بنجاح، وتم تخطي ${skippedCount} سجل مكرر.`, "success");
+        showNotification(`تم استيراد ${successCount} ترشيح بنجاح، وتخطي ${skippedCount} سجل مكرر مسجل مسبقاً.`, "success");
       } else {
         showNotification(`تم استيراد ${successCount} ترشيح بنجاح من ملف Excel!`, "success");
       }
@@ -139,6 +155,14 @@ const Nominations = ({ nominations = [], user, campProfile }) => {
       console.error("Error deleting nomination:", error);
       showNotification(error.message || "تعذر حذف الترشيح من قاعدة البيانات.", "error");
     }
+  };
+
+  const [exportableNominations, setExportableNominations] = useState([]);
+  const [activeFilterDesc, setActiveFilterDesc] = useState("");
+
+  const handleFilteredChange = (filtered, desc) => {
+    setExportableNominations(filtered);
+    setActiveFilterDesc(desc);
   };
 
   return (
@@ -175,20 +199,20 @@ const Nominations = ({ nominations = [], user, campProfile }) => {
             <FaTrash /> مسح الكشف
           </button>
           <button 
-            onClick={() => exportNominationsToExcel(nominations, campProfile)} 
+            onClick={() => exportNominationsToExcel(exportableNominations.length > 0 || activeFilterDesc ? exportableNominations : nominations, campProfile, activeFilterDesc)} 
             className="btn btn-excel"
-            title="تصدير Excel"
+            title={activeFilterDesc ? `تصدير النتائج المصفاة (${exportableNominations.length}) إلى Excel` : "تصدير الكشف إلى Excel"}
             disabled={nominations.length === 0}
           >
-            <FaFileExcel /> تصدير Excel
+            <FaFileExcel /> {activeFilterDesc ? `تصدير المصفّى (${exportableNominations.length})` : "تصدير Excel"}
           </button>
           <button 
-            onClick={() => exportToPDF(nominations, "nominations", campProfile)} 
+            onClick={() => exportToPDF(exportableNominations.length > 0 || activeFilterDesc ? exportableNominations : nominations, "nominations", campProfile, activeFilterDesc)} 
             className="btn btn-pdf"
-            title="تصدير PDF"
+            title={activeFilterDesc ? `تصدير وطباعة النتائج المصفاة (${exportableNominations.length})` : "تصدير الكشف للطباعة و PDF"}
             disabled={nominations.length === 0}
           >
-            <FaFilePdf /> تصدير PDF / طباعة
+            <FaFilePdf /> {activeFilterDesc ? `طباعة المصفّى (${exportableNominations.length})` : "تصدير PDF / طباعة"}
           </button>
         </div>
       </header>
@@ -198,6 +222,7 @@ const Nominations = ({ nominations = [], user, campProfile }) => {
         nominations={nominations}
         onEdit={handleOpenEdit}
         onDelete={handleOpenDelete}
+        onFilteredChange={handleFilteredChange}
       />
 
       {/* نموذج الإضافة والتعديل */}

@@ -7,6 +7,7 @@ import {
   mapFamilyToSupabase,
   mapFamilyToLocal,
 } from "./helpers";
+import { enqueueMutation } from "../lib/syncEngine";
 
 const loadDefaultFamilies = async () => (await import("./familiesDefault.json")).default;
 
@@ -18,7 +19,6 @@ const FAMILIES_CLEARED_KEY = "kareem_camp_families_cleared";
 // ─── Local Storage helpers ────────────────────────────────────────────────────
 
 const getFamiliesFromLocal = () => localStorageGet(FAMILIES_KEY, []);
-
 const saveFamiliesToLocal = (families) => localStorageSet(FAMILIES_KEY, families);
 
 const initLocalStorage = () => {
@@ -29,15 +29,14 @@ const initLocalStorage = () => {
   }
 };
 
-// ─── Demo subscriber pub/sub ─────────────────────────────────────────────────
+// ─── Subscribers pub/sub ──────────────────────────────────────────────────────
 
 const demoSubscribers = new Set();
-
 const notifyDemoSubscribers = () => {
   demoSubscribers.forEach((cb) => cb());
 };
 
-// ─── Supabase mapper ─────────────────────────────────────────────────────────
+// ─── Supabase mapper ──────────────────────────────────────────────────────────
 
 const mapSupabaseFamilyToJS = (row) => {
   return {
@@ -58,14 +57,11 @@ const mapSupabaseFamilyToJS = (row) => {
   };
 };
 
-// ─── Demo data reader ─────────────────────────────────────────────────────────
-
 const getDemoFamilies = (campId) => {
   if (typeof window === "undefined") return [];
   initLocalStorage();
 
   const families = getFamiliesFromLocal();
-
   return families
     .filter((f) => {
       if (!f.campId || f.campId === "kareem") return campId === "kareem";
@@ -112,10 +108,31 @@ export const subscribeFamilies = (campId, callback) => {
     };
   }
 
+  // Central Database API with local cache
   initLocalStorage();
-  const wrapper = () => callback(getDemoFamilies(campId));
+  const fetchFromApi = async () => {
+    try {
+      const res = await fetch(`/api/families?campId=${encodeURIComponent(campId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.families)) {
+          if (data.families.length > 0 || localStorage.getItem(FAMILIES_CLEARED_KEY) === "true") {
+            saveFamiliesToLocal(data.families);
+            callback(data.families, null);
+            return;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("API families sync notice:", e);
+    }
+    callback(getDemoFamilies(campId), null);
+  };
+
+  fetchFromApi();
+
+  const wrapper = () => fetchFromApi();
   demoSubscribers.add(wrapper);
-  wrapper();
   return () => demoSubscribers.delete(wrapper);
 };
 
@@ -123,20 +140,41 @@ export const subscribeFamilies = (campId, callback) => {
  * إضافة عائلة جديدة
  */
 export const addFamily = async (campId, familyData) => {
+  const effectiveCampId = (campId && campId !== "system") ? campId : "kareem";
   const id = familyData.id || createRecordId("family");
+  const localFamily = mapFamilyToLocal(effectiveCampId, familyData, id);
 
   if (isSupabaseConfigured) {
     const { error } = await supabase
       .from("families")
-      .insert([mapFamilyToSupabase(campId, familyData, id)]);
+      .insert([mapFamilyToSupabase(effectiveCampId, familyData, id)]);
     assertSupabaseSuccess(error, "حفظ العائلة");
     return id;
+  }
+
+  // Save to Central API or Enqueue Offline
+  let apiSucceeded = false;
+  try {
+    const res = await fetch("/api/families", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ campId: effectiveCampId, family: { ...familyData, id } }),
+    });
+    if (res.ok) {
+      apiSucceeded = true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "تعذر حفظ العائلة في قاعدة البيانات");
+    }
+  } catch (e) {
+    console.warn("API save notice (Offline Mode):", e);
+    throw e;
   }
 
   localStorage.removeItem(FAMILIES_CLEARED_KEY);
   initLocalStorage();
   const families = getFamiliesFromLocal().filter((f) => f.id !== id);
-  families.push(mapFamilyToLocal(campId, familyData, id));
+  families.push(localFamily);
   saveFamiliesToLocal(families);
   notifyDemoSubscribers();
   return id;
@@ -163,6 +201,25 @@ export const updateFamily = async (id, familyData) => {
     return true;
   }
 
+  // Update in Central API or Enqueue Offline
+  let apiSucceeded = false;
+  try {
+    const res = await fetch("/api/families", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ...familyData }),
+    });
+    if (res.ok) {
+      apiSucceeded = true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "تعذر تحديث بيانات العائلة");
+    }
+  } catch (e) {
+    console.warn("API update notice (Offline Mode):", e);
+    throw e;
+  }
+
   initLocalStorage();
   const families = getFamiliesFromLocal();
   const index = families.findIndex((f) => f.id === id);
@@ -171,6 +228,7 @@ export const updateFamily = async (id, familyData) => {
     saveFamiliesToLocal(families);
   }
   notifyDemoSubscribers();
+  return true;
 };
 
 /**
@@ -184,45 +242,47 @@ export const deleteFamily = async (id) => {
     return true;
   }
 
+  // Delete in Central API or Enqueue Offline
+  let apiSucceeded = false;
+  try {
+    const res = await fetch(`/api/families?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (res.ok) {
+      apiSucceeded = true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "تعذر حذف سجل العائلة");
+    }
+  } catch (e) {
+    console.warn("API delete notice (Offline Mode):", e);
+    throw e;
+  }
+
   initLocalStorage();
   saveFamiliesToLocal(getFamiliesFromLocal().filter((f) => f.id !== id));
   notifyDemoSubscribers();
+  return true;
 };
 
 /**
- * استيراد العائلات الافتراضية بالكامل لمخيم محدد
+ * استيراد العائلات الافتراضية
  */
 export const importDefaultFamiliesToSupabase = async (campId) => {
-  if (!isSupabaseConfigured) {
-    return { success: false, error: "النظام يعمل حالياً في الوضع التجريبي. يرجى ربط Supabase." };
-  }
-
-  try {
-    const defaultFamilies = await loadDefaultFamilies();
-    const rows = defaultFamilies.map((f, i) =>
-      mapFamilyToSupabase(campId, f, f.id || `csv-${i}-${Date.now()}`)
-    );
-    const { error } = await supabase.from("families").upsert(rows);
-    if (error) throw error;
-    return { success: true };
-  } catch (error) {
-    console.error("Error during bulk import to Supabase:", error);
-    return { success: false, error: error.message };
-  }
+  const defaultFamilies = await loadDefaultFamilies();
+  return await batchAddFamilies(campId, defaultFamilies);
 };
 
-// الاسم القديم للتوافق مع الكود الموجود
 export const importDefaultFamiliesToFirestore = importDefaultFamiliesToSupabase;
 
 /**
- * استيراد دفعة عائلات دفعة واحدة بشكل سريع
+ * استيراد دفعة عائلات دفعة واحدة
  */
 export const batchAddFamilies = async (campId, familyList) => {
   if (!familyList || familyList.length === 0) return true;
+  const effectiveCampId = (campId && campId !== "system") ? campId : "kareem";
 
   if (isSupabaseConfigured) {
     const rows = familyList.map((family) =>
-      mapFamilyToSupabase(campId, family, family.id || createRecordId("family"))
+      mapFamilyToSupabase(effectiveCampId, family, family.id || createRecordId("family"))
     );
     const chunkSize = 100;
     for (let i = 0; i < rows.length; i += chunkSize) {
@@ -232,13 +292,37 @@ export const batchAddFamilies = async (campId, familyList) => {
     return true;
   }
 
+  const mappedBatch = familyList.map((f) =>
+    mapFamilyToLocal(effectiveCampId, f, f.id || createRecordId("family"))
+  );
+
+  // Save to Central API or Enqueue Offline
+  let apiSucceeded = false;
+  try {
+    const res = await fetch("/api/families", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        campId: effectiveCampId,
+        action: "batch",
+        families: mappedBatch,
+      }),
+    });
+    if (res.ok) {
+      apiSucceeded = true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "فشل حفظ الدفعة في قاعدة البيانات");
+    }
+  } catch (e) {
+    console.error("API batch save error:", e);
+    throw e;
+  }
+
   localStorage.removeItem(FAMILIES_CLEARED_KEY);
   initLocalStorage();
   const existing = getFamiliesFromLocal();
-  const newEntries = familyList.map((f, i) =>
-    mapFamilyToLocal(campId, f, f.id || `family_${Date.now()}_${i}`)
-  );
-  saveFamiliesToLocal([...existing, ...newEntries]);
+  saveFamiliesToLocal([...existing, ...mappedBatch]);
   notifyDemoSubscribers();
   return true;
 };
@@ -247,13 +331,30 @@ export const batchAddFamilies = async (campId, familyList) => {
  * حذف جميع عائلات المخيم الحالي
  */
 export const deleteAllFamilies = async (campId) => {
+  const effectiveCampId = (campId && campId !== "system") ? campId : "kareem";
   if (isSupabaseConfigured) {
-    const { error } = await supabase.from("families").delete().eq("camp_id", campId);
+    const { error } = await supabase.from("families").delete().eq("camp_id", effectiveCampId);
     assertSupabaseSuccess(error, "مسح كشف العائلات");
     return true;
+  }
+
+  // Delete all in Central API or Enqueue Offline
+  let apiSucceeded = false;
+  try {
+    const res = await fetch(`/api/families?campId=${encodeURIComponent(effectiveCampId)}&action=all`, { method: "DELETE" });
+    if (res.ok) {
+      apiSucceeded = true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "فشل مسح كشف العائلات");
+    }
+  } catch (e) {
+    console.error("API delete all error:", e);
+    throw e;
   }
 
   saveFamiliesToLocal([]);
   localStorage.setItem(FAMILIES_CLEARED_KEY, "true");
   notifyDemoSubscribers();
+  return true;
 };

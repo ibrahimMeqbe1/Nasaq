@@ -17,6 +17,7 @@ import {
   FaMobileAlt,
   FaQuestionCircle,
   FaEnvelope,
+  FaSignInAlt,
 } from "react-icons/fa";
 import PublicHeader from "../components/public/PublicHeader";
 import PublicFooter from "../components/public/PublicFooter";
@@ -48,11 +49,12 @@ export default function LandingPage({ user }) {
 
               <div className="hero-actions">
                 <Link href="/login" className="hero-btn-primary">
+                  <FaSignInAlt aria-hidden="true" />
                   <span>{user ? "الانتقال للوحة التحكم" : "تسجيل الدخول للنظام"}</span>
-                  <FaArrowLeft />
+                  <FaArrowLeft aria-hidden="true" />
                 </Link>
                 <Link href="/features" className="hero-btn-secondary">
-                  <span>استكشاف المميزات</span>
+                  <span>استكشاف المميزات والحلول</span>
                 </Link>
               </div>
             </div>

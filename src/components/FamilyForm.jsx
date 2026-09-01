@@ -62,34 +62,18 @@ const FamilyForm = ({ isOpen, onClose, onSave, family }) => {
     
     if (!formData.name.trim()) {
       tempErrors.name = "اسم رب الأسرة مطلوب";
-    } else if (formData.name.trim().length < 3) {
-      tempErrors.name = "يجب أن يكون الاسم 3 أحرف على الأقل";
     }
 
     if (!formData.idNumber.trim()) {
       tempErrors.idNumber = "رقم الهوية مطلوب";
-    } else if (!/^\d{9}$/.test(formData.idNumber.trim())) {
-      tempErrors.idNumber = "رقم الهوية يجب أن يتكون من 9 أرقام فقط";
-    }
-
-    if (!formData.phone.trim()) {
-      tempErrors.phone = "رقم الهاتف مطلوب";
-    } else if (!/^(059|056|052|050|054)\d{7}$/.test(formData.phone.trim()) && !/^\+?\d{8,14}$/.test(formData.phone.trim())) {
-      tempErrors.phone = "رقم الهاتف غير صحيح (مثال: 0599000000)";
-    }
-
-    if (!formData.membersCount || formData.membersCount < 1) {
-      tempErrors.membersCount = "عدد أفراد الأسرة يجب أن يكون 1 على الأقل";
-    }
-
-    if (!formData.location.trim()) {
-      tempErrors.location = "مكان السكن (الخيمة أو الكرفان) مطلوب";
     }
 
     // التحقق من بيانات الزوجة في حال كانت الحالة "متزوج"
-    if (formData.status === "متزوج") {
-      if (formData.wifeId.trim() && !/^\d{9}$/.test(formData.wifeId.trim())) {
-        tempErrors.wifeId = "رقم هوية الزوجة يجب أن يتكون من 9 أرقام";
+    const isPlaceholder = (val) => !val || val === "-" || val === "لا يوجد" || val === "null" || val === "undefined";
+    if (formData.status === "متزوج" && !isPlaceholder(formData.wifeId)) {
+      const digits = String(formData.wifeId).replace(/\D/g, "");
+      if (digits.length > 0 && digits.length !== 9) {
+        tempErrors.wifeId = "رقم هوية الزوجة يجب أن يتكون من 9 أرقام (أو اتركها فارغة)";
       }
     }
 
@@ -331,11 +315,11 @@ const FamilyForm = ({ isOpen, onClose, onSave, family }) => {
           </div>
 
           {/* أزرار الحفظ والإغلاق */}
-          <div className="form-actions">
-            <button type="submit" className="btn-submit">
-              <FaSave /> حفظ البيانات
+          <div className="modal-footer" style={{ marginTop: "1.5rem", display: "flex", justifyContent: "flex-end", gap: "10px", padding: "1rem 0 0 0", borderTop: "1px solid #e2e8f0" }}>
+            <button type="submit" className="btn btn-primary" style={{ display: "flex", alignItems: "center", gap: "8px", padding: "0.75rem 1.5rem", fontSize: "0.95rem", fontWeight: "700", borderRadius: "10px" }}>
+              <FaSave aria-hidden="true" /> حفظ البيانات
             </button>
-            <button type="button" onClick={onClose} className="btn-cancel">
+            <button type="button" onClick={onClose} className="btn btn-secondary" style={{ padding: "0.75rem 1.25rem", fontSize: "0.95rem", fontWeight: "700", borderRadius: "10px" }}>
               إلغاء
             </button>
           </div>

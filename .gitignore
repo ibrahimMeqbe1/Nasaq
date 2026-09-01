@@ -45,3 +45,9 @@ outputs/Nasaq_SRS_AR_v1.0.docx
 .dev.vars
 .dev.vars.*
 cloudflare-env.d.ts
+
+# SQLite production database (sensitive data - never commit)
+database/*.sqlite
+database/*.sqlite-shm
+database/*.sqlite-wal
+database/nasaq_local_db.json

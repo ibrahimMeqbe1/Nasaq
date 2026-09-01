@@ -12,10 +12,13 @@ import {
   FaBaby,
   FaChartBar,
   FaChartPie,
+  FaChild,
   FaClipboardList,
   FaFemale,
   FaFileExcel,
   FaFilePdf,
+  FaGraduationCap,
+  FaHandsHelping,
   FaHeartbeat,
   FaHome,
   FaPlus,
@@ -101,6 +104,20 @@ const Dashboard = ({ families = [], nominations = [], user, campProfile }) => {
   const grandAgeTotal = age_0_2 + age_3_5 + age_6_18 + age_19_60 + age_over_60 || totalNominationMembers || 1;
   const totalChildrenCount = age_0_2 + age_3_5 + age_6_18;
   const totalAdultsCount = age_19_60 + age_over_60;
+
+  // 1. عدد الأيتام
+  const countOrphans = 
+    families.filter((f) => (f.status || "").includes("يتيم")).length ||
+    nominations.filter((n) => (n.status || "").includes("يتيم")).length || 0;
+
+  // 2. عدد الأرامل
+  const countWidows = 
+    families.filter((f) => (f.status || "").includes("أرمل")).length ||
+    nominations.filter((n) => (n.status || "").includes("أرمل") || isPositive(n.isFemaleHeaded)).length || 0;
+
+  // 3. طلاب المدارس (7 - 18 سنة / 6 - 18 سنة)
+  const countSchoolStudents = age_6_18;
+
   const percentSpecial = totalNominations > 0 ? Math.min(100, Math.round((familiesWithSpecialCases / totalNominations) * 100)) : 0;
   const percentChildren = grandAgeTotal > 0 ? Math.round((totalChildrenCount / grandAgeTotal) * 100) : 0;
   const percentCoverage = totalFamilies > 0 ? Math.min(100, Math.round((totalNominations / totalFamilies) * 100)) : (totalNominations > 0 ? 100 : 0);
@@ -138,7 +155,7 @@ const Dashboard = ({ families = [], nominations = [], user, campProfile }) => {
   const ageGroups = [
     { label: "حتى سنتين", value: age_0_2 },
     { label: "3–5 سنوات", value: age_3_5 },
-    { label: "6–18 سنة", value: age_6_18 },
+    { label: "6–18 سنة (التعليم المدرسي)", value: age_6_18 },
     { label: "19–60 سنة", value: age_19_60 },
     { label: "أكثر من 60 سنة", value: age_over_60 },
   ].map((group) => ({ ...group, percent: Math.round((group.value / (grandAgeTotal || 1)) * 100) }));
@@ -173,6 +190,7 @@ const Dashboard = ({ families = [], nominations = [], user, campProfile }) => {
         </button>
       </header>
 
+      {/* 1. شبكة الإحصاءات العامة */}
       <section className="stats-grid" aria-label="الإحصاءات الأساسية">
         <article className="stat-card stat-card--primary">
           <FaUsers className="stat-card-symbol" aria-hidden="true" />
@@ -200,6 +218,64 @@ const Dashboard = ({ families = [], nominations = [], user, campProfile }) => {
         </article>
       </section>
 
+      {/* 2. شبكة إحصاءات الطفولة والفئات الخاصة والتعليم (جديدة) */}
+      <section className="stats-demographics-container" aria-label="إحصاءات الطفولة والتعليم والفئات الخاصة" style={{ marginBottom: "2.5rem" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem", flexWrap: "wrap", gap: "10px" }}>
+          <h2 style={{ fontSize: "1.15rem", fontWeight: "800", color: "var(--primary-dark)", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+            <FaChild style={{ color: "#059669" }} aria-hidden="true" /> مؤشرات الطفولة، الأرامل، الأيتام، والتعليم
+          </h2>
+          <span style={{ fontSize: "0.82rem", color: "#64748b", fontWeight: "700", background: "#f1f5f9", padding: "4px 10px", borderRadius: "20px" }}>
+            تحديث تلقائي وفوري
+          </span>
+        </div>
+
+        <div className="stats-grid" style={{ marginBottom: 0 }}>
+          <article className="stat-card" style={{ borderRight: "4px solid #d97706" }}>
+            <div className="stat-icon-wrapper gold">
+              <FaHandsHelping aria-hidden="true" />
+            </div>
+            <div className="stat-details">
+              <span className="stat-title">عدد الأيتام</span>
+              <strong className="stat-value" style={{ color: "#d97706" }}><AnimatedNumber value={countOrphans} /></strong>
+              <span className="stat-desc">أسر فاقدة للمعيل</span>
+            </div>
+          </article>
+
+          <article className="stat-card" style={{ borderRight: "4px solid #059669" }}>
+            <div className="stat-icon-wrapper green">
+              <FaChild aria-hidden="true" />
+            </div>
+            <div className="stat-details">
+              <span className="stat-title">إجمالي الأطفال</span>
+              <strong className="stat-value" style={{ color: "#059669" }}><AnimatedNumber value={totalChildrenCount} /></strong>
+              <span className="stat-desc">دون 18 سنة ({percentChildren}٪ من الأفراد)</span>
+            </div>
+          </article>
+
+          <article className="stat-card" style={{ borderRight: "4px solid #8b5cf6" }}>
+            <div className="stat-icon-wrapper" style={{ background: "rgba(139, 92, 246, 0.15)", color: "#8b5cf6" }}>
+              <FaFemale aria-hidden="true" />
+            </div>
+            <div className="stat-details">
+              <span className="stat-title">عدد الأرامل</span>
+              <strong className="stat-value" style={{ color: "#8b5cf6" }}><AnimatedNumber value={countWidows} /></strong>
+              <span className="stat-desc">أسر ترعاها أرامل</span>
+            </div>
+          </article>
+
+          <article className="stat-card" style={{ borderRight: "4px solid #2563eb" }}>
+            <div className="stat-icon-wrapper blue">
+              <FaGraduationCap aria-hidden="true" />
+            </div>
+            <div className="stat-details">
+              <span className="stat-title">طلاب المدارس (7–18 سنة)</span>
+              <strong className="stat-value" style={{ color: "#2563eb" }}><AnimatedNumber value={countSchoolStudents} /></strong>
+              <span className="stat-desc">الفئة المدرسية الأساسية</span>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <div className="dashboard-overview-grid">
         <section className="dashboard-panel ratios-panel">
           <header className="panel-heading">
@@ -211,10 +287,10 @@ const Dashboard = ({ families = [], nominations = [], user, campProfile }) => {
               <div className="ratio-row" key={ratio.label}>
                 <div className="ratio-meta">
                   <span>{ratio.label}</span>
-                  <strong>{ratio.value}٪</strong>
+                  <strong style={{ direction: "ltr", display: "inline-block" }}>{ratio.value}%</strong>
                 </div>
                 <div className="ratio-track" aria-hidden="true">
-                  <span style={{ "--bar-value": `${ratio.value}%` }} />
+                  <span style={{ width: `${Math.min(Math.max(ratio.value, 0), 100)}%` }} />
                 </div>
                 <small>{ratio.detail}</small>
               </div>
@@ -231,8 +307,8 @@ const Dashboard = ({ families = [], nominations = [], user, campProfile }) => {
             {priorityCases.map(({ label, value, icon: Icon }) => (
               <div className="priority-row" key={label}>
                 <span className="priority-icon"><Icon aria-hidden="true" /></span>
-                <span>{label}</span>
-                <strong><AnimatedNumber value={value} /></strong>
+                <span style={{ flex: 1 }}>{label}</span>
+                <strong style={{ color: "#ef4444", fontSize: "1.1rem" }}><AnimatedNumber value={value} /></strong>
               </div>
             ))}
           </div>
@@ -249,10 +325,10 @@ const Dashboard = ({ families = [], nominations = [], user, campProfile }) => {
             <div className="age-row" key={group.label}>
               <div className="age-row-meta">
                 <span>{group.label}</span>
-                <strong>{group.value} فرد · {group.percent}٪</strong>
+                <strong style={{ direction: "ltr", display: "inline-block" }}>{group.value} فرد ({group.percent}%)</strong>
               </div>
               <div className="age-track" aria-hidden="true">
-                <span style={{ "--bar-value": `${group.percent}%` }} />
+                <span style={{ width: `${Math.min(Math.max(group.percent, 0), 100)}%` }} />
               </div>
             </div>
           ))}

@@ -1,67 +1,161 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { FaLightbulb, FaPrint } from "react-icons/fa";
+import { 
+  FaPrint, 
+  FaFilePdf, 
+  FaUsers, 
+  FaWheelchair, 
+  FaHeartbeat, 
+  FaBaby, 
+  FaFemale, 
+  FaHandsHelping, 
+  FaIdCard, 
+  FaPhoneAlt, 
+  FaMapMarkerAlt, 
+  FaCheckCircle, 
+  FaInfoCircle,
+  FaSpinner
+} from "react-icons/fa";
 
 const PrintPage = () => {
   const [data, setData] = useState([]);
-  const [type, setType] = useState("families");
+  const [type, setType] = useState("nominations");
   const [campProfile, setCampProfile] = useState(null);
+  const [filterTitle, setFilterTitle] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // جلب البيانات المخزنة للطباعة
-    const printData = sessionStorage.getItem("kareem_camp_print_data");
-    const printType = sessionStorage.getItem("kareem_camp_print_type") || "families";
-    const printProfile = sessionStorage.getItem("kareem_camp_print_profile");
-    
-    let activeProfile = null;
-    if (printProfile) {
-      activeProfile = JSON.parse(printProfile);
-      setCampProfile(activeProfile);
-    }
+    let isMounted = true;
 
-    // تغيير عنوان التبويب ليكون احترافياً بدلاً من React App
-    if (activeProfile) {
-      document.title = printType === "nominations" ? `كشف ترشيحات ${activeProfile.name || "المخيم"} العام` : `كشف عائلات ${activeProfile.name || "المخيم"} العام`;
-    } else {
-      document.title = printType === "nominations" ? "كشف الترشيحات العام - نظام إدارة المخيمات" : "كشف العائلات العام - نظام إدارة المخيمات";
-    }
+    const loadPrintPayload = async () => {
+      // 1. محاولة قراءة البيانات من sessionStorage أو localStorage
+      let rawData = null;
+      let rawType = null;
+      let rawProfile = null;
+      let rawFilterTitle = null;
 
-    if (printData) {
-      setData(JSON.parse(printData));
-    }
-    setType(printType);
-    sessionStorage.removeItem("kareem_camp_print_data");
-    sessionStorage.removeItem("kareem_camp_print_type");
-    sessionStorage.removeItem("kareem_camp_print_profile");
-    
-    // تشغيل نافذة الطباعة تلقائياً بعد رندر بيانات الصفحة بالكامل للجوال والكمبيوتر
-    const timer = setTimeout(() => {
-      window.print();
-    }, 1500);
+      try {
+        rawData = sessionStorage.getItem("kareem_camp_print_data") || localStorage.getItem("kareem_camp_print_data");
+        rawType = sessionStorage.getItem("kareem_camp_print_type") || localStorage.getItem("kareem_camp_print_type");
+        rawProfile = sessionStorage.getItem("kareem_camp_print_profile") || localStorage.getItem("kareem_camp_print_profile");
+        rawFilterTitle = sessionStorage.getItem("kareem_camp_print_filter_title") || localStorage.getItem("kareem_camp_print_filter_title");
+      } catch (e) {
+        console.warn("Storage access error:", e);
+      }
 
-    return () => clearTimeout(timer);
+      let parsedData = [];
+      if (rawData) {
+        try {
+          parsedData = JSON.parse(rawData);
+        } catch (e) {
+          console.error("Failed to parse print data:", e);
+        }
+      }
+
+      let parsedProfile = null;
+      if (rawProfile) {
+        try {
+          parsedProfile = JSON.parse(rawProfile);
+        } catch (e) {
+          console.error("Failed to parse camp profile:", e);
+        }
+      }
+
+      const activeType = rawType || "nominations";
+
+      // 2. إذا كانت البيانات فارغة (مثلاً فتح الرابط مباشرة /print)، جلب البيانات من API تلقائياً
+      if (!parsedData || parsedData.length === 0) {
+        try {
+          // جلب بيانات المخيم
+          if (!parsedProfile) {
+            const campRes = await fetch("/api/camps?id=kareem");
+            if (campRes.ok) {
+              const campJson = await campRes.json();
+              parsedProfile = campJson.camp || campJson;
+            }
+          }
+
+          // جلب كشف الترشيحات أو العائلات
+          const endpoint = activeType === "families" ? "/api/families?campId=kareem" : "/api/nominations?campId=kareem";
+          const dataRes = await fetch(endpoint);
+          if (dataRes.ok) {
+            const dataJson = await dataRes.json();
+            parsedData = activeType === "families" ? (dataJson.families || []) : (dataJson.nominations || []);
+          }
+        } catch (apiErr) {
+          console.error("Fallback API fetch failed:", apiErr);
+        }
+      }
+
+      if (!isMounted) return;
+
+      if (parsedProfile) setCampProfile(parsedProfile);
+      if (rawFilterTitle) setFilterTitle(rawFilterTitle);
+      setType(activeType);
+      setData(parsedData || []);
+      setIsLoading(false);
+
+      const baseTitle = activeType === "nominations" 
+        ? `كشف ترشيحات ${parsedProfile?.name || "المخيم"}` 
+        : `كشف عائلات ${parsedProfile?.name || "المخيم"}`;
+      document.title = rawFilterTitle ? `${baseTitle} (${rawFilterTitle})` : `${baseTitle} الرسمي`;
+
+      // تشغيل نافذة الطباعة تلقائياً بعد اكتمال التحميل بـ 800ms
+      if (parsedData && parsedData.length > 0) {
+        const timer = setTimeout(() => {
+          window.print();
+        }, 800);
+        return () => clearTimeout(timer);
+      }
+    };
+
+    loadPrintPayload();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  const handleSwitchType = async (newType) => {
+    setIsLoading(true);
+    setType(newType);
+    try {
+      const endpoint = newType === "families" ? "/api/families?campId=kareem" : "/api/nominations?campId=kareem";
+      const res = await fetch(endpoint);
+      if (res.ok) {
+        const json = await res.json();
+        const records = newType === "families" ? (json.families || []) : (json.nominations || []);
+        setData(records);
+        localStorage.setItem("kareem_camp_print_data", JSON.stringify(records));
+        localStorage.setItem("kareem_camp_print_type", newType);
+      }
+    } catch (e) {
+      console.error("Error switching print type:", e);
+    }
+    setIsLoading(false);
+  };
 
   const today = new Date();
   const dateStr = today.toLocaleDateString("ar-EG", {
     year: "numeric",
     month: "long",
-    day: "numeric"
+    day: "numeric",
   });
 
   const totalCount = data.length;
-  const totalMembers = data.reduce((sum, item) => sum + (parseInt(item.membersCount) || 0), 0);
+  const totalMembers = data.reduce((sum, item) => sum + (parseInt(item.membersCount || item.members_count) || 1), 0);
   const reportReference = `${campProfile?.id || "CAMP"}-${type === "nominations" ? "NOM" : "FAM"}-${today.toISOString().slice(0, 10).replaceAll("-", "")}`;
 
-  // إحصائيات الترشيحات الخاصة بالطباعة
   const isPos = (v) => v === 1 || v === "1" || v === true || v === "true" || v === "نعم";
-  const disabledCount = type === "nominations" ? data.filter(n => isPos(n.hasDisabled || n.has_disabled)).length : 0;
-  const chronicCount = type === "nominations" ? data.filter(n => isPos(n.hasChronicDisease || n.has_chronic_disease)).length : 0;
-  const pregnantCount = type === "nominations" ? data.filter(n => isPos(n.isLactatingOrPregnant || n.is_lactating_or_pregnant)).length : 0;
-  const femaleHeadedCount = type === "nominations" ? data.filter(n => isPos(n.isFemaleHeaded || n.is_female_headed)).length : 0;
+  const disabledCount = type === "nominations" ? data.filter((n) => isPos(n.hasDisabled || n.has_disabled)).length : 0;
+  const chronicCount = type === "nominations" ? data.filter((n) => isPos(n.hasChronicDisease || n.has_chronic_disease)).length : 0;
+  const pregnantCount = type === "nominations" ? data.filter((n) => isPos(n.isLactatingOrPregnant || n.is_lactating_or_pregnant)).length : 0;
+  const femaleHeadedCount = type === "nominations" ? data.filter((n) => isPos(n.isFemaleHeaded || n.is_female_headed)).length : 0;
+  const orphanChildCount = type === "nominations" 
+    ? data.filter((n) => isPos(n.isChildHeaded || n.is_child_headed || n.isOrphanHeaded) || (n.status || "").includes("يتيم")).length 
+    : data.filter((f) => (f.status || "").includes("يتيم")).length;
 
-  // حساب وتوزيع الأعمار التفصيلي لكل عائلة لسحب الأرقام الحقيقية في الطباعة
   const getRowAgeBreakdown = (nom) => {
     const getVal = (...keys) => {
       for (const k of keys) {
@@ -149,24 +243,72 @@ const PrintPage = () => {
       a1960m: calc_a1960m,
       a1960f: calc_a1960f,
       aOver60m: calc_aOver60m,
-      aOver60f: calc_aOver60f
+      aOver60f: calc_aOver60f,
     };
   };
 
   return (
-    <div className="print-page-layout" dir="rtl" style={{ padding: "20px", backgroundColor: "white", minHeight: "100vh" }}>
-      {/* تنسيقات الطباعة الفائقة الوضوح للهواتف والكمبيوتر بالاتجاه الأفقي */}
+    <div className="print-page-layout" dir="rtl" style={{ padding: "16px 22px", backgroundColor: "#ffffff", minHeight: "100vh", maxWidth: "100%", boxSizing: "border-box" }}>
+      {/* تنسيقات الطباعة الدقيقة للحفاظ على نفس ألوان وتصميم الموقع */}
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap');
+
+        body, html {
+          font-family: 'Tajawal', 'Segoe UI', Tahoma, sans-serif !important;
+          background-color: #ffffff;
+          color: #0f172a;
+          margin: 0;
+          padding: 0;
+        }
+
+        .print-table {
+          width: 100%;
+          border-collapse: collapse;
+          direction: rtl;
+          font-family: 'Tajawal', sans-serif;
+        }
+
+        .print-table th {
+          background-color: #0f5132 !important;
+          color: #ffffff !important;
+          font-weight: 800;
+          text-align: center;
+          vertical-align: middle;
+          border: 1px solid #0a3622 !important;
+          padding: 6px 3px;
+        }
+
+        .print-table td {
+          border: 1px solid #cbd5e1;
+          padding: 5px 4px;
+          vertical-align: middle;
+          font-size: 7.5pt;
+          line-height: 1.35;
+        }
+
+        .print-table tr:nth-child(even) {
+          background-color: #f8fafc;
+        }
+
+        .badge-priority {
+          display: inline-block;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-size: 6.8pt;
+          font-weight: 700;
+          margin: 1px;
+        }
+
+        .badge-disabled { background-color: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+        .badge-chronic { background-color: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+        .badge-pregnant { background-color: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .badge-female { background-color: #f3e8ff; color: #6b21a8; border: 1px solid #e9d5ff; }
+        .badge-orphan { background-color: #ffedd5; color: #9a3412; border: 1px solid #fed7aa; }
+
         @media print {
           @page {
             size: A4 landscape !important;
-            margin: 3mm 4mm !important;
-          }
-          @page :left {
-            size: landscape !important;
-          }
-          @page :right {
-            size: landscape !important;
+            margin: 4mm 6mm !important;
           }
           html, body {
             width: 100% !important;
@@ -176,7 +318,6 @@ const PrintPage = () => {
             background-color: #ffffff !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
-            font-family: 'Tajawal', 'Cairo', sans-serif !important;
           }
           .no-print {
             display: none !important;
@@ -185,6 +326,7 @@ const PrintPage = () => {
             padding: 0 !important;
             margin: 0 !important;
             width: 100% !important;
+            max-width: 100% !important;
             box-shadow: none !important;
           }
           .print-table-wrapper {
@@ -194,7 +336,7 @@ const PrintPage = () => {
           table.print-table {
             width: 100% !important;
             border-collapse: collapse !important;
-            table-layout: auto !important;
+            table-layout: fixed !important;
             page-break-inside: auto;
           }
           table.print-table tr {
@@ -207,355 +349,432 @@ const PrintPage = () => {
           table.print-table tfoot {
             display: table-footer-group !important;
           }
-          .header, .report-title-bar, .stats-summary, .footer {
+          .header, .report-title-bar, .stats-summary, .footer, .developer-print-footer {
             break-inside: avoid !important;
             page-break-inside: avoid !important;
           }
           table.print-table th, table.print-table td {
-            line-height: 1.45 !important;
-            word-wrap: break-word !important;
-            overflow-wrap: break-word !important;
-            border: 1.5px solid #0f172a !important;
-            color: #000000 !important;
-            font-size: 9pt !important;
-            font-weight: 700 !important;
-            padding: 5px 3px !important;
-          }
-          table.print-table th {
-            font-weight: 900 !important;
-            background-color: #0f5132 !important;
-            color: #ffffff !important;
-            font-size: 9.5pt !important;
-            padding: 6px 4px !important;
-          }
-        }
-
-        /* تحسينات العرض على شاشات الموبايل قبل الطباعة */
-        @media screen and (max-width: 768px) {
-          .print-page-layout {
-            padding: 10px !important;
-          }
-          .header {
-            flex-direction: column !important;
-            text-align: center !important;
-            gap: 10px !important;
-          }
-          .meta-info {
-            text-align: center !important;
-          }
-          .print-table-wrapper {
-            overflow-x: auto !important;
-            -webkit-overflow-scrolling: touch !important;
-            border: 1px solid #cbd5e1;
-            border-radius: 10px;
-            margin-bottom: 15px;
-          }
-          table.print-table {
-            min-width: 900px !important;
+            border: 1px solid #0f172a !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
         }
       `}</style>
 
-      {/* تنبيه وشريط زر الطباعة للهواتف المحمولة */}
+      {/* شريط أدوات الطباعة والتحكم المتقدم (يختفي وقت الطباعة الفعلية) */}
       <div className="no-print" style={{ 
         background: "linear-gradient(135deg, #0f5132 0%, #064e3b 100%)", 
         color: "#ffffff", 
-        padding: "12px 18px", 
+        padding: "12px 20px", 
         borderRadius: "14px", 
-        marginBottom: "20px", 
+        marginBottom: "16px", 
         display: "flex", 
         alignItems: "center", 
         justifyContent: "space-between", 
         flexWrap: "wrap", 
-        gap: "10px",
-        boxShadow: "0 4px 15px rgba(15, 81, 50, 0.25)"
+        gap: "12px",
+        boxShadow: "0 4px 18px rgba(15, 81, 50, 0.25)"
       }}>
-        <div style={{ fontSize: "0.88rem", fontWeight: "700", display: "flex", alignItems: "flex-start", gap: "8px" }}>
-          <FaLightbulb aria-hidden="true" style={{ marginTop: "4px", flexShrink: 0 }} />
-          <span><span style={{ color: "#fef08a" }}>تلميح للطباعة من الجوال:</span> يرجى التأكد من تفعيل وضع <strong>"أفقي (Landscape)"</strong> في خيارات حفظ الـ PDF من هاتفك للحصول على أفضل قراءة احترافية لكافة الأعمدة.</span>
-        </div>
-        <button 
-          onClick={() => window.print()}
-          style={{
-            backgroundColor: "#f59e0b",
-            color: "#0f172a",
-            border: "none",
-            padding: "10px 20px",
-            fontSize: "0.95rem",
-            fontWeight: "900",
-            borderRadius: "50px",
-            cursor: "pointer",
-            boxShadow: "0 4px 10px rgba(0,0,0,0.2)"
-          }}
-        >
-          <FaPrint aria-hidden="true" style={{ marginLeft: "8px" }} /> بدء الطباعة / حفظ PDF
-        </button>
-      </div>
-
-      {/* الترويسة الرئيسية */}
-      <div className="header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "3px double #0f5132", paddingBottom: "15px", marginBottom: "25px" }}>
-        <div className="logo-section" style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-          <img className="logo" src={campProfile?.logoUrl || "/nasaq-logo.png"} alt={`شعار ${campProfile?.name || "المخيم"}`} style={{ width: "82px", height: "82px", objectFit: "contain", borderRadius: "18px", border: "2px solid #b89647", padding: "3px", background: "#fff" }} onError={(e) => { e.currentTarget.src = "/nasaq-logo.png"; }} />
-          <div className="camp-title">
-            <h1 style={{ fontSize: "18pt", color: "#0f5132", margin: 0, fontWeight: 700 }}>{campProfile?.name || "نظام إدارة المخيمات"}</h1>
-            <p style={{ fontSize: "10pt", color: "#b89647", margin: "5px 0 0 0", fontWeight: 600 }}>منصة متكاملة لإدارة المخيمات بسهولة وكفاءة</p>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ 
+            width: "36px", 
+            height: "36px", 
+            borderRadius: "10px", 
+            backgroundColor: "rgba(255, 255, 255, 0.15)", 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center",
+            fontSize: "1.1rem"
+          }}>
+            <FaPrint />
+          </div>
+          <div>
+            <div style={{ fontSize: "1rem", fontWeight: "800" }}>معاينة وطباعة الكشوف الرسمية</div>
+            <div style={{ fontSize: "0.82rem", color: "#d1fae5" }}>
+              الكشف مهيأ بتنسيق المنصة الأصلي وتوزيع الألوان الدقيق (A4 عرضي).
+            </div>
           </div>
         </div>
-        <div className="meta-info" style={{ textAlign: "left", fontSize: "10pt" }}>
-          <p><span style={{ fontWeight: "bold", color: "#0f5132" }}>مسؤول المخيم:</span> {campProfile?.managerName || "غير محدد"}</p>
-          <p><span style={{ fontWeight: "bold", color: "#0f5132" }}>رقم الجوال:</span> {campProfile?.managerPhone || "غير محدد"}</p>
-          <p><span style={{ fontWeight: "bold", color: "#0f5132" }}>التاريخ:</span> {dateStr}</p>
-          <p><span style={{ fontWeight: "bold", color: "#0f5132" }}>الموقع:</span> {campProfile?.address || "غير محدد"}</p>
-          <p><span style={{ fontWeight: "bold", color: "#0f5132" }}>مرجع الكشف:</span> <span dir="ltr">{reportReference}</span></p>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+          {/* أزرار التبديل بين كشف الترشيحات وكشف العائلات */}
+          <div style={{ display: "flex", background: "rgba(0,0,0,0.25)", padding: "3px", borderRadius: "10px", gap: "4px" }}>
+            <button
+              onClick={() => handleSwitchType("nominations")}
+              style={{
+                backgroundColor: type === "nominations" ? "#b89647" : "transparent",
+                color: "#ffffff",
+                border: "none",
+                padding: "6px 14px",
+                borderRadius: "8px",
+                fontWeight: "700",
+                fontSize: "0.85rem",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              كشف الترشيحات المفصل
+            </button>
+            <button
+              onClick={() => handleSwitchType("families")}
+              style={{
+                backgroundColor: type === "families" ? "#b89647" : "transparent",
+                color: "#ffffff",
+                border: "none",
+                padding: "6px 14px",
+                borderRadius: "8px",
+                fontWeight: "700",
+                fontSize: "0.85rem",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              كشف العائلات العام
+            </button>
+          </div>
+
+          <button 
+            onClick={() => window.print()}
+            style={{
+              backgroundColor: "#f59e0b",
+              color: "#0f172a",
+              border: "none",
+              padding: "9px 22px",
+              fontSize: "0.95rem",
+              fontWeight: "900",
+              borderRadius: "50px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              boxShadow: "0 4px 12px rgba(245, 158, 11, 0.4)"
+            }}
+          >
+            <FaPrint /> طباعة الكشف / حفظ PDF
+          </button>
         </div>
       </div>
 
-      <div className="report-title-bar" style={{ textAlign: "center", marginBottom: "20px", background: "#f4f6f4", padding: "10px", borderRadius: "6px", borderRight: "5px solid #0f5132" }}>
-        <h2 style={{ margin: 0, fontSize: "14pt", color: "#0f5132" }}>
-          {type === "nominations" 
-            ? `كشف ترشيحات ${campProfile?.name || "المخيم"} العام (كشف الترشيحات المفصل)` 
-            : `كشف عائلات ${campProfile?.name || "المخيم"} العام`}
-        </h2>
-      </div>
-
-      {/* ملخص الإحصائيات */}
-      <div className="stats-summary" style={{ display: "flex", flexWrap: "wrap", gap: "15px", marginBottom: "20px", background: "#fafafa", padding: "10px 15px", border: "1px solid #e2e8f0", borderRadius: "6px", fontSize: "9.5pt" }}>
-        <div className="stats-item">
-          <span style={{ fontWeight: "bold", color: "#64748b" }}>
-            {type === "nominations" ? "إجمالي العائلات المرشحة:" : "إجمالي عدد العائلات:"}
-          </span>
-          <span style={{ fontWeight: "bold", color: "#0f5132" }}> {totalCount} عائلة</span>
+      {isLoading ? (
+        <div style={{ textAlign: "center", padding: "60px 20px" }}>
+          <FaSpinner className="spin" style={{ fontSize: "2rem", color: "#0f5132", marginBottom: "12px", animation: "spin 1s linear infinite" }} />
+          <h3 style={{ color: "#0f5132", fontWeight: "700" }}>جارٍ تجهيز الكشف للطباعة...</h3>
         </div>
-        <div style={{ color: "#cbd5e1" }}>|</div>
-        <div className="stats-item">
-          <span style={{ fontWeight: "bold", color: "#64748b" }}>
-            {type === "nominations" ? "إجمالي الأفراد المرشحين:" : "إجمالي عدد الأفراد:"}
-          </span>
-          <span style={{ fontWeight: "bold", color: "#0f5132" }}> {totalMembers} فرد</span>
+      ) : data.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "60px 20px", background: "#f8fafc", borderRadius: "14px", border: "1px dashed #cbd5e1" }}>
+          <FaInfoCircle style={{ fontSize: "2.5rem", color: "#94a3b8", marginBottom: "12px" }} />
+          <h3 style={{ color: "#334155", fontWeight: "800" }}>لا توجد سجلات مسجلة في هذا الكشف</h3>
+          <p style={{ color: "#64748b", fontSize: "0.9rem" }}>يرجى تسجيل العائلات أو استيراد ملف الإكسل لعرض البيانات هنا.</p>
         </div>
-        
-        {type === "nominations" && (
-          <>
-            <div style={{ color: "#cbd5e1" }}>|</div>
-            <div className="stats-item">
-              <span style={{ fontWeight: "bold", color: "#64748b" }}>ذوي إعاقة:</span>
-              <span style={{ fontWeight: "bold", color: "#a04000" }}> {disabledCount}</span>
-            </div>
-            <div style={{ color: "#cbd5e1" }}>|</div>
-            <div className="stats-item">
-              <span style={{ fontWeight: "bold", color: "#64748b" }}>أمراض مزمنة:</span>
-              <span style={{ fontWeight: "bold", color: "#842029" }}> {chronicCount}</span>
-            </div>
-            <div style={{ color: "#cbd5e1" }}>|</div>
-            <div className="stats-item">
-              <span style={{ fontWeight: "bold", color: "#64748b" }}>حوامل/مرضعات:</span>
-              <span style={{ fontWeight: "bold", color: "#0f5132" }}> {pregnantCount}</span>
-            </div>
-            <div style={{ color: "#cbd5e1" }}>|</div>
-            <div className="stats-item">
-              <span style={{ fontWeight: "bold", color: "#64748b" }}>معيل امرأة:</span>
-              <span style={{ fontWeight: "bold", color: "#4a148c" }}> {femaleHeadedCount}</span>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* جدول البيانات العريض المسطح */}
-      <div className="print-table-wrapper">
-        {type === "nominations" ? (
-          <table className="print-table" style={{ width: "100%", borderCollapse: "collapse", marginBottom: "30px", direction: "rtl", tableLayout: "auto" }}>
-          <thead>
-            {/* الصف الأول من الهيدر */}
-            <tr style={{ backgroundColor: "#0f5132", color: "white" }}>
-              <th rowSpan="2" style={{ width: "2.5%", fontSize: "7.5pt", padding: "4px 2px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>رقم</th>
-              <th rowSpan="2" style={{ width: "10%", fontSize: "7.5pt", padding: "4px 3px", border: "1px solid #0f5132", textAlign: "right", verticalAlign: "middle" }}>اسم رب الأسرة</th>
-              <th rowSpan="2" style={{ width: "7%", fontSize: "7.5pt", padding: "4px 3px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>الهوية</th>
-              <th rowSpan="2" style={{ width: "4%", fontSize: "7.5pt", padding: "4px 2px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>الحالة</th>
-              <th rowSpan="2" style={{ width: "10%", fontSize: "7.5pt", padding: "4px 3px", border: "1px solid #0f5132", textAlign: "right", verticalAlign: "middle" }}>اسم الزوجة / الهوية</th>
-              <th rowSpan="2" style={{ width: "7.5%", fontSize: "7.5pt", padding: "4px 2px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>رقم الجوال</th>
-              <th rowSpan="2" style={{ width: "3%", fontSize: "7.5pt", padding: "4px 2px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>الأفراد</th>
-              
-              {/* أعمدة الفئات العمرية */}
-              <th colSpan="2" style={{ fontSize: "7pt", padding: "3px 1px", border: "1px solid #0f5132", textAlign: "center", backgroundColor: "#1e3d59" }}>2-0</th>
-              <th colSpan="2" style={{ fontSize: "7pt", padding: "3px 1px", border: "1px solid #0f5132", textAlign: "center", backgroundColor: "#17b978" }}>5-3</th>
-              <th colSpan="2" style={{ fontSize: "7pt", padding: "3px 1px", border: "1px solid #0f5132", textAlign: "center", backgroundColor: "#f35588" }}>18-6</th>
-              <th colSpan="2" style={{ fontSize: "7pt", padding: "3px 1px", border: "1px solid #0f5132", textAlign: "center", backgroundColor: "#7b68ee" }}>60-19</th>
-              <th colSpan="2" style={{ fontSize: "7pt", padding: "3px 1px", border: "1px solid #0f5132", textAlign: "center", backgroundColor: "#ff8c00" }}>60+</th>
-              
-              <th rowSpan="2" style={{ width: "2.5%", fontSize: "7.5pt", padding: "4px 1px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>إعاقة</th>
-              <th rowSpan="2" style={{ width: "2.5%", fontSize: "7.5pt", padding: "4px 1px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>مزمن</th>
-              <th rowSpan="2" style={{ width: "2.5%", fontSize: "7.5pt", padding: "4px 1px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>حامل</th>
-              <th rowSpan="2" style={{ width: "2.5%", fontSize: "7.5pt", padding: "4px 1px", border: "1px solid #0f5132", textAlign: "center", verticalAlign: "middle" }}>معيل</th>
-              <th rowSpan="2" style={{ width: "12%", fontSize: "7.5pt", padding: "4px 3px", border: "1px solid #0f5132", textAlign: "right", verticalAlign: "middle" }}>المحافظة / المندوب</th>
-              <th rowSpan="2" style={{ width: "14%", fontSize: "7.5pt", padding: "4px 3px", border: "1px solid #0f5132", textAlign: "right", verticalAlign: "middle" }}>عنوان السكن (الحالي / الأصلي)</th>
-            </tr>
-            {/* الصف الثاني من الهيدر لتحديد ذكر/أنثى */}
-            <tr style={{ backgroundColor: "#0f5132", color: "white" }}>
-              <th style={{ fontSize: "6.5pt", padding: "2px 1px", border: "1px solid #0f5132", textAlign: "center", width: "1.8%" }}>ذ</th>
-              <th style={{ fontSize: "6.5pt", padding: "2px 1px", border: "1px solid #0f5132", textAlign: "center", width: "1.8%" }}>أ</th>
-              <th style={{ fontSize: "6.5pt", padding: "2px 1px", border: "1px solid #0f5132", textAlign: "center", width: "1.8%" }}>ذ</th>
-              <th style={{ fontSize: "6.5pt", padding: "2px 1px", border: "1px solid #0f5132", textAlign: "center", width: "1.8%" }}>أ</th>
-              <th style={{ fontSize: "6.5pt", padding: "2px 1px", border: "1px solid #0f5132", textAlign: "center", width: "1.8%" }}>ذ</th>
-              <th style={{ fontSize: "6.5pt", padding: "2px 1px", border: "1px solid #0f5132", textAlign: "center", width: "1.8%" }}>أ</th>
-              <th style={{ fontSize: "6.5pt", padding: "2px 1px", border: "1px solid #0f5132", textAlign: "center", width: "1.8%" }}>ذ</th>
-              <th style={{ fontSize: "6.5pt", padding: "2px 1px", border: "1px solid #0f5132", textAlign: "center", width: "1.8%" }}>أ</th>
-              <th style={{ fontSize: "6.5pt", padding: "2px 1px", border: "1px solid #0f5132", textAlign: "center", width: "1.8%" }}>ذ</th>
-              <th style={{ fontSize: "6.5pt", padding: "2px 1px", border: "1px solid #0f5132", textAlign: "center", width: "1.8%" }}>أ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((nom, index) => {
-              const ages = getRowAgeBreakdown(nom);
-              const hasDis = isPos(nom.hasDisabled || nom.has_disabled);
-              const hasChr = isPos(nom.hasChronicDisease || nom.has_chronic_disease);
-              const hasPreg = isPos(nom.isLactatingOrPregnant || nom.is_lactating_or_pregnant);
-              const hasFem = isPos(nom.isFemaleHeaded || nom.is_female_headed);
-
-              return (
-                <tr key={nom.id} style={{ backgroundColor: index % 2 === 1 ? "#f8fafc" : "transparent" }}>
-                  <td style={{ textAlign: "center", fontWeight: "bold", padding: "4px 2px", border: "1px solid #cbd5e1", fontSize: "7pt", lineHeight: "1.3" }}>{nom.serialNo || index + 1}</td>
-                  <td style={{ fontWeight: "bold", color: "#0f5132", padding: "4px 3px", border: "1px solid #cbd5e1", fontSize: "7.5pt", lineHeight: "1.3", wordBreak: "break-word" }}>{nom.name}</td>
-                  <td style={{ padding: "4px 2px", border: "1px solid #cbd5e1", fontSize: "7pt", textAlign: "center", lineHeight: "1.3" }}>{nom.idNumber}</td>
-                  <td style={{ textAlign: "center", padding: "4px 2px", border: "1px solid #cbd5e1", fontSize: "7pt", lineHeight: "1.3" }}>{nom.status || "متزوج"}</td>
-                  <td style={{ color: "#b89647", fontWeight: "600", padding: "4px 3px", border: "1px solid #cbd5e1", fontSize: "7.5pt", lineHeight: "1.3", wordBreak: "break-word" }}>
-                    {nom.wifeName ? (
-                      <div>
-                        {nom.wifeName}
-                        {nom.wifeId && <span style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: "normal", marginRight: "3px" }}>({nom.wifeId})</span>}
-                      </div>
-                    ) : "-"}
-                    {nom.wife2Name && (
-                      <div style={{ fontSize: "6.5pt", color: "#64748b", fontWeight: "normal", marginTop: "2px" }}>
-                        زوجة 2: {nom.wife2Name}
-                        {nom.wife2Id && <span style={{ fontSize: "6pt", marginRight: "2px" }}>({nom.wife2Id})</span>}
-                      </div>
-                    )}
-                  </td>
-                  <td style={{ textAlign: "center", padding: "4px 2px", border: "1px solid #cbd5e1", fontSize: "7pt", lineHeight: "1.3" }}>
-                    <div style={{ fontWeight: "600" }}><span style={{ direction: "ltr", display: "inline-block" }}>{nom.phone || "-"}</span></div>
-                    {nom.phoneAlt && <div style={{ fontSize: "6.5pt", color: "#64748b", marginTop: "2px" }}><span style={{ direction: "ltr", display: "inline-block" }}>{nom.phoneAlt}</span></div>}
-                  </td>
-                  <td style={{ textAlign: "center", fontWeight: "bold", padding: "4px 2px", border: "1px solid #cbd5e1", fontSize: "7pt", lineHeight: "1.3" }}>{nom.membersCount}</td>
-                  
-                  {/* أعمدة الفئات العمرية */}
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt", backgroundColor: "rgba(30, 61, 89, 0.02)" }}>{ages.a02m}</td>
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt", backgroundColor: "rgba(30, 61, 89, 0.02)" }}>{ages.a02f}</td>
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt", backgroundColor: "rgba(23, 185, 120, 0.02)" }}>{ages.a35m}</td>
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt", backgroundColor: "rgba(23, 185, 120, 0.02)" }}>{ages.a35f}</td>
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt", backgroundColor: "rgba(243, 85, 136, 0.02)" }}>{ages.a618m}</td>
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt", backgroundColor: "rgba(243, 85, 136, 0.02)" }}>{ages.a618f}</td>
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt", backgroundColor: "rgba(123, 104, 238, 0.02)" }}>{ages.a1960m}</td>
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt", backgroundColor: "rgba(123, 104, 238, 0.02)" }}>{ages.a1960f}</td>
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt", backgroundColor: "rgba(255, 140, 0, 0.02)" }}>{ages.aOver60m}</td>
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt", backgroundColor: "rgba(255, 140, 0, 0.02)" }}>{ages.aOver60f}</td>
-                  
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt" }}>{hasDis ? "نعم" : "-"}</td>
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt" }}>{hasChr ? "نعم" : "-"}</td>
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt" }}>{hasPreg ? "نعم" : "-"}</td>
-                  <td style={{ textAlign: "center", padding: "4px 1px", border: "1px solid #cbd5e1", fontSize: "7pt" }}>{hasFem ? "نعم" : "-"}</td>
-
-                  {/* المحافظة / المندوب */}
-                  <td style={{ padding: "4px 3px", border: "1px solid #cbd5e1", fontSize: "7.5pt", lineHeight: "1.35", wordBreak: "break-word" }}>
-                    <div style={{ fontWeight: "bold", color: "#0f5132", marginBottom: "2px" }}>{nom.governorate || "شمال غزة"}</div>
-                    {nom.shelterManager && (
-                      <div style={{ fontSize: "6.8pt", color: "#334155" }}>
-                        <div style={{ fontWeight: "600", color: "#0f5132" }}>المندوب: {nom.shelterManager}</div>
-                        {nom.shelterPhone && (
-                          <div style={{ fontSize: "6.5pt", color: "#64748b", marginTop: "1px" }}>
-                            هاتف: <span style={{ direction: "ltr", display: "inline-block" }}>{nom.shelterPhone}</span>
-                          </div>
-                        )}
-                        {nom.shelterPhoneAlt && (
-                          <div style={{ fontSize: "6.5pt", color: "#64748b", marginTop: "1px" }}>
-                            <span style={{ direction: "ltr", display: "inline-block" }}>{nom.shelterPhoneAlt}</span> (بديل)
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </td>
-
-                  {/* عنوان السكن (الحالي / الأصلي) */}
-                  <td style={{ padding: "4px 3px", border: "1px solid #cbd5e1", fontSize: "7.5pt", lineHeight: "1.35", wordBreak: "break-word" }}>
-                    <div style={{ fontWeight: "600", color: "#1e293b", marginBottom: "2px" }}>{nom.currentAddress || "-"}</div>
-                    {nom.originalAddress && <div style={{ fontSize: "6.8pt", color: "#b89647", fontWeight: "600", marginBottom: "2px" }}>الأصلي: {nom.originalAddress}</div>}
-                    {(nom.shelterAddress || nom.shelterGps) && (
-                      <div style={{ fontSize: "6.5pt", color: "#64748b", marginTop: "1px" }}>
-                        مركز الإيواء: {nom.shelterAddress || "غير محدد"} {nom.shelterGps && `(خريطة)`}
-                      </div>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
       ) : (
-        <table className="print-table" style={{ width: "100%", borderCollapse: "collapse", marginBottom: "30px", direction: "rtl" }}>
-          <thead>
-            <tr style={{ backgroundColor: "#0f5132", color: "white" }}>
-              <th style={{ width: "3%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>رقم</th>
-              <th style={{ width: "15%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>اسم رب الأسرة</th>
-              <th style={{ width: "10%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>هوية رب الأسرة</th>
-              <th style={{ width: "10%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>تاريخ الميلاد</th>
-              <th style={{ width: "7%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>الحالة</th>
-              <th style={{ width: "15%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>اسم الزوجة</th>
-              <th style={{ width: "10%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>هوية الزوجة</th>
-              <th style={{ width: "10%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>ميلاد الزوجة</th>
-              <th style={{ width: "10%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>رقم الهاتف</th>
-              <th style={{ width: "4%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "center" }}>الأفراد</th>
-              <th style={{ width: "10%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>مكان السكن</th>
-              <th style={{ width: "12%", fontSize: "8.5pt", padding: "6px 8px", border: "1px solid #0f5132", textAlign: "right" }}>ملاحظات</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((f, index) => {
-              const isMarried = f.status === "متزوج";
-              return (
-                <tr key={f.id} style={{ backgroundColor: index % 2 === 1 ? "#f8fafc" : "transparent" }}>
-                  <td style={{ textAlign: "center", fontWeight: "bold", padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{index + 1}</td>
-                  <td style={{ fontWeight: "bold", color: "#0f5132", padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{f.name}</td>
-                  <td style={{ padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{f.idNumber}</td>
-                  <td style={{ padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{f.dob || "-"}</td>
-                  <td style={{ textAlign: "center", padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{f.status || "أعزب"}</td>
-                  <td style={{ color: "#b89647", fontWeight: "600", padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{isMarried ? (f.wifeName || "-") : "-"}</td>
-                  <td style={{ padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{isMarried ? (f.wifeId || "-") : "-"}</td>
-                  <td style={{ padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{isMarried ? (f.wifeDob || "-") : "-"}</td>
-                  <td style={{ direction: "ltr", textAlign: "right", padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{f.phone}</td>
-                  <td style={{ textAlign: "center", fontWeight: "bold", padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{f.membersCount}</td>
-                  <td style={{ padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt" }}>{f.location}</td>
-                  <td style={{ padding: "6px 8px", border: "1px solid #cbd5e1", fontSize: "8pt", wordBreak: "break-word" }}>{f.notes || "-"}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      )}
-      </div>
-
-      {/* التوقيع والختم */}
-      <div className="footer" style={{ marginTop: "50px", display: "flex", justifyContent: "space-between", fontSize: "10pt" }}>
-        <div>
-          <p>تم استخراج الكشف إلكترونياً بواسطة نظام إدارة {campProfile?.name || "المخيم"}.</p>
-        </div>
-        <div>
-          <div className="signature-box" style={{ borderTop: "1px dashed #94a3b8", width: "200px", textAlign: "center", paddingTop: "10px", marginTop: "40px" }}>
-            توقيع مسؤول المخيم: {campProfile?.managerName || "غير محدد"}
+        <>
+          {/* الترويسة الرئيسية الرسمية */}
+          <div className="header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "3px double #0f5132", paddingBottom: "12px", marginBottom: "14px", width: "100%", boxSizing: "border-box" }}>
+            <div className="logo-section" style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+              <img 
+                className="logo" 
+                src={campProfile?.logoUrl || "/nasaq-logo.png"} 
+                alt={`شعار ${campProfile?.name || "المخيم"}`} 
+                style={{ width: "70px", height: "70px", objectFit: "contain", borderRadius: "12px", border: "2px solid #b89647", padding: "2px", background: "#fff", flexShrink: 0 }} 
+                onError={(e) => { e.currentTarget.src = "/nasaq-logo.png"; }} 
+              />
+              <div className="camp-title">
+                <h1 style={{ fontSize: "16pt", color: "#0f5132", margin: 0, fontWeight: 900 }}>{campProfile?.name || "مخيم الكريم (نظام إدارة المخيمات)"}</h1>
+                <p style={{ fontSize: "9.5pt", color: "#b89647", margin: "3px 0 0 0", fontWeight: 800 }}>منصة نَسَق لإدارة المخيمات والاستجابة الإنسانية</p>
+              </div>
+            </div>
+            
+            <div className="meta-info" style={{ textAlign: "right", fontSize: "9pt", lineHeight: "1.45", flexShrink: 0, minWidth: "260px", paddingRight: "10px", boxSizing: "border-box" }}>
+              <p style={{ margin: "2px 0" }}><span style={{ fontWeight: "bold", color: "#0f5132" }}>مسؤول المخيم:</span> {campProfile?.managerName || "أ. إبراهيم مقبل"}</p>
+              <p style={{ margin: "2px 0" }}><span style={{ fontWeight: "bold", color: "#0f5132" }}>رقم التواصل:</span> <span dir="ltr" style={{ display: "inline-block", fontWeight: "700" }}>{campProfile?.managerPhone || "0599000000"}</span></p>
+              <p style={{ margin: "2px 0" }}><span style={{ fontWeight: "bold", color: "#0f5132" }}>تاريخ الإصدار:</span> {dateStr}</p>
+              <p style={{ margin: "2px 0" }}><span style={{ fontWeight: "bold", color: "#0f5132" }}>الموقع:</span> {campProfile?.address || "غزة - مخيم الكريم"}</p>
+              <p style={{ margin: "2px 0" }}><span style={{ fontWeight: "bold", color: "#0f5132" }}>مرجع الكشف:</span> <span dir="ltr" style={{ display: "inline-block", fontWeight: "700" }}>{reportReference}</span></p>
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* حقوق التطوير أسفل الصفحة */}
-      <div className="developer-print-footer" style={{ 
-        marginTop: "40px", 
-        borderTop: "1px solid #cbd5e1", 
-        paddingTop: "10px", 
-        textAlign: "center", 
-        fontSize: "8.5pt", 
-        color: "#64748b",
-        fontWeight: "600"
-      }}>
-        نَسَق | منصة إدارة المخيمات والاستجابة الإنسانية &nbsp;&nbsp;•&nbsp;&nbsp; كشف صادر إلكترونيًا بتاريخ {dateStr}
-      </div>
+          {/* شريط عنوان التقرير */}
+          <div className="report-title-bar" style={{ textAlign: "center", marginBottom: "12px", background: "#f0fdf4", padding: "8px 14px", borderRadius: "8px", borderRight: "6px solid #0f5132", border: "1px solid #bbf7d0" }}>
+            <h2 style={{ margin: 0, fontSize: "12.5pt", color: "#0f5132", fontWeight: 900 }}>
+              {type === "nominations" 
+                ? (filterTitle ? `كشف ترشيحات ${campProfile?.name || "المخيم"} (${filterTitle})` : `كشف ترشيحات ${campProfile?.name || "المخيم"} المفصل (معايير الأولوية والأعمار)`)
+                : (filterTitle ? `كشف عائلات ${campProfile?.name || "المخيم"} (${filterTitle})` : `كشف عائلات ${campProfile?.name || "المخيم"} العام`)}
+            </h2>
+          </div>
+
+          {/* ملخص الإحصائيات مع نفس كروت المنصة */}
+          <div className="stats-summary" style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "10px", marginBottom: "14px", background: "#f8fafc", padding: "8px 14px", border: "1px solid #e2e8f0", borderRadius: "8px", fontSize: "9pt" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ fontWeight: "bold", color: "#64748b" }}>إجمالي العائلات:</span>
+              <span style={{ fontWeight: "900", color: "#0f5132", background: "#dcfce7", padding: "2px 8px", borderRadius: "4px" }}>{totalCount} عائلة</span>
+            </div>
+
+            <div style={{ color: "#cbd5e1" }}>|</div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ fontWeight: "bold", color: "#64748b" }}>إجمالي الأفراد:</span>
+              <span style={{ fontWeight: "900", color: "#1e3d59", background: "#e0f2fe", padding: "2px 8px", borderRadius: "4px" }}>{totalMembers} فرد</span>
+            </div>
+
+            {type === "nominations" && (
+              <>
+                <div style={{ color: "#cbd5e1" }}>|</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <span style={{ fontWeight: "bold", color: "#64748b" }}>إعاقة:</span>
+                  <span className="badge-priority badge-disabled">{disabledCount}</span>
+                </div>
+                <div style={{ color: "#cbd5e1" }}>|</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <span style={{ fontWeight: "bold", color: "#64748b" }}>مزمن:</span>
+                  <span className="badge-priority badge-chronic">{chronicCount}</span>
+                </div>
+                <div style={{ color: "#cbd5e1" }}>|</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <span style={{ fontWeight: "bold", color: "#64748b" }}>حوامل/مرضعات:</span>
+                  <span className="badge-priority badge-pregnant">{pregnantCount}</span>
+                </div>
+                <div style={{ color: "#cbd5e1" }}>|</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <span style={{ fontWeight: "bold", color: "#64748b" }}>معيل امرأة:</span>
+                  <span className="badge-priority badge-female">{femaleHeadedCount}</span>
+                </div>
+                <div style={{ color: "#cbd5e1" }}>|</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <span style={{ fontWeight: "bold", color: "#64748b" }}>يتيم:</span>
+                  <span className="badge-priority badge-orphan">{orphanChildCount}</span>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* جدول البيانات الرئيسي */}
+          <div className="print-table-wrapper">
+            {type === "nominations" ? (
+              <table className="print-table" style={{ width: "100%", tableLayout: "fixed" }}>
+                <colgroup>
+                  <col style={{ width: "2.8%" }} />
+                  <col style={{ width: "11%" }} />
+                  <col style={{ width: "7.5%" }} />
+                  <col style={{ width: "4%" }} />
+                  <col style={{ width: "10.5%" }} />
+                  <col style={{ width: "7.5%" }} />
+                  <col style={{ width: "3.2%" }} />
+                  {/* أعمدة الأعمار */}
+                  <col style={{ width: "1.9%" }} />
+                  <col style={{ width: "1.9%" }} />
+                  <col style={{ width: "1.9%" }} />
+                  <col style={{ width: "1.9%" }} />
+                  <col style={{ width: "1.9%" }} />
+                  <col style={{ width: "1.9%" }} />
+                  <col style={{ width: "1.9%" }} />
+                  <col style={{ width: "1.9%" }} />
+                  <col style={{ width: "1.9%" }} />
+                  <col style={{ width: "1.9%" }} />
+                  {/* معايير الأولوية */}
+                  <col style={{ width: "11%" }} />
+                  {/* العنوان والملاحظات */}
+                  <col style={{ width: "12%" }} />
+                  <col style={{ width: "12%" }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th rowSpan="2" style={{ fontSize: "7.5pt" }}>#</th>
+                    <th rowSpan="2" style={{ fontSize: "7.5pt", textAlign: "right", paddingRight: "6px" }}>اسم رب الأسرة</th>
+                    <th rowSpan="2" style={{ fontSize: "7.5pt" }}>الهوية والميلاد</th>
+                    <th rowSpan="2" style={{ fontSize: "7.5pt" }}>الحالة</th>
+                    <th rowSpan="2" style={{ fontSize: "7.5pt", textAlign: "right", paddingRight: "6px" }}>اسم الزوجة والبيانات</th>
+                    <th rowSpan="2" style={{ fontSize: "7.5pt" }}>رقم الجوال</th>
+                    <th rowSpan="2" style={{ fontSize: "7.5pt" }}>الأفراد</th>
+                    
+                    {/* توزيع الفئات العمرية بألوان المنصة */}
+                    <th colSpan="2" style={{ fontSize: "7pt", backgroundColor: "#1e3d59 !important" }}>2-0</th>
+                    <th colSpan="2" style={{ fontSize: "7pt", backgroundColor: "#17b978 !important" }}>5-3</th>
+                    <th colSpan="2" style={{ fontSize: "7pt", backgroundColor: "#f35588 !important" }}>18-6</th>
+                    <th colSpan="2" style={{ fontSize: "7pt", backgroundColor: "#7b68ee !important" }}>60-19</th>
+                    <th colSpan="2" style={{ fontSize: "7pt", backgroundColor: "#ff8c00 !important" }}>+60</th>
+                    
+                    <th rowSpan="2" style={{ fontSize: "7.5pt" }}>معايير الأولوية</th>
+                    <th rowSpan="2" style={{ fontSize: "7.5pt", textAlign: "right", paddingRight: "6px" }}>المحافظة والمندوب</th>
+                    <th rowSpan="2" style={{ fontSize: "7.5pt", textAlign: "right", paddingRight: "6px" }}>العنوان الحالي / الأصلي</th>
+                  </tr>
+                  <tr>
+                    <th style={{ fontSize: "6.5pt", backgroundColor: "#1e3d59 !important" }}>ذ</th>
+                    <th style={{ fontSize: "6.5pt", backgroundColor: "#1e3d59 !important" }}>أ</th>
+                    <th style={{ fontSize: "6.5pt", backgroundColor: "#17b978 !important" }}>ذ</th>
+                    <th style={{ fontSize: "6.5pt", backgroundColor: "#17b978 !important" }}>أ</th>
+                    <th style={{ fontSize: "6.5pt", backgroundColor: "#f35588 !important" }}>ذ</th>
+                    <th style={{ fontSize: "6.5pt", backgroundColor: "#f35588 !important" }}>أ</th>
+                    <th style={{ fontSize: "6.5pt", backgroundColor: "#7b68ee !important" }}>ذ</th>
+                    <th style={{ fontSize: "6.5pt", backgroundColor: "#7b68ee !important" }}>أ</th>
+                    <th style={{ fontSize: "6.5pt", backgroundColor: "#ff8c00 !important" }}>ذ</th>
+                    <th style={{ fontSize: "6.5pt", backgroundColor: "#ff8c00 !important" }}>أ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map((nom, index) => {
+                    const ages = getRowAgeBreakdown(nom);
+                    const hasDis = isPos(nom.hasDisabled || nom.has_disabled);
+                    const hasChr = isPos(nom.hasChronicDisease || nom.has_chronic_disease);
+                    const hasPreg = isPos(nom.isLactatingOrPregnant || nom.is_lactating_or_pregnant);
+                    const hasFem = isPos(nom.isFemaleHeaded || nom.is_female_headed);
+                    const hasOrphan = isPos(nom.isChildHeaded || nom.is_child_headed || nom.isOrphanHeaded) || (nom.status || "").includes("يتيم");
+
+                    return (
+                      <tr key={nom.id || index}>
+                        <td style={{ textAlign: "center", fontWeight: "bold" }}>{nom.serialNo || index + 1}</td>
+                        <td style={{ fontWeight: "800", color: "#0f5132", wordBreak: "break-word" }}>{nom.name}</td>
+                        <td style={{ textAlign: "center" }}>
+                          <div style={{ fontWeight: "700" }}>{nom.idNumber}</div>
+                          {nom.dob && nom.dob !== "-" && <div style={{ fontSize: "6.5pt", color: "#64748b" }}>م: {nom.dob}</div>}
+                        </td>
+                        <td style={{ textAlign: "center" }}>{nom.status || "متزوج"}</td>
+                        <td style={{ color: "#b89647", fontWeight: "700", wordBreak: "break-word" }}>
+                          {nom.wifeName ? (
+                            <div>
+                              <div>{nom.wifeName}</div>
+                              {nom.wifeId && <div style={{ fontSize: "6.5pt", color: "#64748b" }}>هوية: {nom.wifeId}</div>}
+                              {nom.wifeDob && nom.wifeDob !== "-" && <div style={{ fontSize: "6.2pt", color: "#64748b" }}>م: {nom.wifeDob}</div>}
+                            </div>
+                          ) : "-"}
+                        </td>
+                        <td style={{ textAlign: "center" }}>
+                          <span dir="ltr" style={{ fontWeight: "700", display: "inline-block" }}>{nom.phone || "-"}</span>
+                          {nom.phoneAlt && <div style={{ fontSize: "6.5pt", color: "#64748b" }} dir="ltr">{nom.phoneAlt}</div>}
+                        </td>
+                        <td style={{ textAlign: "center", fontWeight: "900" }}>{nom.membersCount || nom.members_count || 1}</td>
+
+                        {/* أعمدة الفئات العمرية */}
+                        <td style={{ textAlign: "center", backgroundColor: "rgba(30, 61, 89, 0.04)" }}>{ages.a02m || 0}</td>
+                        <td style={{ textAlign: "center", backgroundColor: "rgba(30, 61, 89, 0.04)" }}>{ages.a02f || 0}</td>
+                        <td style={{ textAlign: "center", backgroundColor: "rgba(23, 185, 120, 0.04)" }}>{ages.a35m || 0}</td>
+                        <td style={{ textAlign: "center", backgroundColor: "rgba(23, 185, 120, 0.04)" }}>{ages.a35f || 0}</td>
+                        <td style={{ textAlign: "center", backgroundColor: "rgba(243, 85, 136, 0.04)" }}>{ages.a618m || 0}</td>
+                        <td style={{ textAlign: "center", backgroundColor: "rgba(243, 85, 136, 0.04)" }}>{ages.a618f || 0}</td>
+                        <td style={{ textAlign: "center", backgroundColor: "rgba(123, 104, 238, 0.04)" }}>{ages.a1960m || 0}</td>
+                        <td style={{ textAlign: "center", backgroundColor: "rgba(123, 104, 238, 0.04)" }}>{ages.a1960f || 0}</td>
+                        <td style={{ textAlign: "center", backgroundColor: "rgba(255, 140, 0, 0.04)" }}>{ages.aOver60m || 0}</td>
+                        <td style={{ textAlign: "center", backgroundColor: "rgba(255, 140, 0, 0.04)" }}>{ages.aOver60f || 0}</td>
+
+                        {/* شارات معايير الأولوية */}
+                        <td>
+                          {hasDis && <span className="badge-priority badge-disabled">إعاقة</span>}
+                          {hasChr && <span className="badge-priority badge-chronic">مزمن</span>}
+                          {hasPreg && <span className="badge-priority badge-pregnant">حامل/مرضعة</span>}
+                          {hasFem && <span className="badge-priority badge-female">معيل امرأة</span>}
+                          {hasOrphan && <span className="badge-priority badge-orphan">يتيم</span>}
+                          {!hasDis && !hasChr && !hasPreg && !hasFem && !hasOrphan && <span style={{ color: "#94a3b8" }}>-</span>}
+                        </td>
+
+                        {/* المحافظة والمندوب */}
+                        <td style={{ wordBreak: "break-word" }}>
+                          <div style={{ fontWeight: "700", color: "#0f5132" }}>{nom.governorate || "شمال غزة"}</div>
+                          {nom.shelterManager && <div style={{ fontSize: "6.8pt", color: "#334155" }}>المندوب: {nom.shelterManager}</div>}
+                          {nom.shelterPhone && <div style={{ fontSize: "6.5pt", color: "#64748b" }} dir="ltr">{nom.shelterPhone}</div>}
+                        </td>
+
+                        {/* العنوان الحالي / الأصلي */}
+                        <td style={{ wordBreak: "break-word" }}>
+                          <div style={{ fontWeight: "600", color: "#1e293b" }}>{nom.currentAddress || nom.location || "-"}</div>
+                          {nom.originalAddress && <div style={{ fontSize: "6.8pt", color: "#b89647" }}>الأصلي: {nom.originalAddress}</div>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <table className="print-table" style={{ width: "100%", tableLayout: "fixed" }}>
+                <colgroup>
+                  <col style={{ width: "3.5%" }} />
+                  <col style={{ width: "16%" }} />
+                  <col style={{ width: "9.5%" }} />
+                  <col style={{ width: "8.5%" }} />
+                  <col style={{ width: "6%" }} />
+                  <col style={{ width: "16%" }} />
+                  <col style={{ width: "9.5%" }} />
+                  <col style={{ width: "8.5%" }} />
+                  <col style={{ width: "9.5%" }} />
+                  <col style={{ width: "4%" }} />
+                  <col style={{ width: "9%" }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th style={{ textAlign: "right", paddingRight: "6px" }}>اسم رب الأسرة</th>
+                    <th>هوية رب الأسرة</th>
+                    <th>تاريخ الميلاد</th>
+                    <th>الحالة</th>
+                    <th style={{ textAlign: "right", paddingRight: "6px" }}>اسم الزوجة</th>
+                    <th>هوية الزوجة</th>
+                    <th>ميلاد الزوجة</th>
+                    <th>رقم الهاتف</th>
+                    <th>الأفراد</th>
+                    <th style={{ textAlign: "right", paddingRight: "6px" }}>السكن / ملاحظات</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map((f, index) => {
+                    const isMarried = (f.status || "").includes("متزوج");
+                    const wifeName = isMarried ? (f.wifeName || f.wife_name || "-") : "-";
+                    const wifeId = isMarried ? (f.wifeId || f.wife_id || "-") : "-";
+                    const wifeDob = isMarried ? (f.wifeDob || f.wife_dob || "-") : "-";
+                    const locNotes = [f.location, f.notes].filter(Boolean).join(" - ") || "-";
+
+                    return (
+                      <tr key={f.id || index}>
+                        <td style={{ textAlign: "center", fontWeight: "bold" }}>{index + 1}</td>
+                        <td style={{ fontWeight: "800", color: "#0f5132", wordBreak: "break-word" }}>{f.name}</td>
+                        <td style={{ textAlign: "center", whiteSpace: "nowrap", fontWeight: "700" }}>{f.idNumber || f.id_number}</td>
+                        <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>{f.dob || f.birthDate || "-"}</td>
+                        <td style={{ textAlign: "center" }}>{f.status || "متزوج"}</td>
+                        <td style={{ color: "#b89647", fontWeight: "700", wordBreak: "break-word" }}>{wifeName}</td>
+                        <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>{wifeId}</td>
+                        <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>{wifeDob}</td>
+                        <td style={{ textAlign: "center", whiteSpace: "nowrap" }}>
+                          <span dir="ltr" style={{ fontWeight: "700", display: "inline-block" }}>{f.phone || "-"}</span>
+                        </td>
+                        <td style={{ textAlign: "center", fontWeight: "900" }}>{f.membersCount || f.members_count || 1}</td>
+                        <td style={{ wordBreak: "break-word", fontSize: "7pt" }}>{locNotes}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* التوقيع والختم الرسمي */}
+          <div className="footer" style={{ marginTop: "35px", display: "flex", justifyContent: "space-between", alignItems: "flex-end", fontSize: "9.5pt" }}>
+            <div>
+              <p style={{ margin: "2px 0", fontWeight: "600", color: "#334155" }}>
+                تم استخراج وتدقيق هذا الكشف إلكترونياً بواسطة نظام إدارة {campProfile?.name || "المخيم"}.
+              </p>
+              <p style={{ margin: "2px 0", fontSize: "8.5pt", color: "#64748b" }}>
+                المرجع الرقمي: <span dir="ltr" style={{ fontWeight: "700" }}>{reportReference}</span>
+              </p>
+            </div>
+            <div>
+              <div className="signature-box" style={{ borderTop: "2px dashed #94a3b8", width: "220px", textAlign: "center", paddingTop: "8px", fontWeight: "700", color: "#0f5132" }}>
+                توقيع واعتماد مسؤول المخيم<br />
+                <span style={{ fontSize: "8.5pt", color: "#64748b", fontWeight: "normal" }}>{campProfile?.managerName || "أ. إبراهيم مقبل"}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* حقوق التطوير أسفل الصفحة */}
+          <div className="developer-print-footer" style={{ 
+            marginTop: "30px", 
+            borderTop: "1px solid #e2e8f0", 
+            paddingTop: "8px", 
+            textAlign: "center", 
+            fontSize: "8pt", 
+            color: "#64748b",
+            fontWeight: "600"
+          }}>
+            نَسَق | منصة إدارة المخيمات والاستجابة الإنسانية &nbsp;&nbsp;•&nbsp;&nbsp; كشف رسمي صادر بتاريخ {dateStr}
+          </div>
+        </>
+      )}
     </div>
   );
 };

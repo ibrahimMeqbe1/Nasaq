@@ -49,8 +49,15 @@ const Login = ({ setUser }) => {
 
       sessionStorage.setItem("kareem_camp_logged_in", JSON.stringify(result.user));
       localStorage.removeItem("kareem_camp_logged_in");
-      setUser(result.user);
-      router.push(result.redirectPath || (result.user.role === "superadmin" ? "/super-admin" : "/"));
+      if (setUser) {
+        setUser(result.user);
+      }
+      const targetPath = result.redirectPath || (result.user.role === "superadmin" ? "/super-admin" : "/");
+      if (typeof window !== "undefined") {
+        window.location.href = targetPath;
+      } else {
+        router.push(targetPath);
+      }
     } catch {
       setError("تعذر الاتصال بالخادم. تحقق من الشبكة ثم أعد المحاولة.");
       setLoading(false);
@@ -65,46 +72,47 @@ const Login = ({ setUser }) => {
             <Image
               src="/nasaq-logo.png"
               alt="شعار نَسَق"
-              width={72}
-              height={72}
+              width={76}
+              height={76}
               priority
               className="login-brand-logo"
             />
             <div>
               <strong>نَسَق</strong>
-              <span>منصة إدارة المخيمات</span>
+              <span>منصة إدارة المخيمات والاستجابة الإنسانية</span>
             </div>
           </div>
 
           <div className="login-intro-copy">
-            <p className="login-kicker">بيانات دقيقة. قرار أسرع.</p>
-            <h2>إدارة المخيم من شاشة واحدة واضحة.</h2>
+            <p className="login-kicker">بيانات دقيقة. قرار إنساني أسرع.</p>
+            <h2>إدارة المخيم وسجلات الإغاثة من شاشة واحدة متكاملة.</h2>
             <p>
-              سجّل العائلات، راجع الترشيحات، وصدّر الكشوفات الرسمية دون تشتيت أو خطوات زائدة.
+              سجّل العائلات، راجع معايير الهشاشة، صدّر الكشوفات الرسمية للأمم المتحدة والمنظمات الدولية دون أي تعقيد.
             </p>
           </div>
 
           <ul className="login-benefits" aria-label="وظائف المنصة الأساسية">
-            <li><FaCheckCircle aria-hidden="true" /><span>سجل موحّد للعائلات والأفراد</span></li>
-            <li><FaCheckCircle aria-hidden="true" /><span>ترشيحات وتقارير قابلة للطباعة</span></li>
-            <li><FaCheckCircle aria-hidden="true" /><span>صلاحيات مستقلة لكل مخيم</span></li>
+            <li><FaCheckCircle aria-hidden="true" /><span>سجل موحّد للعائلات والأفراد ومعايير الهشاشة</span></li>
+            <li><FaCheckCircle aria-hidden="true" /><span>كشوفات ترشيح وتقارير جاهزة للطباعة والتصدير</span></li>
+            <li><FaCheckCircle aria-hidden="true" /><span>قاعدة بيانات علائقية سريعة مع عزل بيانات كل مخيم</span></li>
+            <li><FaCheckCircle aria-hidden="true" /><span>نسخ احتياطي أسبوعي تلقائي واستعادة فورية</span></li>
           </ul>
 
           <div className="login-security-note">
             <FaShieldAlt aria-hidden="true" />
-            <span>الاتصال بقاعدة البيانات محمي، ولا تظهر بيانات مخيم لغير حسابه.</span>
+            <span>نظام محمي بالكامل مع جلسات مشفرة وتتبع إداري لضمان سرية البيانات الإنسانية.</span>
           </div>
         </div>
 
         <div className="login-form-panel">
           <div className="login-mobile-brand" aria-hidden="true">
-            <Image src="/nasaq-logo.png" alt="" width={56} height={56} priority />
+            <Image src="/nasaq-logo.png" alt="" width={60} height={60} priority />
             <strong>نَسَق</strong>
           </div>
 
           <header className="login-form-heading">
             <h1>تسجيل الدخول</h1>
-            <p>استخدم حساب المخيم أو حساب المشرف العام.</p>
+            <p>سجّل دخولك بحساب المشرف العام أو حساب إدارة المخيم.</p>
           </header>
 
           {error && (
@@ -120,7 +128,7 @@ const Login = ({ setUser }) => {
               <input
                 type="text"
                 id="username"
-                placeholder="مثال: camp-admin"
+                placeholder="أدخل اسم المستخدم"
                 value={username}
                 onChange={(event) => {
                   setUsername(event.target.value);
@@ -167,15 +175,15 @@ const Login = ({ setUser }) => {
 
             <button type="submit" className="login-submit" disabled={loading} aria-busy={loading}>
               {loading ? (
-                <><span className="button-spinner" aria-hidden="true" /> جارٍ التحقق…</>
+                <><span className="button-spinner" aria-hidden="true" /> جارٍ التحقق والدخول…</>
               ) : (
-                <><FaSignInAlt aria-hidden="true" /> دخول إلى اللوحة</>
+                <><FaSignInAlt aria-hidden="true" /> دخول إلى المنصة</>
               )}
             </button>
           </form>
 
-          <p className="login-support-copy">إذا تعذر الدخول، تواصل مع مشرف النظام لتأكيد بيانات الحساب.</p>
-          <p className="login-copyright">© 2026 نَسَق لإدارة المخيمات</p>
+          <p className="login-support-copy">منصة موثوقة لإدارة الاستجابة الإنسانية وكشوفات الإغاثة المعتمدة.</p>
+          <p className="login-copyright">© 2026 نَسَق لإدارة المخيمات - م. إبراهيم مقبل</p>
         </div>
       </section>
     </main>

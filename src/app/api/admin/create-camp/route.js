@@ -1,18 +1,13 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin, isAdminConfigured } from "../../../../lib/supabaseAdmin";
+import bcrypt from "bcryptjs";
+import { dbFindOne, dbInsertOne } from "../../../../lib/db";
 import { requireSuperAdmin } from "../../../../lib/adminAuth";
 import { PASSWORD_REQUIREMENT_MESSAGE, isPasswordAllowed } from "../../../../lib/passwordPolicy";
 
 export async function POST(request) {
   try {
-    if (!isAdminConfigured || !supabaseAdmin) {
-      return NextResponse.json(
-        { success: false, error: "الخادم غير مهيأ لإنشاء المخيمات." },
-        { status: 503 }
-      );
-    }
-
-    if (!(await requireSuperAdmin(request))) {
+    const admin = await requireSuperAdmin(request);
+    if (!admin) {
       return NextResponse.json(
         { success: false, error: "انتهت جلسة المشرف العام. سجّل الدخول من جديد ثم حاول مرة أخرى." },
         { status: 403 }
@@ -59,12 +54,7 @@ export async function POST(request) {
       );
     }
 
-    const { data: existingCamp, error: existingCampError } = await supabaseAdmin
-      .from("camps")
-      .select("id")
-      .eq("id", cleanId)
-      .maybeSingle();
-    if (existingCampError) throw existingCampError;
+    const existingCamp = await dbFindOne("camps", { id: cleanId });
     if (existingCamp) {
       return NextResponse.json(
         { success: false, error: "معرّف المخيم مستخدم بالفعل. اختر معرّفًا آخر." },
@@ -72,81 +62,53 @@ export async function POST(request) {
       );
     }
 
-    const { data: existingProfile, error: existingProfileError } = await supabaseAdmin
-      .from("users")
-      .select("id")
-      .ilike("username", cleanUsername)
-      .maybeSingle();
-    if (existingProfileError) throw existingProfileError;
-    if (existingProfile) {
+    const existingUser = await dbFindOne("users", { username: cleanUsername });
+    if (existingUser) {
       return NextResponse.json(
         { success: false, error: "اسم المستخدم مستخدم بالفعل. اختر اسمًا آخر." },
         { status: 409 }
       );
     }
 
-    const email = `${cleanUsername.toLowerCase()}@camp.com`;
-    let createdAuthUserId = null;
+    const passwordHash = await bcrypt.hash(adminPassword, 10);
 
-    try {
-      const { data: created, error: createError } =
-        await supabaseAdmin.auth.admin.createUser({
-          email,
-          password: adminPassword,
-          email_confirm: true,
-          user_metadata: { username: cleanUsername },
-          app_metadata: { role: "admin", campId: cleanId },
-        });
-      if (createError || !created?.user) {
-        throw createError || new Error("تعذر إنشاء حساب المدير.");
-      }
-      createdAuthUserId = created.user.id;
+    // 1. إنشاء سجل المخيم
+    const campDoc = {
+      id: cleanId,
+      name: cleanName,
+      managerName: cleanManagerName,
+      managerPhone: cleanManagerPhone,
+      address: String(body.address || "").trim(),
+      isActive: true,
+      subscriptionExpiry: expiryDate,
+      logoUrl: String(body.logoUrl || "").trim(),
+      createdAt: new Date().toISOString(),
+    };
+    await dbInsertOne("camps", campDoc);
 
-      const { error: profileError } = await supabaseAdmin.rpc("create_camp_profile", {
-        target_camp_id: cleanId,
-        target_name: cleanName,
-        target_manager_name: cleanManagerName,
-        target_phone: cleanManagerPhone,
-        target_expiry: expiryDate,
-        target_user_id: createdAuthUserId,
-        target_username: cleanUsername,
-      });
-      if (profileError) throw profileError;
-    } catch (creationError) {
-      if (createdAuthUserId) {
-        await supabaseAdmin.auth.admin.deleteUser(createdAuthUserId);
-      }
-
-      if (/already been registered|email_exists/i.test(creationError?.message || "")) {
-        return NextResponse.json(
-          { success: false, error: "اسم المستخدم مستخدم مسبقًا في حساب آخر. اختر اسمًا مختلفًا." },
-          { status: 409 }
-        );
-      }
-      throw creationError;
-    }
+    // 2. إنشاء حساب مدير المخيم
+    const userDoc = {
+      id: `user_${cleanId}_${Date.now()}`,
+      username: cleanUsername,
+      passwordHash,
+      role: "admin",
+      campId: cleanId,
+      name: cleanManagerName || cleanName,
+      createdAt: new Date().toISOString(),
+    };
+    await dbInsertOne("users", userDoc);
 
     return NextResponse.json({
       success: true,
       username: cleanUsername,
       campId: cleanId,
+      message: "تم إنشاء المخيم وحساب المدير بنجاح!",
     });
   } catch (error) {
     console.error("create-camp API error:", error);
-    const isTimeout = error?.name === "TimeoutError" || error?.name === "AbortError";
-    const isConnectionError = /fetch failed|EACCES|ECONN/i.test(
-      `${error?.message || ""} ${error?.details || ""}`
-    );
     return NextResponse.json(
-      {
-        success: false,
-        error: isTimeout
-          ? "استغرق الاتصال بقاعدة البيانات وقتًا طويلًا. حاول مرة أخرى."
-          : isConnectionError
-            ? "تعذر الاتصال بقاعدة البيانات الآن. تحقق من الإنترنت ثم حاول مرة أخرى."
-          : error?.message || "حدث خطأ أثناء إنشاء المخيم.",
-      },
-      { status: isTimeout ? 504 : isConnectionError ? 503 : 500 }
+      { success: false, error: error?.message || "حدث خطأ أثناء إنشاء المخيم." },
+      { status: 500 }
     );
   }
 }
