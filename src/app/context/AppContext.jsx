@@ -87,15 +87,17 @@ export const AppProvider = ({ children }) => {
 
   // 2. التحقق من حالة اشتراك المخيم وتشغيل فحص النسخ الاحتياطي التلقائي
   useEffect(() => {
-    if (!user || user.role === "superadmin" || !user.campId) {
+    if (!user) {
       setCampProfile(null);
       setIsSubscriptionExpired(false);
       return;
     }
 
-    getCampProfile(user.campId).then((profile) => {
+    const targetCampId = (user.campId && user.campId !== "system") ? user.campId : "kareem";
+
+    getCampProfile(targetCampId).then((profile) => {
       setCampProfile(profile);
-      if (profile) {
+      if (profile && user.role !== "superadmin") {
         const now = new Date();
         const expiry = new Date(profile.subscriptionExpiry);
         const isExpired = !profile.isActive || expiry < now;
@@ -113,14 +115,14 @@ export const AppProvider = ({ children }) => {
       fetch("/api/backup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "auto_check", campId: user.campId }),
+        body: JSON.stringify({ action: "auto_check", campId: targetCampId }),
       }).catch(() => {});
     } catch {}
   }, [user?.campId, user?.role]);
 
   // 3. جلب بيانات العائلات والترشيحات والاشتراك الفوري
   useEffect(() => {
-    if (!user || user.role === "superadmin") {
+    if (!user) {
       setFamilies([]);
       setNominations([]);
       setDataError("");

@@ -140,13 +140,14 @@ export const subscribeFamilies = (campId, callback) => {
  * إضافة عائلة جديدة
  */
 export const addFamily = async (campId, familyData) => {
+  const effectiveCampId = (campId && campId !== "system") ? campId : "kareem";
   const id = familyData.id || createRecordId("family");
-  const localFamily = mapFamilyToLocal(campId, familyData, id);
+  const localFamily = mapFamilyToLocal(effectiveCampId, familyData, id);
 
   if (isSupabaseConfigured) {
     const { error } = await supabase
       .from("families")
-      .insert([mapFamilyToSupabase(campId, familyData, id)]);
+      .insert([mapFamilyToSupabase(effectiveCampId, familyData, id)]);
     assertSupabaseSuccess(error, "حفظ العائلة");
     return id;
   }
@@ -157,20 +158,17 @@ export const addFamily = async (campId, familyData) => {
     const res = await fetch("/api/families", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ campId, family: { ...familyData, id } }),
+      body: JSON.stringify({ campId: effectiveCampId, family: { ...familyData, id } }),
     });
-    if (res.ok) apiSucceeded = true;
+    if (res.ok) {
+      apiSucceeded = true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "تعذر حفظ العائلة في قاعدة البيانات");
+    }
   } catch (e) {
     console.warn("API save notice (Offline Mode):", e);
-  }
-
-  if (!apiSucceeded) {
-    enqueueMutation({
-      entity: "family",
-      type: "add",
-      campId,
-      payload: { ...familyData, id },
-    });
+    throw e;
   }
 
   localStorage.removeItem(FAMILIES_CLEARED_KEY);
@@ -211,18 +209,15 @@ export const updateFamily = async (id, familyData) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, ...familyData }),
     });
-    if (res.ok) apiSucceeded = true;
+    if (res.ok) {
+      apiSucceeded = true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "تعذر تحديث بيانات العائلة");
+    }
   } catch (e) {
     console.warn("API update notice (Offline Mode):", e);
-  }
-
-  if (!apiSucceeded) {
-    enqueueMutation({
-      entity: "family",
-      type: "update",
-      recordId: id,
-      payload: { id, ...familyData },
-    });
+    throw e;
   }
 
   initLocalStorage();
@@ -251,17 +246,15 @@ export const deleteFamily = async (id) => {
   let apiSucceeded = false;
   try {
     const res = await fetch(`/api/families?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-    if (res.ok) apiSucceeded = true;
+    if (res.ok) {
+      apiSucceeded = true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "تعذر حذف سجل العائلة");
+    }
   } catch (e) {
     console.warn("API delete notice (Offline Mode):", e);
-  }
-
-  if (!apiSucceeded) {
-    enqueueMutation({
-      entity: "family",
-      type: "delete",
-      recordId: id,
-    });
+    throw e;
   }
 
   initLocalStorage();
@@ -285,10 +278,11 @@ export const importDefaultFamiliesToFirestore = importDefaultFamiliesToSupabase;
  */
 export const batchAddFamilies = async (campId, familyList) => {
   if (!familyList || familyList.length === 0) return true;
+  const effectiveCampId = (campId && campId !== "system") ? campId : "kareem";
 
   if (isSupabaseConfigured) {
     const rows = familyList.map((family) =>
-      mapFamilyToSupabase(campId, family, family.id || createRecordId("family"))
+      mapFamilyToSupabase(effectiveCampId, family, family.id || createRecordId("family"))
     );
     const chunkSize = 100;
     for (let i = 0; i < rows.length; i += chunkSize) {
@@ -299,7 +293,7 @@ export const batchAddFamilies = async (campId, familyList) => {
   }
 
   const mappedBatch = familyList.map((f) =>
-    mapFamilyToLocal(campId, f, f.id || createRecordId("family"))
+    mapFamilyToLocal(effectiveCampId, f, f.id || createRecordId("family"))
   );
 
   // Save to Central API or Enqueue Offline
@@ -309,23 +303,20 @@ export const batchAddFamilies = async (campId, familyList) => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        campId,
+        campId: effectiveCampId,
         action: "batch",
         families: mappedBatch,
       }),
     });
-    if (res.ok) apiSucceeded = true;
+    if (res.ok) {
+      apiSucceeded = true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "فشل حفظ الدفعة في قاعدة البيانات");
+    }
   } catch (e) {
-    console.warn("API batch save notice (Offline Mode):", e);
-  }
-
-  if (!apiSucceeded) {
-    enqueueMutation({
-      entity: "family",
-      type: "batch",
-      campId,
-      payload: mappedBatch,
-    });
+    console.error("API batch save error:", e);
+    throw e;
   }
 
   localStorage.removeItem(FAMILIES_CLEARED_KEY);
@@ -340,8 +331,9 @@ export const batchAddFamilies = async (campId, familyList) => {
  * حذف جميع عائلات المخيم الحالي
  */
 export const deleteAllFamilies = async (campId) => {
+  const effectiveCampId = (campId && campId !== "system") ? campId : "kareem";
   if (isSupabaseConfigured) {
-    const { error } = await supabase.from("families").delete().eq("camp_id", campId);
+    const { error } = await supabase.from("families").delete().eq("camp_id", effectiveCampId);
     assertSupabaseSuccess(error, "مسح كشف العائلات");
     return true;
   }
@@ -349,18 +341,16 @@ export const deleteAllFamilies = async (campId) => {
   // Delete all in Central API or Enqueue Offline
   let apiSucceeded = false;
   try {
-    const res = await fetch(`/api/families?campId=${encodeURIComponent(campId)}&action=all`, { method: "DELETE" });
-    if (res.ok) apiSucceeded = true;
+    const res = await fetch(`/api/families?campId=${encodeURIComponent(effectiveCampId)}&action=all`, { method: "DELETE" });
+    if (res.ok) {
+      apiSucceeded = true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "فشل مسح كشف العائلات");
+    }
   } catch (e) {
-    console.warn("API delete all notice (Offline Mode):", e);
-  }
-
-  if (!apiSucceeded) {
-    enqueueMutation({
-      entity: "family",
-      type: "deleteAll",
-      campId,
-    });
+    console.error("API delete all error:", e);
+    throw e;
   }
 
   saveFamiliesToLocal([]);

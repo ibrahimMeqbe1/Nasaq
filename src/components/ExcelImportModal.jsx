@@ -384,20 +384,18 @@ const ExcelImportModal = ({ isOpen, onClose, campId, onImportComplete, importTyp
 
       return record;
     }).filter(record => {
-      if (!record.name || !record.idNumber) return false;
+      if (!record.name) return false;
       const nameClean = String(record.name).trim();
-      const idClean = String(record.idNumber).trim();
-      
+      const idClean = String(record.idNumber || "").trim();
+
+      if (!nameClean || nameClean.length < 2) return false;
+
       const junkKeywords = [
         "اسم رب الأسرة", "اسم رب الاسرة", "الاسم رباعي", "الاسم الرباعي", 
         "رقم الهوية", "رقم هوية", "هوية رب الاسرة", "هوية رب الأسرة", "الهوية"
       ];
       
-      if (junkKeywords.some(kw => nameClean === kw || idClean === kw || nameClean.startsWith(kw) || idClean.startsWith(kw))) {
-        return false;
-      }
-
-      if (!/\d/.test(idClean)) {
+      if (junkKeywords.some(kw => nameClean === kw || idClean === kw || nameClean.startsWith(kw))) {
         return false;
       }
 

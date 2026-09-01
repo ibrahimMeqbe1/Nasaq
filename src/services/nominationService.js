@@ -411,10 +411,11 @@ export const importDefaultNominationsToFirestore = async (campId) => {
  */
 export const batchAddNominations = async (campId, nomList) => {
   if (!nomList || nomList.length === 0) return true;
+  const effectiveCampId = (campId && campId !== "system") ? campId : "kareem";
 
   if (isSupabaseConfigured) {
     const rows = nomList.map((nom) => ({
-      ...mapNominationToSupabase(campId, nom, nom.id || createRecordId("nom")),
+      ...mapNominationToSupabase(effectiveCampId, nom, nom.id || createRecordId("nom")),
       created_at: nom.createdAt || new Date().toISOString(),
     }));
     const chunkSize = 100;
@@ -428,7 +429,7 @@ export const batchAddNominations = async (campId, nomList) => {
   const mappedBatch = nomList.map((n, i) => ({
     ...n,
     id: n.id || createRecordId("nom"),
-    campId: campId,
+    campId: effectiveCampId,
     name: (n.name || "").trim(),
     idNumber: (n.idNumber || "").trim(),
     phone: (n.phone || "").trim(),
@@ -454,23 +455,20 @@ export const batchAddNominations = async (campId, nomList) => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        campId,
+        campId: effectiveCampId,
         action: "batch",
         nominations: mappedBatch,
       }),
     });
-    if (res.ok) apiSucceeded = true;
+    if (res.ok) {
+      apiSucceeded = true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "فشل حفظ الترشيحات في قاعدة البيانات");
+    }
   } catch (e) {
-    console.warn("API batch nominations notice (Offline Mode):", e);
-  }
-
-  if (!apiSucceeded) {
-    enqueueMutation({
-      entity: "nomination",
-      type: "batch",
-      campId,
-      payload: mappedBatch,
-    });
+    console.error("API batch nominations error:", e);
+    throw e;
   }
 
   localStorage.removeItem("kareem_camp_nominations_cleared");
@@ -486,8 +484,9 @@ export const batchAddNominations = async (campId, nomList) => {
  * حذف جميع ترشيحات المخيم الحالي
  */
 export const deleteAllNominations = async (campId) => {
+  const effectiveCampId = (campId && campId !== "system") ? campId : "kareem";
   if (isSupabaseConfigured) {
-    const { error } = await supabase.from("nominations").delete().eq("camp_id", campId);
+    const { error } = await supabase.from("nominations").delete().eq("camp_id", effectiveCampId);
     assertSupabaseSuccess(error, "مسح كشف الترشيحات");
     return true;
   }
@@ -495,18 +494,16 @@ export const deleteAllNominations = async (campId) => {
   // Delete all in Central API or Enqueue Offline
   let apiSucceeded = false;
   try {
-    const res = await fetch(`/api/nominations?campId=${encodeURIComponent(campId)}&action=all`, { method: "DELETE" });
-    if (res.ok) apiSucceeded = true;
+    const res = await fetch(`/api/nominations?campId=${encodeURIComponent(effectiveCampId)}&action=all`, { method: "DELETE" });
+    if (res.ok) {
+      apiSucceeded = true;
+    } else {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "فشل مسح كشف الترشيحات");
+    }
   } catch (e) {
-    console.warn("API delete all nominations notice (Offline Mode):", e);
-  }
-
-  if (!apiSucceeded) {
-    enqueueMutation({
-      entity: "nomination",
-      type: "deleteAll",
-      campId,
-    });
+    console.error("API delete all nominations error:", e);
+    throw e;
   }
 
   localStorage.setItem("kareem_camp_nominations_v3", encryptData([]));
