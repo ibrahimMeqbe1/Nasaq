@@ -2,6 +2,38 @@ import fs from "fs";
 import path from "path";
 import bcrypt from "bcryptjs";
 
+// ─── MongoDB Optional Cloud Engine ──────────────────────────────────────────
+const MONGODB_URI = process.env.MONGODB_URI || process.env.DATABASE_URL || "";
+const DB_NAME = process.env.MONGODB_DB_NAME || "nasaq";
+
+export const isMongoConfigured = Boolean(
+  MONGODB_URI &&
+  (MONGODB_URI.startsWith("mongodb://") || MONGODB_URI.startsWith("mongodb+srv://")) &&
+  !MONGODB_URI.includes("YOUR_")
+);
+
+let mongoClient = null;
+let mongoClientPromise = null;
+
+if (isMongoConfigured) {
+  try {
+    const { MongoClient } = require("mongodb");
+    if (process.env.NODE_ENV === "development") {
+      if (!global._mongoClientPromise) {
+        mongoClient = new MongoClient(MONGODB_URI);
+        global._mongoClientPromise = mongoClient.connect();
+      }
+      mongoClientPromise = global._mongoClientPromise;
+    } else {
+      mongoClient = new MongoClient(MONGODB_URI);
+      mongoClientPromise = mongoClient.connect();
+    }
+  } catch (e) {
+    console.warn("MongoDB client not loaded:", e.message);
+  }
+}
+
+// ─── Production SQLite Relational Database Engine ───────────────────────────
 const DB_DIR = path.join(process.cwd(), "database");
 const SQLITE_FILE = path.join(DB_DIR, "nasaq_production.sqlite");
 let sqliteDb = null;
@@ -626,5 +658,3 @@ export async function dbCount(collectionName, query = {}) {
   const items = await dbFind(collectionName, query);
   return items.length;
 }
-
-export { isMongoConfigured };
