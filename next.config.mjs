@@ -20,6 +20,7 @@ const contentSecurityPolicy = [
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  serverExternalPackages: ["better-sqlite3", "mongodb"],
   async headers() {
     return [
       {
