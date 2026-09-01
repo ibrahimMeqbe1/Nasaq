@@ -12,7 +12,14 @@ export async function GET(request) {
       if (!camp) {
         return NextResponse.json({ success: false, error: "المخيم غير موجود" }, { status: 404 });
       }
-      return NextResponse.json({ success: true, camp });
+      const adminUser = await dbFindOne("users", { campId, role: "admin" });
+      return NextResponse.json({
+        success: true,
+        camp: {
+          ...camp,
+          adminUsername: adminUser ? adminUser.username : "",
+        },
+      });
     }
 
     // List all camps (requires superadmin or returns basic active camps list)

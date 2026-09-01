@@ -164,6 +164,18 @@ export const getCampProfile = async (campId) => {
     return mapCampRow(data);
   }
 
+  try {
+    const res = await fetch(`/api/camps?campId=${encodeURIComponent(campId)}`, {
+      credentials: "same-origin",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success && data.camp) {
+      return data.camp;
+    }
+  } catch (e) {
+    console.warn("getCampProfile API notice:", e);
+  }
+
   initCampLocalStorage();
   const camps = getCampsFromLocal();
   return camps[campId] || {
@@ -180,13 +192,13 @@ export const getCampProfile = async (campId) => {
 export const updateCampProfile = async (campId, updatedFields) => {
   if (isSupabaseConfigured) {
     const payload = {};
-      if (updatedFields.name !== undefined)               payload.name = updatedFields.name;
-      if (updatedFields.managerName !== undefined)        payload.manager_name = updatedFields.managerName;
-      if (updatedFields.managerPhone !== undefined)       payload.phone = updatedFields.managerPhone;
-      if (updatedFields.address !== undefined)            payload.location = updatedFields.address;
-      if (updatedFields.subscriptionExpiry !== undefined) payload.subscription_expiry = updatedFields.subscriptionExpiry;
-      if (updatedFields.isActive !== undefined)           payload.is_active = updatedFields.isActive;
-      if (updatedFields.logoUrl !== undefined)            payload.logo_url = updatedFields.logoUrl;
+    if (updatedFields.name !== undefined)               payload.name = updatedFields.name;
+    if (updatedFields.managerName !== undefined)        payload.manager_name = updatedFields.managerName;
+    if (updatedFields.managerPhone !== undefined)       payload.phone = updatedFields.managerPhone;
+    if (updatedFields.address !== undefined)            payload.location = updatedFields.address;
+    if (updatedFields.subscriptionExpiry !== undefined) payload.subscription_expiry = updatedFields.subscriptionExpiry;
+    if (updatedFields.isActive !== undefined)           payload.is_active = updatedFields.isActive;
+    if (updatedFields.logoUrl !== undefined)            payload.logo_url = updatedFields.logoUrl;
 
     if (Object.keys(payload).length > 0) {
       const { data, error } = await supabase.from("camps").update(payload).eq("id", campId).select("id");
@@ -196,17 +208,17 @@ export const updateCampProfile = async (campId, updatedFields) => {
     return { success: true };
   }
 
-  // Non-Supabase: persist to SQLite via the server API so changes survive page navigation
   const res = await fetch("/api/camps", {
     method: "PUT",
+    credentials: "same-origin",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id: campId, ...updatedFields }),
   });
-  const json = await res.json();
+  const json = await res.json().catch(() => ({}));
   if (!res.ok || !json.success) {
     throw new Error(json.error || "فشل تحديث بيانات المخيم");
   }
-  // Also update local mirror so the UI reflects the change immediately
+
   initCampLocalStorage();
   const camps = getCampsFromLocal();
   camps[campId] = camps[campId]
@@ -226,14 +238,21 @@ export const getAllCamps = async () => {
         .select("*")
         .order("created_at", { ascending: true });
       if (error) throw error;
-
-      // An empty array is a valid production result. Falling back to the local
-      // demo records here made deleted camps reappear after a page refresh.
       return (data || []).map(mapCampRow);
     } catch (err) {
       console.error("Supabase get all camps error:", err);
       throw new Error("تعذر تحميل المخيمات من قاعدة البيانات. حاول مرة أخرى.");
     }
+  }
+
+  try {
+    const res = await fetch("/api/camps", { credentials: "same-origin" });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success && Array.isArray(data.camps)) {
+      return data.camps;
+    }
+  } catch (err) {
+    console.warn("getAllCamps API notice:", err);
   }
 
   initCampLocalStorage();
@@ -246,50 +265,31 @@ export const createCamp = async (campData) => {
   const { id, name, managerName, managerPhone, adminUsername, adminPassword, trialPeriod } = campData;
   const expiryDate = calcTrialExpiry(trialPeriod);
 
-  if (isSupabaseConfigured) {
-    try {
-      // الإنشاء لازم يصير عبر مسار سيرفر محمي (service role)، مش إدراج مباشر
-      // من المتصفح، عشان: 1) الباسورد يتشفر صح، 2) يتربط حساب Supabase Auth
-      // حقيقي للمدير الجديد، 3) RLS ما يمنع العملية أصلاً.
-      const res = await fetch("/api/admin/create-camp", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          id, name, managerName, managerPhone, adminUsername, adminPassword,
-          expiryDate: expiryDate.toISOString(),
-        }),
-        signal: AbortSignal.timeout(35000),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!data.success) throw new Error(data.error || "فشل إنشاء المخيم");
-      return data;
-    } catch (err) {
-      console.error("Supabase create camp error:", err);
-      return {
-        success: false,
-        error: err?.name === "AbortError" || err?.name === "TimeoutError"
-          ? "استغرق إنشاء المخيم وقتًا طويلًا. تحقق من الاتصال وحاول مرة أخرى."
-          : err.message,
-      };
-    }
+  try {
+    const res = await fetch("/api/admin/create-camp", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        id, name, managerName, managerPhone, adminUsername, adminPassword,
+        expiryDate: expiryDate.toISOString(),
+      }),
+      signal: AbortSignal.timeout(35000),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) throw new Error(data.error || "فشل إنشاء المخيم");
+    return data;
+  } catch (err) {
+    console.error("create camp error:", err);
+    return {
+      success: false,
+      error: err?.name === "AbortError" || err?.name === "TimeoutError"
+        ? "استغرق إنشاء المخيم وقتًا طويلًا. تحقق من الاتصال وحاول مرة أخرى."
+        : err.message,
+    };
   }
-
-  initCampLocalStorage();
-  const camps = getCampsFromLocal();
-  if (camps[id]) return { success: false, error: "معرّف المخيم مستخدم بالفعل" };
-
-  camps[id] = { id, name, managerName, managerPhone, address: "", isActive: true,
-    subscriptionExpiry: expiryDate.toISOString(), logoUrl: "", createdAt: new Date().toISOString() };
-  saveCampsToLocal(camps);
-
-  const users = getUsersFromLocal();
-  users.push({ username: adminUsername, password: adminPassword, role: "admin", campId: id, name });
-  saveUsersToLocal(users);
-
-  return { success: true };
 };
 
 export const deleteCampPermanently = async (campId) => {
@@ -297,34 +297,24 @@ export const deleteCampPermanently = async (campId) => {
     return { success: false, error: "معرّف المخيم غير صالح للحذف" };
   }
 
-  if (isSupabaseConfigured) {
-    try {
-      const response = await fetch("/api/admin/delete-camp", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ campId, confirmation: campId }),
-        signal: AbortSignal.timeout(35000),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || "فشل حذف المخيم");
-      }
-      return result;
-    } catch (error) {
-      return { success: false, error: error.message };
+  try {
+    const response = await fetch("/api/admin/delete-camp", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ campId, confirmation: campId }),
+      signal: AbortSignal.timeout(35000),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.success) {
+      throw new Error(result.error || "فشل حذف المخيم");
     }
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
   }
-
-  initCampLocalStorage();
-  const camps = getCampsFromLocal();
-  if (!camps[campId]) return { success: false, error: "المخيم غير موجود" };
-  delete camps[campId];
-  saveCampsToLocal(camps);
-  saveUsersToLocal(getUsersFromLocal().filter((item) => item.campId !== campId));
-  return { success: true, deleted: { local: true } };
 };
 
 // ─── Payment methods ──────────────────────────────────────────────────────────
@@ -339,6 +329,18 @@ export const getPaymentMethods = async () => {
     assertSupabaseSuccess(error, "تحميل طرق الدفع");
     return data?.value || DEFAULT_PAYMENT_METHODS;
   }
+
+  try {
+    const res = await fetch("/api/payment-methods", { credentials: "same-origin" });
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (data.success && data.paymentMethods) {
+        return data.paymentMethods;
+      }
+    }
+  } catch (err) {
+    console.warn("Payment methods API error:", err);
+  }
   return localStorageGetJSON(PAYMENT_METHODS_KEY) || DEFAULT_PAYMENT_METHODS;
 };
 
@@ -352,40 +354,45 @@ export const updatePaymentMethods = async (methods) => {
     assertSupabaseSuccess(error, "حفظ طرق الدفع");
     return { success: true };
   }
-  if (typeof window !== "undefined") {
-    localStorage.setItem(PAYMENT_METHODS_KEY, JSON.stringify(methods));
+
+  try {
+    const res = await fetch("/api/payment-methods", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(methods),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || "فشل حفظ طرق الدفع");
+    }
+    return { success: true };
+  } catch (e) {
+    console.warn("API payment-methods update warning:", e);
+    throw e;
   }
-  return { success: true };
 };
 
 // ─── Renewal requests ─────────────────────────────────────────────────────────
 
 export const submitRenewalRequest = async (requestData) => {
   const { campId, campName, requestedMonths, notes } = requestData;
-  const newRequest = {
-    id: createRecordId("request"),
-    camp_id: campId,
-    camp_name: campName,
-    requested_months: parseInt(requestedMonths) || 1,
-    notes: notes || "",
-    status: "pending",
-    request_date: new Date().toISOString(),
-  };
 
-  if (isSupabaseConfigured) {
-    const { error } = await supabase.from("renewal_requests").insert([newRequest]);
-    assertSupabaseSuccess(error, "إرسال طلب التجديد");
-    return { success: true };
-  }
-
-  initCampLocalStorage();
-  const requests = localStorageGetJSON(PAYMENT_REQUESTS_KEY, []);
-  requests.push({
-    id: newRequest.id, campId, campName,
-    requestedMonths: newRequest.requested_months,
-    notes: newRequest.notes, status: "pending", createdAt: newRequest.request_date,
+  const res = await fetch("/api/payment-requests", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      campId,
+      campName,
+      requestedMonths: parseInt(requestedMonths) || 12,
+      notes,
+    }),
   });
-  localStorage.setItem(PAYMENT_REQUESTS_KEY, JSON.stringify(requests));
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || !json.success) {
+    throw new Error(json.error || "فشل إرسال طلب التجديد");
+  }
   return { success: true };
 };
 
@@ -397,70 +404,71 @@ export const getAllRenewalRequests = async () => {
       .order("request_date", { ascending: false });
     assertSupabaseSuccess(error, "تحميل طلبات التجديد");
     return (data || []).map((row) => ({
-          id: row.id, campId: row.camp_id, campName: row.camp_name,
-          requestedMonths: row.requested_months || 1,
-          status: row.status || "pending", notes: row.notes || "",
-          createdAt: row.request_date,
+      id: row.id, campId: row.camp_id, campName: row.camp_name,
+      requestedMonths: row.requested_months || 1,
+      status: row.status || "pending", notes: row.notes || "",
+      createdAt: row.request_date,
     }));
   }
 
-  return localStorageGetJSON(PAYMENT_REQUESTS_KEY, []);
+  try {
+    const res = await fetch("/api/payment-requests", { credentials: "same-origin" });
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (data.success && Array.isArray(data.requests)) {
+        return data.requests;
+      }
+    }
+  } catch (e) {
+    console.warn("getAllRenewalRequests error:", e);
+  }
+  return [];
 };
 
 export const approveRenewalRequest = async (requestId, campId, monthsCount = 1) => {
-  if (isSupabaseConfigured) {
-    const { error } = await supabase.rpc("approve_renewal_request", {
-      target_request_id: requestId,
-      target_camp_id: campId,
-      months_to_add: Math.max(1, parseInt(monthsCount) || 1),
+  try {
+    const campProfile = await getCampProfile(campId);
+    const baseDate = campProfile?.subscriptionExpiry && new Date(campProfile.subscriptionExpiry) > new Date()
+      ? new Date(campProfile.subscriptionExpiry)
+      : new Date();
+    baseDate.setMonth(baseDate.getMonth() + (parseInt(monthsCount) || 1));
+
+    await updateCampProfile(campId, {
+      subscriptionExpiry: baseDate.toISOString(),
+      isActive: true,
     });
-    assertSupabaseSuccess(error, "اعتماد طلب التجديد");
+
+    await fetch("/api/payment-requests", {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: requestId, status: "approved" }),
+    });
+
     return { success: true };
+  } catch (e) {
+    console.error("approveRenewalRequest error:", e);
+    throw e;
   }
-
-  initCampLocalStorage();
-  const requests = localStorageGetJSON(PAYMENT_REQUESTS_KEY, []);
-  const camps = getCampsFromLocal();
-
-  const reqIndex = requests.findIndex((r) => r.id === requestId);
-  if (reqIndex !== -1) {
-    requests[reqIndex].status = "approved";
-    requests[reqIndex].resolvedAt = new Date().toISOString();
-  }
-
-  if (camps[campId]) {
-    const baseDate = new Date(camps[campId].subscriptionExpiry) > new Date()
-      ? new Date(camps[campId].subscriptionExpiry) : new Date();
-    baseDate.setMonth(baseDate.getMonth() + monthsCount);
-    camps[campId].subscriptionExpiry = baseDate.toISOString();
-    camps[campId].isActive = true;
-  }
-
-  localStorage.setItem(PAYMENT_REQUESTS_KEY, JSON.stringify(requests));
-  saveCampsToLocal(camps);
-  return { success: true };
 };
 
 export const declineRenewalRequest = async (requestId) => {
-  if (isSupabaseConfigured) {
-    const { data, error } = await supabase
-      .from("renewal_requests")
-      .update({ status: "declined" })
-      .eq("id", requestId)
-      .select("id");
-    assertSupabaseSuccess(error, "رفض طلب التجديد");
-    if (!data?.length) throw new Error("طلب التجديد غير موجود أو لا تملك صلاحية تعديله.");
+  try {
+    const res = await fetch("/api/payment-requests", {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: requestId, status: "declined" }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.success) {
+      throw new Error(json.error || "فشل رفض طلب التجديد");
+    }
     return { success: true };
+  } catch (e) {
+    console.error("declineRenewalRequest error:", e);
+    throw e;
   }
-
-  const requests = localStorageGetJSON(PAYMENT_REQUESTS_KEY, []);
-  const reqIndex = requests.findIndex((r) => r.id === requestId);
-  if (reqIndex !== -1) {
-    requests[reqIndex].status = "declined";
-    requests[reqIndex].resolvedAt = new Date().toISOString();
-  }
-  localStorage.setItem(PAYMENT_REQUESTS_KEY, JSON.stringify(requests));
-  return { success: true };
 };
 
 // ─── Announcements ────────────────────────────────────────────────────────────
@@ -478,7 +486,18 @@ export const getAnnouncement = async () => {
     };
   }
 
-  return localStorageGetJSON(ANNOUNCEMENT_KEY) || DEFAULT_ANNOUNCEMENT;
+  try {
+    const res = await fetch("/api/announcements", { credentials: "same-origin" });
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (data.success && data.announcement) {
+        return data.announcement;
+      }
+    }
+  } catch (err) {
+    console.warn("Announcements API error:", err);
+  }
+  return DEFAULT_ANNOUNCEMENT;
 };
 
 export const updateAnnouncement = async (announcementData) => {
@@ -498,10 +517,17 @@ export const updateAnnouncement = async (announcementData) => {
     return { success: true };
   }
 
-  if (typeof window !== "undefined") {
-    localStorage.setItem(ANNOUNCEMENT_KEY, JSON.stringify(payload));
-    window.dispatchEvent(new Event("announcementUpdated"));
+  const res = await fetch("/api/announcements", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || "فشل حفظ الإعلان في قاعدة البيانات");
   }
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("announcementUpdated"));
   return { success: true };
 };
 
@@ -585,59 +611,39 @@ export const getCampAdminUser = async (campId) => {
     return { username: data.username || "", password: "" };
   }
 
-  initCampLocalStorage();
-  const users = getUsersFromLocal();
-  const u = users.find((u) => u.campId === campId)
-    || DEFAULT_DEMO_USERS.find((u) => u.campId === campId);
-  return { username: u?.username || "", password: u?.password || "123456" };
+  try {
+    const res = await fetch(`/api/camps?campId=${encodeURIComponent(campId)}`, { credentials: "same-origin" });
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (data.success && data.camp) {
+        return { username: data.camp.adminUsername || "", password: "" };
+      }
+    }
+  } catch (e) {
+    console.warn("getCampAdminUser error:", e);
+  }
+
+  return { username: "", password: "" };
 };
 
 export const updateCampFullDetails = async (campId, campDetails) => {
   const { name, managerName, managerPhone, address, adminUsername, adminPassword } = campDetails;
 
-  if (isSupabaseConfigured) {
-    try {
-      const response = await fetch("/api/admin/update-camp", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ campId, name, managerName, managerPhone, address, adminUsername, adminPassword }),
-        signal: AbortSignal.timeout(35000),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok || !result.success) throw new Error(result.error || "فشل تحديث حساب المخيم");
-      return result;
-    } catch (err) {
-      console.error("Supabase updateCampFullDetails error:", err);
-      return { success: false, error: err.message };
-    }
+  try {
+    const response = await fetch("/api/admin/update-camp", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ campId, name, managerName, managerPhone, address, adminUsername, adminPassword }),
+      signal: AbortSignal.timeout(35000),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.success) throw new Error(result.error || "فشل تحديث حساب المخيم");
+    return result;
+  } catch (err) {
+    console.error("updateCampFullDetails error:", err);
+    return { success: false, error: err.message };
   }
-
-  initCampLocalStorage();
-  const camps = getCampsFromLocal();
-  if (camps[campId]) {
-    camps[campId] = {
-      ...camps[campId],
-      ...(name && { name }),
-      ...(managerName && { managerName }),
-      ...(managerPhone && { managerPhone }),
-      ...(address && { address }),
-    };
-    saveCampsToLocal(camps);
-  }
-
-  const users = getUsersFromLocal();
-  const uIndex = users.findIndex((u) => u.campId === campId);
-  if (uIndex !== -1) {
-    if (adminUsername) users[uIndex].username = adminUsername;
-    if (adminPassword) users[uIndex].password = adminPassword;
-    if (name) users[uIndex].name = name;
-  } else if (adminUsername && adminPassword) {
-    users.push({ username: adminUsername, password: adminPassword, role: "admin", campId, name: name || campId });
-  }
-  saveUsersToLocal(users);
-
-  return { success: true };
 };

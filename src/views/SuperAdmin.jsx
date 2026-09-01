@@ -28,7 +28,9 @@ import {
   FaMobileAlt,
   FaCreditCard,
   FaKey,
-  FaInfinity
+  FaInfinity,
+  FaBolt,
+  FaBan
 } from "react-icons/fa";
 import AnimatedNumber, { AnimatedDonut } from "../components/AnimatedNumber";
 import {
@@ -113,6 +115,7 @@ const SuperAdmin = ({ user, onLogout }) => {
   const [selectedCampForSubscription, setSelectedCampForSubscription] = useState(null);
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
   const [subscriptionExpiryInput, setSubscriptionExpiryInput] = useState("");
+  const [isSavingSubscription, setIsSavingSubscription] = useState(false);
 
   // حالة نموذج تعديل كافة بيانات المخيم
   const [isEditCampModalOpen, setIsEditCampModalOpen] = useState(false);
@@ -249,16 +252,13 @@ const SuperAdmin = ({ user, onLogout }) => {
 
   const handleOpenSubscriptionModal = (camp) => {
     setSelectedCampForSubscription(camp);
-    const isExpired = !camp.subscriptionExpiry || new Date(camp.subscriptionExpiry) <= new Date();
     
-    // إذا كان اشتراك المخيم منتهياً، اقترح تلقائياً تمديد شهر كامل ابتداءً من اليوم
+    // عرض تاريخ انتهاء الاشتراك الحالي للمخيم كما هو في قاعدة البيانات دون إضافة تلقائية
     let initialDate;
-    if (isExpired) {
-      initialDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    if (camp.subscriptionExpiry) {
+      initialDate = new Date(camp.subscriptionExpiry);
     } else {
-      // إذا كان نشطاً، اضف 30 يوماً على تاريخ انتهاء اشتراكه الحالي
-      const currentExp = new Date(camp.subscriptionExpiry);
-      initialDate = new Date(currentExp.getTime() + 30 * 24 * 60 * 60 * 1000);
+      initialDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
     }
     setSubscriptionExpiryInput(formatDateToLocalInput(initialDate));
     setIsSubscriptionModalOpen(true);
@@ -270,6 +270,7 @@ const SuperAdmin = ({ user, onLogout }) => {
     setSuccess("");
     if (!selectedCampForSubscription || !subscriptionExpiryInput) return;
 
+    setIsSavingSubscription(true);
     try {
       const expiryDateISO = new Date(subscriptionExpiryInput).toISOString();
       const isActive = new Date(expiryDateISO) > new Date();
@@ -295,6 +296,8 @@ const SuperAdmin = ({ user, onLogout }) => {
     } catch (err) {
       console.error("Subscription update error:", err);
       setError("حدث خطأ أثناء حفظ التعديلات.");
+    } finally {
+      setIsSavingSubscription(false);
     }
   };
 
@@ -1339,36 +1342,202 @@ const SuperAdmin = ({ user, onLogout }) => {
         </div>
       )}
 
-      {/* نافذة تعديل تاريخ انتهاء الاشتراك منبثقة */}
+      {/* نافذة تعديل تاريخ انتهاء الاشتراك منبثقة بتصميم حديث وعصري */}
       {isSubscriptionModalOpen && selectedCampForSubscription && (
-        <div className="modal-overlay">
-          <div className="modal-content gold-modal-header" style={{ maxWidth: "550px", width: "95%" }}>
-            <div className="modal-header">
-              <h2 className="gold-modal-title" style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <FaClock />
-                <span>تعديل فترة اشتراك: {selectedCampForSubscription.name}</span>
-              </h2>
-              <button type="button" onClick={() => setIsSubscriptionModalOpen(false)} className="btn-close" title="إغلاق">
+        <div className="modal-overlay" style={{ background: "rgba(15, 23, 42, 0.75)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem", zIndex: 9999 }}>
+          <div
+            className="modal-content"
+            style={{
+              maxWidth: "580px",
+              width: "100%",
+              borderRadius: "22px",
+              background: "#ffffff",
+              boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.3)",
+              border: "1px solid #e2e8f0",
+              overflow: "hidden",
+              padding: 0,
+            }}
+          >
+            {/* رأس النافذة */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "1.25rem 1.5rem",
+                background: "linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)",
+                borderBottom: "1px solid #e2e8f0",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div
+                  style={{
+                    width: "42px",
+                    height: "42px",
+                    borderRadius: "12px",
+                    background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                    color: "#ffffff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "1.1rem",
+                    boxShadow: "0 6px 14px rgba(5, 150, 105, 0.25)",
+                    flexShrink: 0,
+                  }}
+                >
+                  <FaClock />
+                </div>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: "1.18rem", fontWeight: "800", color: "#0f172a" }}>
+                    تعديل فترة الاشتراك
+                  </h2>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "3px" }}>
+                    <span style={{ fontSize: "0.84rem", color: "#64748b" }}>المخيم:</span>
+                    <span
+                      style={{
+                        fontSize: "0.84rem",
+                        fontWeight: "700",
+                        color: "#047857",
+                        backgroundColor: "#ecfdf5",
+                        padding: "2px 8px",
+                        borderRadius: "6px",
+                        border: "1px solid #a7f3d0",
+                      }}
+                    >
+                      {selectedCampForSubscription.name}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsSubscriptionModalOpen(false)}
+                className="btn-close"
+                title="إغلاق"
+                style={{
+                  background: "#ffffff",
+                  border: "1px solid #cbd5e1",
+                  width: "34px",
+                  height: "34px",
+                  borderRadius: "50%",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#64748b",
+                  transition: "all 0.15s ease",
+                }}
+              >
                 <FaTimes />
               </button>
             </div>
+
             <form onSubmit={handleUpdateSubscriptionExpiry}>
-              <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
-                
-                {/* التمديد السريع */}
+              <div style={{ padding: "1.5rem", display: "flex", flexDirection: "column", gap: "18px" }}>
+
+                {/* بطاقة معلومات الحالة الحالية للمخيم */}
+                <div
+                  style={{
+                    background: selectedCampForSubscription.isActive && selectedCampForSubscription.subscriptionExpiry && new Date(selectedCampForSubscription.subscriptionExpiry) > new Date()
+                      ? "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)"
+                      : "linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)",
+                    border: `1px solid ${
+                      selectedCampForSubscription.isActive && selectedCampForSubscription.subscriptionExpiry && new Date(selectedCampForSubscription.subscriptionExpiry) > new Date()
+                        ? "#bbf7d0"
+                        : "#fecaca"
+                    }`,
+                    borderRadius: "14px",
+                    padding: "12px 14px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "8px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    {selectedCampForSubscription.isActive && selectedCampForSubscription.subscriptionExpiry && new Date(selectedCampForSubscription.subscriptionExpiry) > new Date() ? (
+                      <FaCheckCircle style={{ color: "#16a34a", fontSize: "1.1rem" }} />
+                    ) : (
+                      <FaBan style={{ color: "#dc2626", fontSize: "1.1rem" }} />
+                    )}
+                    <div>
+                      <div style={{ fontSize: "0.82rem", color: "#475569", fontWeight: "600" }}>الحالة الحالية للاشتراك:</div>
+                      <div
+                        style={{
+                          fontSize: "0.92rem",
+                          fontWeight: "800",
+                          color: selectedCampForSubscription.isActive && selectedCampForSubscription.subscriptionExpiry && new Date(selectedCampForSubscription.subscriptionExpiry) > new Date()
+                            ? "#15803d"
+                            : "#b91c1c",
+                        }}
+                      >
+                        {selectedCampForSubscription.isActive && selectedCampForSubscription.subscriptionExpiry && new Date(selectedCampForSubscription.subscriptionExpiry) > new Date()
+                          ? `نشط حتى ${new Date(selectedCampForSubscription.subscriptionExpiry).toLocaleDateString("ar-EG")}`
+                          : "الاشتراك منتهي الصلاحية"}
+                      </div>
+                    </div>
+                  </div>
+
+                  <span
+                    style={{
+                      fontSize: "0.78rem",
+                      fontWeight: "700",
+                      padding: "4px 10px",
+                      borderRadius: "20px",
+                      backgroundColor: "#ffffff",
+                      color: selectedCampForSubscription.isActive && selectedCampForSubscription.subscriptionExpiry && new Date(selectedCampForSubscription.subscriptionExpiry) > new Date()
+                        ? "#15803d"
+                        : "#b91c1c",
+                      border: `1px solid ${
+                        selectedCampForSubscription.isActive && selectedCampForSubscription.subscriptionExpiry && new Date(selectedCampForSubscription.subscriptionExpiry) > new Date()
+                          ? "#86efac"
+                          : "#fca5a5"
+                      }`,
+                    }}
+                  >
+                    معرف: {selectedCampForSubscription.id}
+                  </span>
+                </div>
+
+                {/* قسم التمديد والتعيين السريع */}
                 <div>
-                  <label style={{ fontWeight: "700", display: "block", marginBottom: "8px", fontSize: "0.9rem", color: "#334155" }}>⚡ تمديد سريع إلى:</label>
-                  <div className="quick-extend-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      marginBottom: "10px",
+                      color: "#1e293b",
+                      fontSize: "0.9rem",
+                      fontWeight: "800",
+                    }}
+                  >
+                    <FaBolt style={{ color: "#f59e0b" }} />
+                    <span>تحديد مدة سريعة (ابتداءً من اللحظة الحالية):</span>
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(115px, 1fr))", gap: "8px" }}>
                     <button
                       type="button"
                       onClick={() => {
-                        const base = subscriptionExpiryInput ? new Date(subscriptionExpiryInput) : new Date();
-                        const target = new Date(Math.max(base.getTime(), Date.now()));
-                        target.setHours(target.getHours() + 1);
-                        const tzOffset = target.getTimezoneOffset() * 60000;
-                        setSubscriptionExpiryInput((new Date(target - tzOffset)).toISOString().slice(0, 16));
+                        const now = new Date();
+                        now.setHours(now.getHours() + 1);
+                        setSubscriptionExpiryInput(formatDateToLocalInput(now));
                       }}
-                      className="quick-extend-btn"
+                      style={{
+                        padding: "9px 8px",
+                        border: "1.5px solid #e2e8f0",
+                        borderRadius: "10px",
+                        backgroundColor: "#ffffff",
+                        color: "#334155",
+                        fontSize: "0.85rem",
+                        fontWeight: "700",
+                        cursor: "pointer",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
+                        transition: "all 0.15s ease",
+                      }}
                     >
                       + ساعة واحدة
                     </button>
@@ -1379,7 +1548,17 @@ const SuperAdmin = ({ user, onLogout }) => {
                         now.setDate(now.getDate() + 1);
                         setSubscriptionExpiryInput(formatDateToLocalInput(now));
                       }}
-                      className="quick-extend-btn"
+                      style={{
+                        padding: "9px 8px",
+                        border: "1.5px solid #e2e8f0",
+                        borderRadius: "10px",
+                        backgroundColor: "#ffffff",
+                        color: "#334155",
+                        fontSize: "0.85rem",
+                        fontWeight: "700",
+                        cursor: "pointer",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
+                      }}
                     >
                       + يوم واحد
                     </button>
@@ -1390,7 +1569,17 @@ const SuperAdmin = ({ user, onLogout }) => {
                         now.setDate(now.getDate() + 7);
                         setSubscriptionExpiryInput(formatDateToLocalInput(now));
                       }}
-                      className="quick-extend-btn"
+                      style={{
+                        padding: "9px 8px",
+                        border: "1.5px solid #e2e8f0",
+                        borderRadius: "10px",
+                        backgroundColor: "#ffffff",
+                        color: "#334155",
+                        fontSize: "0.85rem",
+                        fontWeight: "700",
+                        cursor: "pointer",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
+                      }}
                     >
                       + أسبوع واحد
                     </button>
@@ -1401,7 +1590,17 @@ const SuperAdmin = ({ user, onLogout }) => {
                         now.setMonth(now.getMonth() + 1);
                         setSubscriptionExpiryInput(formatDateToLocalInput(now));
                       }}
-                      className="quick-extend-btn"
+                      style={{
+                        padding: "9px 8px",
+                        border: "1.5px solid #e2e8f0",
+                        borderRadius: "10px",
+                        backgroundColor: "#ffffff",
+                        color: "#334155",
+                        fontSize: "0.85rem",
+                        fontWeight: "700",
+                        cursor: "pointer",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
+                      }}
                     >
                       + شهر واحد
                     </button>
@@ -1412,7 +1611,17 @@ const SuperAdmin = ({ user, onLogout }) => {
                         now.setMonth(now.getMonth() + 6);
                         setSubscriptionExpiryInput(formatDateToLocalInput(now));
                       }}
-                      className="quick-extend-btn"
+                      style={{
+                        padding: "9px 8px",
+                        border: "1.5px solid #e2e8f0",
+                        borderRadius: "10px",
+                        backgroundColor: "#ffffff",
+                        color: "#334155",
+                        fontSize: "0.85rem",
+                        fontWeight: "700",
+                        cursor: "pointer",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
+                      }}
                     >
                       + 6 أشهر
                     </button>
@@ -1423,7 +1632,17 @@ const SuperAdmin = ({ user, onLogout }) => {
                         now.setFullYear(now.getFullYear() + 1);
                         setSubscriptionExpiryInput(formatDateToLocalInput(now));
                       }}
-                      className="quick-extend-btn"
+                      style={{
+                        padding: "9px 8px",
+                        border: "1.5px solid #e2e8f0",
+                        borderRadius: "10px",
+                        backgroundColor: "#ffffff",
+                        color: "#334155",
+                        fontSize: "0.85rem",
+                        fontWeight: "700",
+                        cursor: "pointer",
+                        boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
+                      }}
                     >
                       + سنة واحدة
                     </button>
@@ -1432,8 +1651,21 @@ const SuperAdmin = ({ user, onLogout }) => {
                       onClick={() => {
                         setSubscriptionExpiryInput("2099-12-31T23:59");
                       }}
-                      className="quick-extend-btn"
-                      style={{ backgroundColor: "rgba(15, 81, 50, 0.1)", color: "#0f5132", fontWeight: "bold" }}
+                      style={{
+                        padding: "9px 8px",
+                        border: "1.5px solid #a7f3d0",
+                        borderRadius: "10px",
+                        backgroundColor: "#ecfdf5",
+                        color: "#065f46",
+                        fontSize: "0.85rem",
+                        fontWeight: "800",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        boxShadow: "0 1px 3px rgba(6, 95, 70, 0.08)",
+                      }}
                     >
                       <FaInfinity aria-hidden="true" /> دائم (مفتوح)
                     </button>
@@ -1443,19 +1675,54 @@ const SuperAdmin = ({ user, onLogout }) => {
                         const past = new Date(Date.now() - 5 * 60 * 1000);
                         setSubscriptionExpiryInput(formatDateToLocalInput(past));
                       }}
-                      className="quick-extend-btn danger-btn"
+                      style={{
+                        padding: "9px 8px",
+                        border: "1.5px solid #fecaca",
+                        borderRadius: "10px",
+                        backgroundColor: "#fef2f2",
+                        color: "#dc2626",
+                        fontSize: "0.85rem",
+                        fontWeight: "800",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: "6px",
+                        boxShadow: "0 1px 3px rgba(220, 38, 38, 0.08)",
+                      }}
                     >
-                      إنهاء الآن ⛔
+                      <FaBan aria-hidden="true" /> إنهاء الآن
                     </button>
                   </div>
                 </div>
 
-                {/* حقل وقت الانتهاء الدقيق يدوي بالروزنامة والوقت */}
-                <div className="form-group" style={{ background: "#f8fafc", padding: "12px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-                  <label htmlFor="expiryInput" style={{ fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", color: "#334155" }}>
-                    <FaCalendarAlt style={{ color: "#b89647" }} />
-                    <span>تحديد تاريخ ووقت انتهاء الاشتراك الدقيق *</span>
+                {/* حقل وقت وتاريخ الانتهاء الدقيق مع المعاينة */}
+                <div
+                  style={{
+                    background: "#f8fafc",
+                    padding: "16px",
+                    borderRadius: "14px",
+                    border: "1.5px solid #cbd5e1",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px",
+                  }}
+                >
+                  <label
+                    htmlFor="expiryInput"
+                    style={{
+                      fontWeight: "800",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      color: "#0f172a",
+                      fontSize: "0.92rem",
+                    }}
+                  >
+                    <FaCalendarAlt style={{ color: "#059669" }} />
+                    <span>تحديد تاريخ ووقت انتهاء الاشتراك الدقيق:</span>
                   </label>
+
                   <input
                     type="datetime-local"
                     id="expiryInput"
@@ -1464,29 +1731,114 @@ const SuperAdmin = ({ user, onLogout }) => {
                     required
                     style={{
                       width: "100%",
-                      padding: "10px 12px",
-                      border: "1.5px solid #b89647",
-                      borderRadius: "6px",
-                      marginTop: "6px",
+                      padding: "12px 14px",
+                      border: "1.5px solid #94a3b8",
+                      borderRadius: "10px",
                       fontFamily: "inherit",
                       fontSize: "1rem",
-                      fontWeight: "600",
+                      fontWeight: "700",
+                      color: "#0f172a",
                       outline: "none",
                       boxSizing: "border-box",
-                      backgroundColor: "white"
+                      backgroundColor: "#ffffff",
+                      boxShadow: "0 2px 5px rgba(0,0,0,0.03)",
                     }}
                   />
+
                   {subscriptionExpiryInput && (
-                    <div style={{ fontSize: "0.82rem", color: "#0f5132", marginTop: "6px", fontWeight: "600" }}>
-                      <FaCalendarAlt aria-hidden="true" /> الموعد المحدد: {new Date(subscriptionExpiryInput).toLocaleString("ar-EG", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                    <div
+                      style={{
+                        fontSize: "0.84rem",
+                        padding: "8px 12px",
+                        borderRadius: "8px",
+                        background: new Date(subscriptionExpiryInput) > new Date() ? "#f0fdf4" : "#fef2f2",
+                        border: `1px solid ${new Date(subscriptionExpiryInput) > new Date() ? "#bbf7d0" : "#fecaca"}`,
+                        color: new Date(subscriptionExpiryInput) > new Date() ? "#166534" : "#991b1b",
+                        fontWeight: "700",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "6px",
+                      }}
+                    >
+                      <FaCalendarAlt aria-hidden="true" />
+                      <span>
+                        الموعد المختار:{" "}
+                        {new Date(subscriptionExpiryInput).toLocaleString("ar-EG", {
+                          weekday: "long",
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}{" "}
+                        ({new Date(subscriptionExpiryInput) > new Date() ? "سيكون الاشتراك نشطاً" : "سيكون الاشتراك منتهياً"})
+                      </span>
                     </div>
                   )}
                 </div>
 
               </div>
-              <div className="modal-footer">
-                <button type="button" onClick={() => setIsSubscriptionModalOpen(false)} className="btn-cancel">إلغاء</button>
-                <button type="submit" className="btn-submit" style={{ backgroundColor: "#b89647", borderColor: "#b89647" }}>حفظ وتعديل</button>
+
+              {/* أزرار الإجراءات */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "1.25rem 1.5rem",
+                  background: "#f8fafc",
+                  borderTop: "1px solid #e2e8f0",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setIsSubscriptionModalOpen(false)}
+                  disabled={isSavingSubscription}
+                  style={{
+                    background: "#ffffff",
+                    color: "#475569",
+                    border: "1.5px solid #cbd5e1",
+                    padding: "10px 22px",
+                    borderRadius: "11px",
+                    fontWeight: "700",
+                    cursor: "pointer",
+                    fontSize: "0.92rem",
+                    transition: "all 0.15s ease",
+                  }}
+                >
+                  إلغاء
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSavingSubscription}
+                  style={{
+                    background: "linear-gradient(135deg, #059669 0%, #047857 100%)",
+                    color: "#ffffff",
+                    border: "none",
+                    padding: "10px 26px",
+                    borderRadius: "11px",
+                    fontWeight: "800",
+                    cursor: isSavingSubscription ? "wait" : "pointer",
+                    fontSize: "0.92rem",
+                    boxShadow: "0 4px 14px rgba(5, 150, 105, 0.35)",
+                    opacity: isSavingSubscription ? 0.75 : 1,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
+                  {isSavingSubscription ? (
+                    <>
+                      <FaSpinner className="spinner" /> جارٍ حفظ وتطبيق التعديل...
+                    </>
+                  ) : (
+                    <>
+                      <FaCheckCircle /> حفظ وتعديل الاشتراك
+                    </>
+                  )}
+                </button>
               </div>
             </form>
           </div>
